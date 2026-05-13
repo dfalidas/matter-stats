@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { BarChart3, BookOpenCheck } from "lucide-react";
 import Link from "next/link";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 import "./globals.css";
 
 const navigation = [
@@ -21,35 +28,46 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body className="font-sans antialiased">
-        <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-6 py-6 lg:px-8">
-          <header className="mb-8 rounded-3xl border border-white/70 bg-white/75 p-4 shadow-soft backdrop-blur">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <Link href="/dashboard" className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-matter text-lg font-black text-white">
-                  M
-                </span>
-                <div>
-                  <p className="text-lg font-semibold tracking-tight text-ink">Matter Stats</p>
-                  <p className="text-sm text-slate-500">Private reading analytics</p>
+        <TooltipProvider delayDuration={150}>
+          <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-6 py-6 lg:px-8">
+            <header className="mb-8 rounded-3xl border border-white/10 bg-card/75 p-4 shadow-soft backdrop-blur">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <Link href="/dashboard" className="flex items-center gap-3">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+                    <BookOpenCheck className="h-5 w-5" aria-hidden />
+                  </span>
+                  <div>
+                    <p className="flex items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
+                      Matter Stats <Badge variant="secondary">Private</Badge>
+                    </p>
+                    <p className="text-sm text-muted-foreground">Dark-first reading analytics</p>
+                  </div>
+                </Link>
+                <div className="flex flex-col gap-4 lg:items-end">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="secondary" size="sm" className="w-fit">
+                        <BarChart3 aria-hidden /> Ready for charts
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Recharts is wired for dashboard visualizations.</TooltipContent>
+                  </Tooltip>
+                  <Separator className="lg:hidden" />
+                  <nav aria-label="Primary navigation" className="flex flex-wrap gap-2">
+                    {navigation.map((item) => (
+                      <Button key={item.href} asChild variant="ghost" size="sm">
+                        <Link href={item.href}>{item.label}</Link>
+                      </Button>
+                    ))}
+                  </nav>
                 </div>
-              </Link>
-              <nav aria-label="Primary navigation" className="flex flex-wrap gap-2">
-                {navigation.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className="rounded-full px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-900 hover:text-white"
-                  >
-                    {item.label}
-                  </Link>
-                ))}
-              </nav>
-            </div>
-          </header>
-          <main className="flex-1">{children}</main>
-        </div>
+              </div>
+            </header>
+            <main className="flex-1">{children}</main>
+          </div>
+        </TooltipProvider>
       </body>
     </html>
   );

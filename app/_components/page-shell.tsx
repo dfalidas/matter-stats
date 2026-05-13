@@ -1,19 +1,33 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { motion } from "framer-motion";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+import { cn } from "@/lib/utils";
 
 type PageShellProps = {
   title: string;
   eyebrow: string;
   description: string;
   children?: ReactNode;
+  className?: string;
 };
 
-export function PageShell({ title, eyebrow, description, children }: PageShellProps) {
+export function PageShell({ title, eyebrow, description, children, className }: PageShellProps) {
   return (
-    <section className="rounded-[2rem] border border-white/70 bg-white/80 p-6 shadow-soft backdrop-blur md:p-10">
-      <p className="text-sm font-semibold uppercase tracking-[0.26em] text-matter">{eyebrow}</p>
-      <h1 className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-ink md:text-6xl">{title}</h1>
-      <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-600">{description}</p>
-      {children ? <div className="mt-8">{children}</div> : null}
-    </section>
+    <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }}>
+      <Card className={cn("overflow-hidden border-white/10 bg-card/80 shadow-soft backdrop-blur", className)}>
+        <CardHeader className="p-6 md:p-10">
+          <p className="text-sm font-semibold uppercase tracking-[0.26em] text-primary">{eyebrow}</p>
+          <CardTitle className="mt-4 max-w-3xl text-4xl font-bold tracking-tight text-foreground md:text-6xl">
+            {title}
+          </CardTitle>
+          <p className="mt-4 max-w-2xl text-lg leading-8 text-muted-foreground">{description}</p>
+        </CardHeader>
+        {children ? <CardContent className="px-6 pb-6 md:px-10 md:pb-10">{children}</CardContent> : null}
+      </Card>
+    </motion.section>
   );
 }
