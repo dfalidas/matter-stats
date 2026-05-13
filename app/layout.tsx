@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { logout } from "@/lib/auth-actions";
 
 import "./globals.css";
 
@@ -55,13 +56,20 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
                     <TooltipContent>Recharts is wired for dashboard visualizations.</TooltipContent>
                   </Tooltip>
                   <Separator className="lg:hidden" />
-                  <nav aria-label="Primary navigation" className="flex flex-wrap gap-2">
-                    {navigation.map((item) => (
-                      <Button key={item.href} asChild variant="ghost" size="sm">
-                        <Link href={item.href}>{item.label}</Link>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <nav aria-label="Primary navigation" className="flex flex-wrap gap-2">
+                      {navigation.map((item) => (
+                        <Button key={item.href} asChild variant="ghost" size="sm">
+                          <Link href={item.href}>{item.label}</Link>
+                        </Button>
+                      ))}
+                    </nav>
+                    <form action={logout}>
+                      <Button type="submit" variant="outline" size="sm">
+                        Log out
                       </Button>
-                    ))}
-                  </nav>
+                    </form>
+                  </div>
                 </div>
               </div>
             </header>

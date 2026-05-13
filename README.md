@@ -4,6 +4,7 @@ Matter Stats is a private, single-user reading analytics dashboard scaffolded wi
 
 ## Routes
 
+- `/login` — private access form for the shared app password
 - `/dashboard` — placeholder analytics overview
 - `/settings` — placeholder dashboard settings
 - `/reports` — placeholder reading reports
@@ -14,6 +15,14 @@ Matter Stats is a private, single-user reading analytics dashboard scaffolded wi
 - `/year-in-reading` — placeholder annual recap
 
 ## Getting started
+
+Set the server-only access password before running the app:
+
+```bash
+APP_ACCESS_PASSWORD=your-private-password
+```
+
+The password is checked only on the server and successful logins receive an HTTP-only secure cookie. Keep `MATTER_API_TOKEN` server-only and never expose it with a `NEXT_PUBLIC_` prefix.
 
 Install dependencies:
 
