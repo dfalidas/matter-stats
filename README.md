@@ -1,29 +1,44 @@
 # Matter Stats
 
-A private, single-user Matter reading analytics dashboard built with Next.js App Router, TypeScript, Tailwind CSS, Recharts, and Supabase PostgreSQL.
+Matter Stats is a private, single-user reading analytics dashboard scaffolded with the Next.js App Router, TypeScript, Tailwind CSS, and ESLint.
 
-## Phase 1 scope
+## Routes
 
-- Dark-first dashboard shell with core routes.
-- HTTP-only cookie app-password gate using `APP_ACCESS_PASSWORD`.
-- Server-only Matter and Supabase credential modules.
-- Typed data models for articles, sessions, highlights, and dashboard summaries.
-- Manual sync API route scaffold with an incremental cursor-shaped result.
-- Supabase schema starter in `supabase/schema.sql`.
+- `/dashboard` — placeholder analytics overview
+- `/settings` — placeholder dashboard settings
+- `/reports` — placeholder reading reports
+- `/sources` — placeholder source analytics
+- `/authors` — placeholder author insights
+- `/tags` — placeholder tag trends
+- `/articles` — placeholder article library
+- `/year-in-reading` — placeholder annual recap
 
-## Local setup
+## Getting started
 
-1. Copy `.env.example` to `.env.local` and fill in the server-side values.
-2. Apply `supabase/schema.sql` to your Supabase project.
-3. Install dependencies and run the app:
+Install dependencies:
 
 ```bash
 npm install
+```
+
+Start the development server:
+
+```bash
 npm run dev
 ```
 
-## Security notes
+Open [http://localhost:3000/dashboard](http://localhost:3000/dashboard) to view the placeholder dashboard.
 
-- `MATTER_API_TOKEN` is only read from server-only modules.
-- `SUPABASE_SERVICE_ROLE_KEY` is only read from server-only modules.
-- Browser routes are protected by an HTTP-only cookie set after the app password succeeds.
+## Checks
+
+Run ESLint:
+
+```bash
+npm run lint
+```
+
+Run the TypeScript compiler without emitting files:
+
+```bash
+npm run typecheck
+```
