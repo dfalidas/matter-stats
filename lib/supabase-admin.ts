@@ -1,0 +1,96 @@
+import "server-only";
+
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+import { serverEnv } from "@/lib/env";
+import type { Database, TablesInsert, TablesUpdate } from "@/lib/supabase-types";
+
+export type SupabaseAdminClient = SupabaseClient<Database>;
+
+let supabaseAdminClient: SupabaseAdminClient | null = null;
+
+export function createSupabaseAdminClient(): SupabaseAdminClient {
+  return createClient<Database>(serverEnv.supabase.url, serverEnv.supabase.serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
+
+export function getSupabaseAdminClient(): SupabaseAdminClient {
+  supabaseAdminClient ??= createSupabaseAdminClient();
+  return supabaseAdminClient;
+}
+
+export async function upsertMatterItems(items: TablesInsert<"matter_items">[]) {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await getSupabaseAdminClient()
+    .from("matter_items")
+    .upsert(items, { onConflict: "id" })
+    .select();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function upsertReadingSessions(sessions: TablesInsert<"reading_sessions">[]) {
+  if (sessions.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await getSupabaseAdminClient()
+    .from("reading_sessions")
+    .upsert(sessions, { onConflict: "id" })
+    .select();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function upsertDailyStats(stats: TablesInsert<"daily_stats">[]) {
+  if (stats.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await getSupabaseAdminClient()
+    .from("daily_stats")
+    .upsert(stats, { onConflict: "date" })
+    .select();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function createSyncRun(syncRun: TablesInsert<"sync_runs">) {
+  const { data, error } = await getSupabaseAdminClient().from("sync_runs").insert(syncRun).select().single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function updateSyncRun(id: string, syncRun: TablesUpdate<"sync_runs">) {
+  const { data, error } = await getSupabaseAdminClient().from("sync_runs").update(syncRun).eq("id", id).select().single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}

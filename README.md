@@ -16,13 +16,18 @@ Matter Stats is a private, single-user reading analytics dashboard scaffolded wi
 
 ## Getting started
 
-Set the server-only access password before running the app:
+Set the required environment variables before running the app:
 
 ```bash
 APP_ACCESS_PASSWORD=your-private-password
+MATTER_API_TOKEN=your-matter-api-token
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-browser-safe-anon-key
 ```
 
-The password is checked only on the server and successful logins receive an HTTP-only secure cookie. Keep `MATTER_API_TOKEN` server-only and never expose it with a `NEXT_PUBLIC_` prefix.
+The password is checked only on the server and successful logins receive an HTTP-only secure cookie. Keep `MATTER_API_TOKEN` and `SUPABASE_SERVICE_ROLE_KEY` server-only and never expose either value with a `NEXT_PUBLIC_` prefix. Client components should use the anon-key browser client in `lib/supabase.ts`, while server actions and sync jobs should use the service-role admin helpers in `lib/supabase-admin.ts`.
 
 Install dependencies:
 
