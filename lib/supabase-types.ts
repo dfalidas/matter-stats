@@ -246,6 +246,8 @@ export type Database = {
           status: string;
           items_synced: number;
           sessions_synced: number;
+          annotations_synced: number;
+          tags_synced: number;
           error_message: string | null;
           checkpoint_timestamp: string | null;
           created_at: string;
@@ -258,6 +260,8 @@ export type Database = {
           status: string;
           items_synced?: number;
           sessions_synced?: number;
+          annotations_synced?: number;
+          tags_synced?: number;
           error_message?: string | null;
           checkpoint_timestamp?: string | null;
           created_at?: string;
@@ -270,6 +274,8 @@ export type Database = {
           status?: string;
           items_synced?: number;
           sessions_synced?: number;
+          annotations_synced?: number;
+          tags_synced?: number;
           error_message?: string | null;
           checkpoint_timestamp?: string | null;
           created_at?: string;
