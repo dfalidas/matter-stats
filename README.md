@@ -43,6 +43,10 @@ npm run dev
 
 Open [http://localhost:3000/dashboard](http://localhost:3000/dashboard) to view the placeholder dashboard.
 
+## Deployment
+
+For production setup instructions, see [Deployment guide: Vercel + Supabase](docs/deployment.md).
+
 ## Checks
 
 Run ESLint:
