@@ -5,25 +5,25 @@
 @layer base {
   :root {
     color-scheme: dark;
-    --background: 222.2 47.4% 5.6%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 47.4% 8%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 47.4% 7%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 4 100% 65%;
-    --primary-foreground: 222.2 47.4% 6%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --background: 220 16% 6%;
+    --foreground: 210 24% 96%;
+    --card: 220 14% 9%;
+    --card-foreground: 210 24% 96%;
+    --popover: 220 14% 8%;
+    --popover-foreground: 210 24% 96%;
+    --primary: 5 94% 66%;
+    --primary-foreground: 220 22% 7%;
+    --secondary: 220 10% 15%;
+    --secondary-foreground: 210 24% 96%;
+    --muted: 220 10% 15%;
+    --muted-foreground: 215 11% 68%;
+    --accent: 220 10% 18%;
+    --accent-foreground: 210 24% 96%;
     --destructive: 0 72.2% 50.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 4 100% 65%;
+    --destructive-foreground: 210 24% 96%;
+    --border: 220 10% 18%;
+    --input: 220 10% 18%;
+    --ring: 5 94% 66%;
     --radius: 1rem;
   }
 
@@ -45,8 +45,9 @@
     min-height: 100vh;
     margin: 0;
     background:
-      radial-gradient(circle at top left, hsl(var(--primary) / 0.2), transparent 32rem),
-      radial-gradient(circle at 80% 10%, rgb(37 99 235 / 0.16), transparent 28rem),
+      radial-gradient(circle at top left, hsl(var(--primary) / 0.18), transparent 30rem),
+      radial-gradient(circle at 80% 0%, rgb(148 163 184 / 0.1), transparent 34rem),
+      linear-gradient(135deg, rgb(18 20 23 / 0.96), rgb(8 9 11 / 0.98) 48%, rgb(16 17 20 / 0.96)),
       hsl(var(--background));
     color: hsl(var(--foreground));
   }
