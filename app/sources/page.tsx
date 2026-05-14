@@ -3,6 +3,8 @@ import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { getSourceRanking, normalizeSourcePeriod } from "@/lib/sources-service";
 import { SourcesRanking } from "./sources-ranking";
 
+export const dynamic = "force-dynamic";
+
 type SourcesPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };

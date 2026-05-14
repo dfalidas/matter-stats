@@ -18,6 +18,8 @@ const MATTER_ACCOUNT_URL = "https://api.getmatter.com/public/v1/me";
 
 const sensitiveServerCredentialKeys = ["MATTER_API_TOKEN", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const;
 
+export const dynamic = "force-dynamic";
+
 type ConnectionState = "connected" | "warning" | "error" | "not-configured";
 
 type MatterConnectionStatus = {

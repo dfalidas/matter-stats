@@ -3,6 +3,8 @@ import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { getTagRanking, normalizeTagPeriod } from "@/lib/tags-service";
 import { TagsRanking } from "./tags-ranking";
 
+export const dynamic = "force-dynamic";
+
 type TagsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };

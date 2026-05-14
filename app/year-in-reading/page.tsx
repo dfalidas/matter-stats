@@ -6,6 +6,8 @@ import { YearInReadingOverview } from "./year-in-reading-overview";
 
 const FALLBACK_YEAR = new Date().getFullYear();
 
+export const dynamic = "force-dynamic";
+
 type YearInReadingResult =
   | {
       ok: true;

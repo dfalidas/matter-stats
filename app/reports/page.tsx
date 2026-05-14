@@ -5,6 +5,8 @@ import { getReadingReport, REPORT_PERIODS, type ReportPeriod } from "@/lib/repor
 
 const DEFAULT_REPORT_PERIOD: ReportPeriod = "weekly";
 
+export const dynamic = "force-dynamic";
+
 type ReportsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };

@@ -3,6 +3,8 @@ import { ArticlesLibrary } from "./articles-library";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { getArticleList, normalizeArticlePage, normalizeArticlePeriod, normalizeArticleTextFilter } from "@/lib/articles-service";
 
+export const dynamic = "force-dynamic";
+
 type ArticlesPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };

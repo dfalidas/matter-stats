@@ -23,6 +23,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getArticleDetail } from "@/lib/articles-service";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 
+export const dynamic = "force-dynamic";
+
 type ArticleDetailPageProps = {
   params: Promise<{ id: string }>;
 };

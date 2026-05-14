@@ -3,6 +3,8 @@ import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { getAuthorRanking, normalizeAuthorPeriod } from "@/lib/authors-service";
 import { AuthorsRanking } from "./authors-ranking";
 
+export const dynamic = "force-dynamic";
+
 type AuthorsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
