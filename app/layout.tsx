@@ -20,7 +20,7 @@ const navigation = [
   { href: "/articles", label: "Articles" },
   { href: "/year-in-reading", label: "Year in Reading" },
   { href: "/settings", label: "Settings" },
-];
+] as const;
 
 export const metadata: Metadata = {
   title: "Matter Stats",
