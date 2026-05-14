@@ -3,11 +3,14 @@
 import { useTransition } from "react";
 import { motion } from "framer-motion";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { BarChart3, BookOpen, CalendarDays, Clock, FileText, Newspaper, Sparkles, Timer, Users } from "lucide-react";
+import { BarChart3, BookOpen, CalendarDays, Clock, FileText, Newspaper, Sparkles, Tags, Timer, TrendingDown, TrendingUp, Users } from "lucide-react";
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
   XAxis,
@@ -41,6 +44,14 @@ type DistributionPoint = {
   minutes: number;
   words: number;
   sessions: number;
+};
+
+type MixPoint = {
+  name: string;
+  minutes: number;
+  words: number;
+  articles: number;
+  fill: string;
 };
 
 const periodOptions = [
@@ -92,8 +103,11 @@ function ReportContent({ report }: { report: ReadingReport }) {
   const isEmpty = isReportEmpty(report);
   const distributionData = buildDistributionData(metrics.heatmap, report.period);
   const rangeLabel = formatReportRange(report);
-  const title = report.period === "weekly" ? `Week of ${rangeLabel}` : `${capitalize(report.period)} report`;
+  const title = getReportTitle(report);
   const insight = buildInsightSentence(metrics.heatmap, report.period);
+  const comparisonLabel = getComparisonLabel(report);
+  const activeDays = buildMostActiveDays(metrics.heatmap);
+  const mixData = buildTopicSourceMix(report);
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, ease: "easeOut" }} className="space-y-5">
@@ -114,31 +128,39 @@ function ReportContent({ report }: { report: ReadingReport }) {
       {isEmpty ? <EmptyState title={`No reading in this ${periodNouns[report.period]} yet`} description="Sync Matter or choose a different period to populate report cards, charts, rankings, and timelines." icon={Sparkles} action={<SyncMatterButton />} /> : null}
 
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(210px,1fr))]">
-        <MetricCard label="Total Reading Time" value={formatDuration(metrics.totals.totalReadingTimeSeconds)} helper="Across synced reading sessions" icon={Clock} accent="violet" />
-        <MetricCard label="Words Read" value={formatInteger(metrics.totals.wordsRead)} helper="Estimated from Matter sessions" icon={BookOpen} accent="blue" />
-        <MetricCard label="Sessions" value={formatInteger(metrics.totals.sessionsCount)} helper={`Avg ${formatDuration(metrics.totals.averageSessionLengthSeconds)}`} icon={Timer} accent="amber" />
-        <MetricCard label="Articles" value={formatInteger(metrics.totals.articlesRead)} helper="Unique Matter items read" icon={Newspaper} accent="red" />
+        <MetricCard label="Total Reading Time" value={formatDuration(metrics.totals.totalReadingTimeSeconds)} helper={comparisonLabel} trend={<ComparisonTrend value={metrics.comparison.delta.totalReadingTimePercentChange} />} icon={Clock} accent="violet" />
+        <MetricCard label="Words Read" value={formatInteger(metrics.totals.wordsRead)} helper={comparisonLabel} trend={<ComparisonTrend value={metrics.comparison.delta.wordsReadPercentChange} />} icon={BookOpen} accent="blue" />
+        <MetricCard label="Sessions" value={formatInteger(metrics.totals.sessionsCount)} helper={`Avg ${formatDuration(metrics.totals.averageSessionLengthSeconds)} • ${comparisonLabel}`} trend={<ComparisonTrend value={metrics.comparison.delta.sessionsCountPercentChange} />} icon={Timer} accent="amber" />
+        <MetricCard label="Articles" value={formatInteger(metrics.totals.articlesRead)} helper={comparisonLabel} trend={<ComparisonTrend value={metrics.comparison.delta.articlesReadPercentChange} />} icon={Newspaper} accent="red" />
       </div>
 
+      <ChartCard title={report.period === "monthly" ? "Month-over-month comparison" : "Previous period comparison"} description={`Compared with ${formatComparisonRange(report)}.`}>
+        <div className="grid gap-3 md:grid-cols-4">
+          <ComparisonStat label="Reading time" current={formatDuration(metrics.totals.totalReadingTimeSeconds)} previous={formatDuration(metrics.comparison.totals.totalReadingTimeSeconds)} change={metrics.comparison.delta.totalReadingTimePercentChange} />
+          <ComparisonStat label="Words" current={formatInteger(metrics.totals.wordsRead)} previous={formatInteger(metrics.comparison.totals.wordsRead)} change={metrics.comparison.delta.wordsReadPercentChange} />
+          <ComparisonStat label="Articles" current={formatInteger(metrics.totals.articlesRead)} previous={formatInteger(metrics.comparison.totals.articlesRead)} change={metrics.comparison.delta.articlesReadPercentChange} />
+          <ComparisonStat label="Sessions" current={formatInteger(metrics.totals.sessionsCount)} previous={formatInteger(metrics.comparison.totals.sessionsCount)} change={metrics.comparison.delta.sessionsCountPercentChange} />
+        </div>
+      </ChartCard>
+
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.95fr)]">
-        <ChartCard title="Daily Distribution" description="Minutes read per day in this report window." badge={capitalize(report.period)} contentClassName="h-80">
+        <ChartCard title="Daily Trend" description="Minutes read each day in this report window." badge={capitalize(report.period)} contentClassName="h-80">
           {distributionData.some((day) => day.minutes > 0 || day.words > 0) ? (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={distributionData} margin={{ top: 10, right: 18, left: 0, bottom: 0 }}>
+              <LineChart data={distributionData} margin={{ top: 10, right: 18, left: 0, bottom: 0 }}>
                 <CartesianGrid stroke="hsl(var(--dashboard-border))" strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="label" stroke="hsl(var(--dashboard-muted))" tickLine={false} axisLine={false} minTickGap={14} />
                 <YAxis stroke="hsl(var(--dashboard-muted))" tickLine={false} axisLine={false} width={36} />
                 <RechartsTooltip
-                  cursor={{ fill: "hsl(var(--muted) / 0.35)" }}
                   contentStyle={{ background: "hsl(var(--dashboard-card))", border: "1px solid hsl(var(--dashboard-border))", borderRadius: "16px", color: "hsl(var(--dashboard-text))" }}
                   formatter={(value, name) => [name === "minutes" ? `${value} min` : value, name === "minutes" ? "Reading time" : name]}
                   labelFormatter={(label) => `Date: ${label}`}
                 />
-                <Bar dataKey="minutes" fill="hsl(var(--accent-red))" radius={[10, 10, 4, 4]} />
-              </BarChart>
+                <Line type="monotone" dataKey="minutes" stroke="hsl(var(--accent-red))" strokeWidth={3} dot={{ r: 3, fill: "hsl(var(--accent-red))" }} activeDot={{ r: 5 }} />
+              </LineChart>
             </ResponsiveContainer>
           ) : (
-            <EmptyState title="No daily distribution" description="Reading activity will appear here after sessions are synced." className="h-full" icon={BarChart3} />
+            <EmptyState title="No daily trend" description="Reading activity will appear here after sessions are synced." className="h-full" icon={BarChart3} />
           )}
         </ChartCard>
 
@@ -151,6 +173,41 @@ function ReportContent({ report }: { report: ReadingReport }) {
             </div>
           ) : (
             <EmptyState title="No sessions yet" description="Synced sessions for this period will be listed as a timeline." icon={Clock} />
+          )}
+        </ChartCard>
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <ChartCard title="Topic / Source Mix" description="Blend of tags and sources by reading time." action={<Tags className="h-5 w-5 text-dashboard-muted" aria-hidden />}>
+          {mixData.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-[13rem_minmax(0,1fr)] md:items-center">
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={mixData} dataKey="minutes" nameKey="name" innerRadius={54} outerRadius={82} paddingAngle={3}>
+                      {mixData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip
+                      contentStyle={{ background: "hsl(var(--dashboard-card))", border: "1px solid hsl(var(--dashboard-border))", borderRadius: "16px", color: "hsl(var(--dashboard-text))" }}
+                      formatter={(value) => [`${value} min`, "Reading time"]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <RankingList items={mixData.map((item) => ({ id: item.name, label: item.name, value: item.minutes, helper: `${formatInteger(item.articles)} articles • ${formatInteger(item.words)} words`, accent: "blue" }))} maxValue={Math.max(...mixData.map((item) => item.minutes), 1)} />
+            </div>
+          ) : (
+            <EmptyState title="No topic or source mix" description="Tags and sources appear here when synced Matter items include metadata." icon={Tags} />
+          )}
+        </ChartCard>
+
+        <ChartCard title="Most Active Days" description={`Days with the most reading this ${periodNouns[report.period]}.`} action={<CalendarDays className="h-5 w-5 text-dashboard-muted" aria-hidden />}>
+          {activeDays.length > 0 ? (
+            <RankingList items={activeDays.map((day) => ({ id: day.date, label: formatDateLabel(day.date, "medium"), value: Math.round(day.readingTimeSeconds / 60), helper: `${formatInteger(day.wordsRead)} words • ${formatInteger(day.sessionsCount)} sessions`, accent: "red" }))} maxValue={Math.max(...activeDays.map((day) => Math.round(day.readingTimeSeconds / 60)), 1)} />
+          ) : (
+            <EmptyState title="No active days yet" description="Your most active days will appear after monthly reading sessions sync." icon={CalendarDays} />
           )}
         </ChartCard>
       </div>
@@ -173,7 +230,7 @@ function ReportContent({ report }: { report: ReadingReport }) {
         </ChartCard>
       </div>
 
-      <ChartCard title="Best Longform Reads" description="Longest reads in the selected report period, ranked by estimated words read.">
+      <ChartCard title={report.period === "monthly" ? "Best Reads This Month" : "Best Longform Reads"} description="Longest reads in the selected report period, ranked by estimated words read.">
         {report.longformReads.length > 0 ? (
           <div className="grid gap-3 md:grid-cols-2">
             {report.longformReads.map((read) => (
@@ -185,6 +242,31 @@ function ReportContent({ report }: { report: ReadingReport }) {
         )}
       </ChartCard>
     </motion.div>
+  );
+}
+
+function ComparisonTrend({ value }: { value: number | null }) {
+  const Icon = value !== null && value < 0 ? TrendingDown : TrendingUp;
+  const color = value === null || value === 0 ? "text-dashboard-muted" : value > 0 ? "text-emerald-400" : "text-amber-400";
+
+  return (
+    <span className={`inline-flex items-center gap-1 ${color}`}>
+      {value === null ? null : <Icon className="h-3.5 w-3.5" aria-hidden />}
+      {formatPercentChange(value)}
+    </span>
+  );
+}
+
+function ComparisonStat({ label, current, previous, change }: { label: string; current: string; previous: string; change: number | null }) {
+  return (
+    <div className="rounded-2xl border border-dashboard-border bg-background/35 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-dashboard-muted">{label}</p>
+        <ComparisonTrend value={change} />
+      </div>
+      <p className="mt-3 text-2xl font-bold tracking-tight text-dashboard-text">{current}</p>
+      <p className="mt-1 text-xs text-dashboard-muted">Previous: {previous}</p>
+    </div>
   );
 }
 
@@ -218,6 +300,36 @@ function buildDistributionData(days: ReadingHeatmapDay[], period: ReportPeriod):
     }));
 }
 
+const mixColors = [
+  "hsl(var(--accent-red))",
+  "hsl(var(--accent-blue))",
+  "hsl(var(--accent-violet))",
+  "hsl(var(--accent-amber))",
+  "hsl(var(--primary))",
+  "hsl(var(--muted-foreground))",
+];
+
+function buildTopicSourceMix(report: ReadingReport): MixPoint[] {
+  const buckets = [...report.metrics.topTags, ...report.metrics.topSources].slice(0, 6);
+
+  return buckets
+    .map((bucket, index) => ({
+      name: bucket.name,
+      minutes: Math.max(1, Math.round(bucket.readingTimeSeconds / 60)),
+      words: bucket.wordsRead,
+      articles: bucket.articlesRead,
+      fill: mixColors[index % mixColors.length],
+    }))
+    .filter((bucket) => bucket.minutes > 0 || bucket.words > 0 || bucket.articles > 0);
+}
+
+function buildMostActiveDays(days: ReadingHeatmapDay[]) {
+  return days
+    .filter((day) => day.readingTimeSeconds > 0 || day.wordsRead > 0 || day.sessionsCount > 0)
+    .sort((a, b) => b.readingTimeSeconds - a.readingTimeSeconds || b.wordsRead - a.wordsRead || b.sessionsCount - a.sessionsCount)
+    .slice(0, 5);
+}
+
 function buildInsightSentence(days: ReadingHeatmapDay[], period: ReportPeriod) {
   const activeDays = days.filter((day) => day.readingTimeSeconds > 0 || day.wordsRead > 0 || day.sessionsCount > 0).sort((a, b) => b.readingTimeSeconds - a.readingTimeSeconds || b.wordsRead - a.wordsRead);
 
@@ -239,6 +351,53 @@ function buildInsightSentence(days: ReadingHeatmapDay[], period: ReportPeriod) {
 
 function isReportEmpty(report: ReadingReport) {
   return report.metrics.totals.totalReadingTimeSeconds === 0 && report.metrics.totals.wordsRead === 0 && report.metrics.totals.sessionsCount === 0 && report.timeline.length === 0;
+}
+
+function getReportTitle(report: ReadingReport) {
+  if (report.period === "monthly" && report.metrics.range.startDate) {
+    return formatMonthTitle(report.metrics.range.startDate);
+  }
+
+  if (report.period === "weekly") {
+    return `Week of ${formatReportRange(report)}`;
+  }
+
+  return `${capitalize(report.period)} report`;
+}
+
+function getComparisonLabel(report: ReadingReport) {
+  return report.period === "monthly" ? "vs previous month" : "vs previous period";
+}
+
+function formatComparisonRange(report: ReadingReport) {
+  const range = report.metrics.comparison.range;
+
+  if (!range?.startDate) {
+    return "the previous period";
+  }
+
+  const start = formatDateLabel(range.startDate, "medium");
+  const end = formatDateLabel(getInclusiveEndDate(range.endDate), "medium");
+
+  return report.period === "monthly" ? formatMonthTitle(range.startDate) : `${start} – ${end}`;
+}
+
+function formatMonthTitle(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(date);
+}
+
+function formatPercentChange(value: number | null) {
+  if (value === null) {
+    return "New";
+  }
+
+  if (value === 0) {
+    return "No change";
+  }
+
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${Math.round(value)}%`;
 }
 
 function formatReportRange(report: ReadingReport) {

@@ -75,6 +75,17 @@ test("calculates previous equivalent period for finite ranges", () => {
   assert.equal(previousRange?.endDate, "2026-05-11");
 });
 
+
+test("calculates previous calendar month for month-over-month comparisons", () => {
+  const range = resolveMetricsDateRange({ preset: "month", now: "2026-05-14T12:00:00Z", timezone: "Europe/London" });
+  const previousRange = getPreviousEquivalentRange(range);
+
+  assert.equal(range.startDate, "2026-05-01");
+  assert.equal(range.endDate, "2026-06-01");
+  assert.equal(previousRange?.startDate, "2026-04-01");
+  assert.equal(previousRange?.endDate, "2026-05-01");
+});
+
 test("returns typed zero metrics for an empty data set", async () => {
   const metrics = await getReadingMetrics(emptyClient, {
     preset: "today",
