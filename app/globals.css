@@ -9,6 +9,16 @@
     --foreground: 210 24% 96%;
     --card: 220 14% 9%;
     --card-foreground: 210 24% 96%;
+    --dashboard-background: 220 16% 6%;
+    --dashboard-card: 220 14% 10%;
+    --dashboard-border: 220 10% 18%;
+    --dashboard-text: 210 24% 96%;
+    --dashboard-muted: 215 11% 68%;
+    --accent-red: 5 94% 66%;
+    --accent-violet: 262 83% 70%;
+    --accent-blue: 199 89% 64%;
+    --success: 149 63% 48%;
+    --warning: 38 92% 58%;
     --popover: 220 14% 8%;
     --popover-foreground: 210 24% 96%;
     --primary: 5 94% 66%;
@@ -21,6 +31,11 @@
     --accent-foreground: 210 24% 96%;
     --destructive: 0 72.2% 50.6%;
     --destructive-foreground: 210 24% 96%;
+    --chart-1: var(--accent-red);
+    --chart-2: var(--accent-violet);
+    --chart-3: var(--accent-blue);
+    --chart-4: var(--success);
+    --chart-5: var(--warning);
     --border: 220 10% 18%;
     --input: 220 10% 18%;
     --ring: 5 94% 66%;
@@ -45,10 +60,10 @@
     min-height: 100vh;
     margin: 0;
     background:
-      radial-gradient(circle at top left, hsl(var(--primary) / 0.18), transparent 30rem),
-      radial-gradient(circle at 80% 0%, rgb(148 163 184 / 0.1), transparent 34rem),
-      linear-gradient(135deg, rgb(18 20 23 / 0.96), rgb(8 9 11 / 0.98) 48%, rgb(16 17 20 / 0.96)),
-      hsl(var(--background));
+      radial-gradient(circle at top left, hsl(var(--accent-red) / 0.18), transparent 30rem),
+      radial-gradient(circle at 80% 0%, hsl(var(--accent-violet) / 0.12), transparent 34rem),
+      linear-gradient(135deg, hsl(var(--dashboard-card) / 0.96), hsl(var(--dashboard-background) / 0.98) 48%, rgb(16 17 20 / 0.96)),
+      hsl(var(--dashboard-background));
     color: hsl(var(--foreground));
   }
 
