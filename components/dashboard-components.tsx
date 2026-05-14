@@ -1,19 +1,41 @@
 "use client";
 
 import type { ComponentType, HTMLAttributes, ReactNode } from "react";
-import { AlertTriangle, ArrowRight, FileText, Loader2, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  FileText,
+  HelpCircle,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, type ButtonProps } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export type Accent = "red" | "violet" | "blue" | "green" | "amber";
 
-const accentClasses: Record<Accent, { text: string; bg: string; border: string; fill: string }> = {
+const accentClasses: Record<
+  Accent,
+  { text: string; bg: string; border: string; fill: string }
+> = {
   red: {
     text: "text-accent-red",
     bg: "bg-accent-red/10",
@@ -46,7 +68,10 @@ const accentClasses: Record<Accent, { text: string; bg: string; border: string; 
   },
 };
 
-export type DashboardIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
+export type DashboardIcon = ComponentType<{
+  className?: string;
+  "aria-hidden"?: boolean;
+}>;
 
 export type MetricCardProps = HTMLAttributes<HTMLDivElement> & {
   label: ReactNode;
@@ -55,29 +80,86 @@ export type MetricCardProps = HTMLAttributes<HTMLDivElement> & {
   icon?: DashboardIcon;
   accent?: Accent;
   trend?: ReactNode;
+  tooltip?: ReactNode;
 };
 
-export function MetricCard({ label, value, helper, icon: Icon, accent = "red", trend, className, ...props }: MetricCardProps) {
+export function MetricCard({
+  label,
+  value,
+  helper,
+  icon: Icon,
+  accent = "red",
+  trend,
+  tooltip,
+  className,
+  ...props
+}: MetricCardProps) {
   const styles = accentClasses[accent];
 
   return (
-    <Card className={cn("border-dashboard-border bg-dashboard-card/80 shadow-soft backdrop-blur", className)} {...props}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-        <CardDescription className="text-dashboard-muted">{label}</CardDescription>
+    <Card
+      className={cn(
+        "group border-dashboard-border bg-dashboard-card/80 shadow-soft backdrop-blur transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-dashboard-card/95 hover:shadow-lg",
+        className,
+      )}
+      {...props}
+    >
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-5 pb-3">
+        <div className="flex items-center gap-1.5">
+          <CardDescription className="text-dashboard-muted">
+            {label}
+          </CardDescription>
+          {tooltip ? <MetricTooltip>{tooltip}</MetricTooltip> : null}
+        </div>
         {Icon ? (
-          <span className={cn("rounded-xl border p-2", styles.border, styles.bg)}>
+          <span
+            className={cn(
+              "rounded-xl border p-2 transition-transform duration-200 group-hover:scale-105",
+              styles.border,
+              styles.bg,
+            )}
+          >
             <Icon className={cn("h-4 w-4", styles.text)} aria-hidden />
           </span>
         ) : null}
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-5 pt-0">
         <div className="flex items-end justify-between gap-3">
-          <p className="text-3xl font-bold tracking-tight text-dashboard-text">{value}</p>
-          {trend ? <div className="text-sm font-medium text-dashboard-muted">{trend}</div> : null}
+          <p className="text-2xl font-bold tracking-tight text-dashboard-text sm:text-3xl">
+            {value}
+          </p>
+          {trend ? (
+            <div className="text-sm font-medium text-dashboard-muted">
+              {trend}
+            </div>
+          ) : null}
         </div>
-        {helper ? <p className="mt-2 text-sm text-dashboard-muted">{helper}</p> : null}
+        {helper ? (
+          <p className="mt-2 text-sm text-dashboard-muted">{helper}</p>
+        ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function MetricTooltip({ children }: { children: ReactNode }) {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="rounded-full text-dashboard-muted transition-colors hover:text-dashboard-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Metric details"
+          >
+            <HelpCircle className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-56 border border-dashboard-border bg-dashboard-card text-dashboard-text shadow-soft">
+          {children}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -90,22 +172,50 @@ export type ChartCardProps = HTMLAttributes<HTMLDivElement> & {
   contentClassName?: string;
 };
 
-export function ChartCard({ title, description, badge, action, children, className, contentClassName, ...props }: ChartCardProps) {
+export function ChartCard({
+  title,
+  description,
+  badge,
+  action,
+  children,
+  className,
+  contentClassName,
+  ...props
+}: ChartCardProps) {
   return (
-    <Card className={cn("border-dashboard-border bg-dashboard-card/80 shadow-soft backdrop-blur", className)} {...props}>
-      <CardHeader>
+    <Card
+      className={cn(
+        "border-dashboard-border bg-dashboard-card/80 shadow-soft backdrop-blur transition-all duration-200 hover:border-primary/25 hover:bg-dashboard-card/95 hover:shadow-lg",
+        className,
+      )}
+      {...props}
+    >
+      <CardHeader className="p-5 pb-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <CardTitle className="text-dashboard-text">{title}</CardTitle>
-            {description ? <CardDescription className="mt-1 text-dashboard-muted">{description}</CardDescription> : null}
+            {description ? (
+              <CardDescription className="mt-1 text-dashboard-muted">
+                {description}
+              </CardDescription>
+            ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {badge ? <Badge variant="outline" className="border-dashboard-border text-dashboard-muted">{badge}</Badge> : null}
+            {badge ? (
+              <Badge
+                variant="outline"
+                className="border-dashboard-border text-dashboard-muted"
+              >
+                {badge}
+              </Badge>
+            ) : null}
             {action}
           </div>
         </div>
       </CardHeader>
-      <CardContent className={contentClassName}>{children}</CardContent>
+      <CardContent className={cn("p-5 pt-0", contentClassName)}>
+        {children}
+      </CardContent>
     </Card>
   );
 }
@@ -123,8 +233,14 @@ export type RankingListProps = HTMLAttributes<HTMLDivElement> & {
   maxValue?: number;
 };
 
-export function RankingList({ items, maxValue, className, ...props }: RankingListProps) {
-  const peak = maxValue ?? Math.max(...items.map((item) => Number(item.value) || 0), 1);
+export function RankingList({
+  items,
+  maxValue,
+  className,
+  ...props
+}: RankingListProps) {
+  const peak =
+    maxValue ?? Math.max(...items.map((item) => Number(item.value) || 0), 1);
 
   return (
     <div className={cn("space-y-3", className)} {...props}>
@@ -134,21 +250,35 @@ export function RankingList({ items, maxValue, className, ...props }: RankingLis
         const width = `${Math.max(6, Math.min(100, (numericValue / peak) * 100))}%`;
 
         return (
-          <div key={item.id} className="rounded-2xl border border-dashboard-border bg-background/35 p-3">
+          <div
+            key={item.id}
+            className="rounded-2xl border border-dashboard-border bg-background/35 p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-muted/25 hover:shadow-sm"
+          >
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-dashboard-muted">
                   {index + 1}
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-dashboard-text">{item.label}</p>
-                  {item.helper ? <p className="truncate text-xs text-dashboard-muted">{item.helper}</p> : null}
+                  <p className="truncate text-sm font-medium text-dashboard-text">
+                    {item.label}
+                  </p>
+                  {item.helper ? (
+                    <p className="truncate text-xs text-dashboard-muted">
+                      {item.helper}
+                    </p>
+                  ) : null}
                 </div>
               </div>
-              <span className={cn("text-sm font-semibold", accent.text)}>{item.value}</span>
+              <span className={cn("text-sm font-semibold", accent.text)}>
+                {item.value}
+              </span>
             </div>
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted/70">
-              <div className={cn("h-full rounded-full", accent.fill)} style={{ width }} />
+              <div
+                className={cn("h-full rounded-full", accent.fill)}
+                style={{ width }}
+              />
             </div>
           </div>
         );
@@ -166,13 +296,28 @@ export type ArticleRowProps = HTMLAttributes<HTMLDivElement> & {
   href?: string;
 };
 
-export function ArticleRow({ title, source, meta, status, tags = [], href, className, ...props }: ArticleRowProps) {
+export function ArticleRow({
+  title,
+  source,
+  meta,
+  status,
+  tags = [],
+  href,
+  className,
+  ...props
+}: ArticleRowProps) {
   const content = (
     <>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="truncate text-sm font-semibold text-dashboard-text">{title}</h3>
-          {status ? <Badge className="bg-accent-blue/10 text-accent-blue hover:bg-accent-blue/15">{status}</Badge> : null}
+          <h3 className="truncate text-sm font-semibold text-dashboard-text">
+            {title}
+          </h3>
+          {status ? (
+            <Badge className="bg-accent-blue/10 text-accent-blue hover:bg-accent-blue/15">
+              {status}
+            </Badge>
+          ) : null}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-dashboard-muted">
           {source ? <span>{source}</span> : null}
@@ -182,25 +327,38 @@ export function ArticleRow({ title, source, meta, status, tags = [], href, class
         {tags.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {tags.map((tag, index) => (
-              <Badge key={index} variant="secondary" className="bg-muted/70 text-dashboard-muted">
+              <Badge
+                key={index}
+                variant="secondary"
+                className="bg-muted/70 text-dashboard-muted"
+              >
                 {tag}
               </Badge>
             ))}
           </div>
         ) : null}
       </div>
-      {href ? <ArrowRight className="h-4 w-4 shrink-0 text-dashboard-muted" aria-hidden /> : null}
+      {href ? (
+        <ArrowRight
+          className="h-4 w-4 shrink-0 text-dashboard-muted transition-transform duration-200 group-hover:translate-x-0.5"
+          aria-hidden
+        />
+      ) : null}
     </>
   );
 
   const classes = cn(
-    "flex items-center gap-3 rounded-2xl border border-dashboard-border bg-background/35 p-4 transition-colors hover:bg-muted/35",
-    className
+    "group flex items-center gap-3 rounded-2xl border border-dashboard-border bg-background/35 p-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-muted/35 hover:shadow-sm",
+    className,
   );
 
   if (href) {
     return (
-      <a href={href} className={classes} {...(props as HTMLAttributes<HTMLAnchorElement>)}>
+      <a
+        href={href}
+        className={classes}
+        {...(props as HTMLAttributes<HTMLAnchorElement>)}
+      >
         {content}
       </a>
     );
@@ -226,7 +384,13 @@ export type HeatmapGridProps = HTMLAttributes<HTMLDivElement> & {
   accent?: Accent;
 };
 
-export function HeatmapGrid({ items, maxValue, accent = "red", className, ...props }: HeatmapGridProps) {
+export function HeatmapGrid({
+  items,
+  maxValue,
+  accent = "red",
+  className,
+  ...props
+}: HeatmapGridProps) {
   const peak = maxValue ?? Math.max(...items.map((item) => item.value), 1);
   const accentVariable = {
     red: "var(--accent-red)",
@@ -239,14 +403,17 @@ export function HeatmapGrid({ items, maxValue, accent = "red", className, ...pro
   return (
     <div className={cn("grid grid-cols-7 gap-2", className)} {...props}>
       {items.map((item) => {
-        const intensity = item.value <= 0 ? 0.08 : Math.min(0.95, 0.18 + (item.value / peak) * 0.7);
+        const intensity =
+          item.value <= 0
+            ? 0.08
+            : Math.min(0.95, 0.18 + (item.value / peak) * 0.7);
 
         return (
           <div
             key={item.id}
             title={`${item.label}: ${item.value}`}
             aria-label={item.ariaLabel ?? `${item.label}: ${item.value}`}
-            className="aspect-square rounded-lg border border-dashboard-border"
+            className="aspect-square rounded-lg border border-dashboard-border transition-all duration-200 hover:scale-110 hover:border-primary/30 hover:shadow-sm"
             style={{ backgroundColor: `hsl(${accentVariable} / ${intensity})` }}
           />
         );
@@ -268,12 +435,25 @@ export type PeriodSelectorProps = {
   label?: string;
 };
 
-export function PeriodSelector({ value, options, onValueChange, className, label = "Select period" }: PeriodSelectorProps) {
+export function PeriodSelector({
+  value,
+  options,
+  onValueChange,
+  className,
+  label = "Select period",
+}: PeriodSelectorProps) {
   return (
     <Tabs value={value} onValueChange={onValueChange} className={className}>
-      <TabsList aria-label={label} className="bg-muted/70">
+      <TabsList
+        aria-label={label}
+        className="h-auto flex-wrap justify-start gap-1 bg-muted/70 p-1"
+      >
         {options.map((option) => (
-          <TabsTrigger key={option.value} value={option.value} className="data-[state=active]:bg-card">
+          <TabsTrigger
+            key={option.value}
+            value={option.value}
+            className="rounded-lg px-3 py-1.5 text-xs transition-all duration-200 hover:bg-card/70 data-[state=active]:bg-card data-[state=active]:shadow-sm sm:text-sm"
+          >
             {option.label}
           </TabsTrigger>
         ))}
@@ -288,10 +468,21 @@ export type SyncButtonProps = ButtonProps & {
   idleLabel?: ReactNode;
 };
 
-export function SyncButton({ isSyncing = false, syncingLabel = "Syncing...", idleLabel = "Sync", disabled, children, ...props }: SyncButtonProps) {
+export function SyncButton({
+  isSyncing = false,
+  syncingLabel = "Syncing...",
+  idleLabel = "Sync",
+  disabled,
+  children,
+  ...props
+}: SyncButtonProps) {
   return (
     <Button disabled={disabled || isSyncing} {...props}>
-      {isSyncing ? <Loader2 className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />}
+      {isSyncing ? (
+        <Loader2 className="animate-spin" aria-hidden />
+      ) : (
+        <RefreshCw aria-hidden />
+      )}
       {children ?? (isSyncing ? syncingLabel : idleLabel)}
     </Button>
   );
@@ -304,14 +495,33 @@ export type EmptyStateProps = HTMLAttributes<HTMLDivElement> & {
   action?: ReactNode;
 };
 
-export function EmptyState({ title, description, icon: Icon = FileText, action, className, ...props }: EmptyStateProps) {
+export function EmptyState({
+  title,
+  description,
+  icon: Icon = FileText,
+  action,
+  className,
+  ...props
+}: EmptyStateProps) {
   return (
-    <div className={cn("rounded-3xl border border-dashed border-dashboard-border bg-dashboard-card/50 p-8 text-center", className)} {...props}>
+    <div
+      className={cn(
+        "rounded-3xl border border-dashed border-dashboard-border bg-dashboard-card/50 p-8 text-center",
+        className,
+      )}
+      {...props}
+    >
       <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-dashboard-muted">
         <Icon className="h-5 w-5" aria-hidden />
       </div>
-      <h3 className="mt-4 text-base font-semibold text-dashboard-text">{title}</h3>
-      {description ? <p className="mx-auto mt-2 max-w-md text-sm text-dashboard-muted">{description}</p> : null}
+      <h3 className="mt-4 text-base font-semibold text-dashboard-text">
+        {title}
+      </h3>
+      {description ? (
+        <p className="mx-auto mt-2 max-w-md text-sm text-dashboard-muted">
+          {description}
+        </p>
+      ) : null}
       {action ? <div className="mt-5">{action}</div> : null}
     </div>
   );
@@ -321,7 +531,14 @@ export type ErrorStateProps = EmptyStateProps & {
   message?: ReactNode;
 };
 
-export function ErrorState({ title, description, message, icon = AlertTriangle, className, ...props }: ErrorStateProps) {
+export function ErrorState({
+  title,
+  description,
+  message,
+  icon = AlertTriangle,
+  className,
+  ...props
+}: ErrorStateProps) {
   return (
     <EmptyState
       title={title}
@@ -349,9 +566,20 @@ export type LoadingSkeletonProps = HTMLAttributes<HTMLDivElement> & {
   variant?: "card" | "chart" | "list";
 };
 
-export function LoadingSkeleton({ rows = 3, variant = "card", className, ...props }: LoadingSkeletonProps) {
+export function LoadingSkeleton({
+  rows = 3,
+  variant = "card",
+  className,
+  ...props
+}: LoadingSkeletonProps) {
   return (
-    <div className={cn("rounded-3xl border border-dashboard-border bg-dashboard-card/70 p-5", className)} {...props}>
+    <div
+      className={cn(
+        "rounded-3xl border border-dashboard-border bg-dashboard-card/70 p-5 shadow-soft",
+        className,
+      )}
+      {...props}
+    >
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-2">
           <Skeleton className="h-4 w-28" />
@@ -360,8 +588,12 @@ export function LoadingSkeleton({ rows = 3, variant = "card", className, ...prop
         <Skeleton className="h-10 w-10 rounded-2xl" />
       </div>
       <Separator className="my-5 bg-dashboard-border" />
-      {variant === "chart" ? <Skeleton className="h-48 w-full rounded-2xl" /> : null}
-      <div className={cn("space-y-3", variant === "chart" ? "mt-4" : undefined)}>
+      {variant === "chart" ? (
+        <Skeleton className="h-48 w-full rounded-2xl" />
+      ) : null}
+      <div
+        className={cn("space-y-3", variant === "chart" ? "mt-4" : undefined)}
+      >
         {Array.from({ length: rows }, (_, index) => (
           <div key={index} className="flex items-center gap-3">
             <Skeleton className="h-9 w-9 rounded-xl" />
