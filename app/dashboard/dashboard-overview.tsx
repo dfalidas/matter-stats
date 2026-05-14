@@ -1,7 +1,7 @@
 "use client";
 
-import { format, subDays } from "date-fns";
-import { Activity, Clock, Flame, Newspaper } from "lucide-react";
+import { format, parseISO, subDays } from "date-fns";
+import { Activity, Clock, Flame, Highlighter, Newspaper } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -18,40 +18,59 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { DailyStat } from "@/lib/supabase-types";
+import type { DashboardSummary } from "@/lib/supabase-queries";
 
 import { SyncMatterButton } from "./sync-matter-button";
 
-const metrics = [
-  { label: "Articles read", value: "0", helper: "Awaiting your first import", icon: Newspaper },
-  { label: "Reading time", value: "0h", helper: "Tracked across sessions", icon: Clock },
-  { label: "Top source", value: "—", helper: "Ranked after sync", icon: Activity },
-  { label: "Current streak", value: "0 days", helper: "Daily reading momentum", icon: Flame },
-];
-
-const readingTrend = Array.from({ length: 7 }, (_, index) => {
-  const date = subDays(new Date(), 6 - index);
-
-  return {
-    date: format(date, "MMM d"),
-    articles: 0,
-    minutes: 0,
-  };
-});
+type DashboardOverviewProps = {
+  summary: DashboardSummary;
+  readingTrend: DailyStat[];
+};
 
 const recentActivity = [
-  { title: "Import Matter archive", source: "Setup", status: "Pending" },
-  { title: "Connect Supabase", source: "Settings", status: "Ready" },
-  { title: "Review reading trends", source: "Dashboard", status: "Waiting" },
+  { title: "Sync Matter data", source: "Matter", status: "Ready" },
+  { title: "Recalculate daily stats", source: "daily_stats", status: "Automatic" },
+  { title: "Render dashboard charts", source: "daily_stats", status: "Live" },
 ];
 
-export function DashboardOverview() {
+export function DashboardOverview({ summary, readingTrend }: DashboardOverviewProps) {
+  const chartData = buildChartData(readingTrend);
+  const totalHighlights = readingTrend.reduce((total, stat) => total + stat.highlights_count, 0);
+  const metrics = [
+    {
+      label: "Articles read",
+      value: formatInteger(summary.articlesRead),
+      helper: "Summed from daily_stats",
+      icon: Newspaper,
+    },
+    {
+      label: "Reading time",
+      value: formatDuration(summary.readingTimeSeconds),
+      helper: "Tracked across sessions",
+      icon: Clock,
+    },
+    {
+      label: "Top source",
+      value: summary.topSource ?? "—",
+      helper: "Latest active daily leader",
+      icon: Activity,
+    },
+    {
+      label: "Current streak",
+      value: `${summary.currentStreakDays} ${summary.currentStreakDays === 1 ? "day" : "days"}`,
+      helper: "Daily reading momentum",
+      icon: Flame,
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-background/45 p-5 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-xl font-semibold tracking-tight text-foreground">Manual Matter import</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Fetch the latest Matter library, reading sessions, tags, and annotations into Supabase.
+            Fetch Matter library, sessions, tags, and annotations, then rebuild daily_stats for affected days.
           </p>
         </div>
         <SyncMatterButton />
@@ -92,16 +111,16 @@ export function DashboardOverview() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <CardTitle>Reading trend</CardTitle>
-                  <CardDescription>Grouped and formatted with date-fns for the latest seven-day window.</CardDescription>
+                  <CardDescription>Latest seven-day window read directly from the daily_stats table.</CardDescription>
                 </div>
-                <Badge variant="outline">Recharts</Badge>
+                <Badge variant="outline">daily_stats</Badge>
               </div>
             </CardHeader>
             <CardContent className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={readingTrend} margin={{ left: 0, right: 12 }}>
+                <AreaChart data={chartData} margin={{ left: 0, right: 12 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                  <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
                   <RechartsTooltip
                     contentStyle={{
@@ -112,6 +131,7 @@ export function DashboardOverview() {
                     }}
                   />
                   <Area type="monotone" dataKey="articles" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.22)" />
+                  <Area type="monotone" dataKey="minutes" stroke="hsl(var(--chart-2))" fill="hsl(var(--chart-2) / 0.14)" />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
@@ -122,7 +142,7 @@ export function DashboardOverview() {
           <Card className="border-white/10 bg-background/45">
             <CardHeader>
               <CardTitle>Recent activity</CardTitle>
-              <CardDescription>Placeholder rows until Matter import data is available.</CardDescription>
+              <CardDescription>Sync and rollup status for the daily dashboard data path.</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -145,6 +165,10 @@ export function DashboardOverview() {
                   ))}
                 </TableBody>
               </Table>
+              <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+                <Highlighter className="h-4 w-4 text-primary" aria-hidden />
+                {formatInteger(totalHighlights)} highlights in the current seven-day chart window.
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -165,4 +189,42 @@ export function DashboardOverview() {
       </Tabs>
     </div>
   );
+}
+
+function buildChartData(readingTrend: DailyStat[]) {
+  const statsByDate = new Map(readingTrend.map((stat) => [stat.date, stat]));
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = subDays(new Date(), 6 - index);
+    const key = format(date, "yyyy-MM-dd");
+    const stat = statsByDate.get(key);
+
+    return {
+      date: key,
+      label: format(parseISO(key), "MMM d"),
+      articles: stat?.items_read_count ?? 0,
+      minutes: Math.round((stat?.reading_time_seconds ?? 0) / 60),
+      words: stat?.words_read ?? 0,
+      sessions: stat?.sessions_count ?? 0,
+    };
+  });
+}
+
+function formatInteger(value: number) {
+  return new Intl.NumberFormat("en").format(value);
+}
+
+function formatDuration(seconds: number) {
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }

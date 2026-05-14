@@ -12,6 +12,7 @@ import {
   upsertMatterTags,
   upsertReadingSessions,
 } from "@/lib/supabase-admin";
+import { recalculateDailyStats } from "@/lib/daily-stats";
 import type { TablesInsert } from "@/lib/supabase-types";
 import {
   normalizeAnnotation,
@@ -31,10 +32,6 @@ export type MatterSyncResult = {
   syncRunId?: string;
   itemsSynced?: number;
   sessionsSynced?: number;
-};
-
-type DailyStatsRecalculation = {
-  affectedDates: Set<string>;
 };
 
 type SyncCheckpoint = {
@@ -110,6 +107,10 @@ export async function syncMatterData(): Promise<MatterSyncResult> {
       advanceCheckpoint(checkpoint, sessionRow.ended_at);
     }
 
+    for (const affectedDate of await getReadingSessionDatesForSessionIds(sessionRows.map((session) => session.id))) {
+      affectedDates.add(affectedDate);
+    }
+
     await upsertInBatches(sessionRows, upsertReadingSessions);
 
     const annotationRows: TablesInsert<"annotations">[] = [];
@@ -124,6 +125,10 @@ export async function syncMatterData(): Promise<MatterSyncResult> {
         addDateFromTimestamp(affectedDates, annotationRow.created_at_matter);
         advanceCheckpoint(checkpoint, annotationRow.updated_at_matter);
       }
+    }
+
+    for (const affectedDate of await getAnnotationDatesForAnnotationIds(annotationRows.map((annotation) => annotation.id))) {
+      affectedDates.add(affectedDate);
     }
 
     await upsertInBatches(annotationRows, upsertAnnotations);
@@ -219,6 +224,60 @@ async function getReadingSessionDatesForItems(itemIds: string[]): Promise<string
   return [...dates];
 }
 
+async function getReadingSessionDatesForSessionIds(sessionIds: Array<string | undefined>): Promise<string[]> {
+  const ids = sessionIds.filter(isNonEmptyString);
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const dates = new Set<string>();
+  const client = getSupabaseAdminClient();
+
+  for (let index = 0; index < ids.length; index += UPSERT_BATCH_SIZE) {
+    const { data, error } = await client
+      .from("reading_sessions")
+      .select("started_at")
+      .in("id", ids.slice(index, index + UPSERT_BATCH_SIZE));
+
+    if (error) {
+      throw error;
+    }
+
+    for (const session of data ?? []) {
+      addDateFromTimestamp(dates, session.started_at);
+    }
+  }
+
+  return [...dates];
+}
+
+async function getAnnotationDatesForAnnotationIds(annotationIds: Array<string | undefined>): Promise<string[]> {
+  const ids = annotationIds.filter(isNonEmptyString);
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const dates = new Set<string>();
+  const client = getSupabaseAdminClient();
+
+  for (let index = 0; index < ids.length; index += UPSERT_BATCH_SIZE) {
+    const { data, error } = await client
+      .from("annotations")
+      .select("created_at_matter")
+      .in("id", ids.slice(index, index + UPSERT_BATCH_SIZE));
+
+    if (error) {
+      throw error;
+    }
+
+    for (const annotation of data ?? []) {
+      addDateFromTimestamp(dates, annotation.created_at_matter);
+    }
+  }
+
+  return [...dates];
+}
+
 async function getMatterItemById(itemId: string, cache: Map<string, MatterItemRow | null>): Promise<MatterItemRow | null> {
   if (cache.has(itemId)) {
     return cache.get(itemId) ?? null;
@@ -237,94 +296,6 @@ async function getMatterItemById(itemId: string, cache: Map<string, MatterItemRo
   const item = data ? { id: data.id, word_count: data.word_count, progress: data.progress } : null;
   cache.set(itemId, item);
   return item;
-}
-
-async function recalculateDailyStats({ affectedDates }: DailyStatsRecalculation) {
-  if (affectedDates.size === 0) {
-    return;
-  }
-
-  const stats: TablesInsert<"daily_stats">[] = [];
-  for (const date of [...affectedDates].sort()) {
-    stats.push(await calculateDailyStat(date));
-  }
-
-  await upsertInBatches(stats, async (batch) => {
-    const { error } = await getSupabaseAdminClient().from("daily_stats").upsert(batch, { onConflict: "date" });
-    if (error) {
-      throw error;
-    }
-  });
-}
-
-async function calculateDailyStat(date: string): Promise<TablesInsert<"daily_stats">> {
-  const client = getSupabaseAdminClient();
-  const start = `${date}T00:00:00.000Z`;
-  const end = `${date}T23:59:59.999Z`;
-
-  const { data: sessions, error: sessionsError } = await client
-    .from("reading_sessions")
-    .select("item_id, duration_seconds, words_estimated")
-    .gte("started_at", start)
-    .lte("started_at", end);
-
-  if (sessionsError) {
-    throw sessionsError;
-  }
-
-  const sessionRows = sessions ?? [];
-  const itemIds = [...new Set(sessionRows.map((session) => session.item_id).filter(Boolean))];
-  const sourcesByItemId = new Map<string, string | null>();
-
-  for (let index = 0; index < itemIds.length; index += UPSERT_BATCH_SIZE) {
-    const { data: items, error: itemsError } = await client
-      .from("matter_items")
-      .select("id, source")
-      .in("id", itemIds.slice(index, index + UPSERT_BATCH_SIZE));
-
-    if (itemsError) {
-      throw itemsError;
-    }
-
-    for (const item of items ?? []) {
-      sourcesByItemId.set(item.id, item.source);
-    }
-  }
-
-  const { count: highlightsCount, error: annotationsError } = await client
-    .from("annotations")
-    .select("id", { count: "exact", head: true })
-    .gte("created_at_matter", start)
-    .lte("created_at_matter", end);
-
-  if (annotationsError) {
-    throw annotationsError;
-  }
-
-  const sourceSeconds = new Map<string, number>();
-  let readingTimeSeconds = 0;
-  let wordsRead = 0;
-
-  for (const session of sessionRows) {
-    const durationSeconds = session.duration_seconds ?? 0;
-    readingTimeSeconds += durationSeconds;
-    wordsRead += session.words_estimated ?? 0;
-
-    const source = sourcesByItemId.get(session.item_id);
-    if (source) {
-      sourceSeconds.set(source, (sourceSeconds.get(source) ?? 0) + durationSeconds);
-    }
-  }
-
-  return {
-    date,
-    reading_time_seconds: readingTimeSeconds,
-    words_read: wordsRead,
-    sessions_count: sessionRows.length,
-    items_read_count: itemIds.length,
-    highlights_count: highlightsCount ?? 0,
-    top_source: getTopSource(sourceSeconds),
-  };
 }
 
 async function* iterateOptionalMatterTags(params: Parameters<typeof iterateMatterTags>[0] = {}) {
@@ -388,16 +359,7 @@ function maxIsoTimestamp(current: string | null, candidate: string | null | unde
   return current;
 }
 
-function getTopSource(sourceSeconds: Map<string, number>): string | null {
-  let topSource: string | null = null;
-  let topSeconds = -1;
 
-  for (const [source, seconds] of sourceSeconds) {
-    if (seconds > topSeconds) {
-      topSource = source;
-      topSeconds = seconds;
-    }
-  }
-
-  return topSource;
+function isNonEmptyString(value: string | null | undefined): value is string {
+  return typeof value === "string" && value.trim().length > 0;
 }
