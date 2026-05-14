@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": false,
+    "outDir": "../.test-build",
+    "rootDir": "..",
+    "types": ["node"],
+    "jsx": "react-jsx",
+    "incremental": false,
+    "tsBuildInfoFile": "../.test-build/tsconfig.tsbuildinfo"
+  },
+  "include": ["../lib/matter-normalizers.ts", "./**/*.test.ts"]
+}
