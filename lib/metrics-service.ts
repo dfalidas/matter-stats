@@ -196,6 +196,34 @@ export function getPreviousEquivalentRange(range: MetricsDateRange): MetricsDate
     return null;
   }
 
+  if (range.preset === "month") {
+    const { year, month } = getLocalDateParts(range.start, range.timezone);
+    const previousStart = localDateToUtc(year, month - 1, 1, range.timezone);
+
+    return {
+      start: previousStart,
+      end: range.start,
+      startDate: formatDateInTimezone(previousStart, range.timezone),
+      endDate: formatDateInTimezone(range.start, range.timezone),
+      timezone: range.timezone,
+      preset: "custom",
+    };
+  }
+
+  if (range.preset === "year") {
+    const { year } = getLocalDateParts(range.start, range.timezone);
+    const previousStart = localDateToUtc(year - 1, 1, 1, range.timezone);
+
+    return {
+      start: previousStart,
+      end: range.start,
+      startDate: formatDateInTimezone(previousStart, range.timezone),
+      endDate: formatDateInTimezone(range.start, range.timezone),
+      timezone: range.timezone,
+      preset: "custom",
+    };
+  }
+
   const days = Math.max(1, differenceInLocalDays(range.start, range.end, range.timezone));
   const previousStart = addLocalDays(range.start, -days, range.timezone);
 
