@@ -58,6 +58,57 @@ export async function upsertReadingSessions(sessions: TablesInsert<"reading_sess
   return data;
 }
 
+export async function upsertMatterTags(tags: TablesInsert<"matter_tags">[]) {
+  if (tags.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await getSupabaseAdminClient()
+    .from("matter_tags")
+    .upsert(tags, { onConflict: "id" })
+    .select();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function upsertItemTags(itemTags: TablesInsert<"item_tags">[]) {
+  if (itemTags.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await getSupabaseAdminClient()
+    .from("item_tags")
+    .upsert(itemTags, { onConflict: "item_id,tag_id" })
+    .select();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function upsertAnnotations(annotations: TablesInsert<"annotations">[]) {
+  if (annotations.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await getSupabaseAdminClient()
+    .from("annotations")
+    .upsert(annotations, { onConflict: "id" })
+    .select();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
 export async function upsertDailyStats(stats: TablesInsert<"daily_stats">[]) {
   if (stats.length === 0) {
     return [];
