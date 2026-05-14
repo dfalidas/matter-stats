@@ -15,8 +15,7 @@ This guide walks through deploying Matter Stats with a hosted Supabase database 
 4. Pick the region closest to where you usually use the app.
 5. Select **Create new project** and wait for Supabase to finish provisioning the project.
 6. Open **Project Settings** > **Data API** or **API Keys** and copy these values for the Vercel setup later:
-   - **Project URL**: used for `SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_URL`.
-   - **anon** or **publishable** browser-safe key: used for `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+   - **Project URL**: used for `SUPABASE_URL`.
    - **service_role** or **secret** server key: used for `SUPABASE_SERVICE_ROLE_KEY`.
 
 > Keep the service-role or secret key private. It can bypass normal database access controls and must never be committed to GitHub or exposed with a `NEXT_PUBLIC_` prefix.
@@ -62,13 +61,11 @@ Replace `your-project-ref` with the reference from your Supabase project URL or 
 | `MATTER_API_TOKEN` | Your Matter API token. | Server-only secret |
 | `SUPABASE_URL` | Supabase Project URL. | Server-only secret |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role or secret server key. | Server-only secret |
-| `NEXT_PUBLIC_SUPABASE_URL` | Same Supabase Project URL. | Browser-safe public value |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon or publishable key. | Browser-safe public value |
 
 5. Select **Save** after adding each variable.
 6. If you edited variables after a deployment already ran, trigger a new deployment so Vercel rebuilds with the new values.
 
-Do not add `NEXT_PUBLIC_` to `MATTER_API_TOKEN`, `APP_ACCESS_PASSWORD`, or `SUPABASE_SERVICE_ROLE_KEY`. Only variables intentionally needed in the browser should use `NEXT_PUBLIC_`.
+Do not add `NEXT_PUBLIC_` to `MATTER_API_TOKEN`, `APP_ACCESS_PASSWORD`, `SUPABASE_URL`, or `SUPABASE_SERVICE_ROLE_KEY`. The current private app does not require any browser-exposed Supabase keys.
 
 ## 4. Deploy from GitHub to Vercel
 

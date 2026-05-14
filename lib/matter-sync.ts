@@ -167,11 +167,11 @@ export async function syncMatterData(): Promise<MatterSyncResult> {
           error_message: sanitizedError,
         });
       } catch (updateError) {
-        console.error("Matter sync run error update failed", { syncRunId, updateError });
+        console.error("Matter sync run error update failed", { syncRunId, error: sanitizeLogError(updateError) });
       }
     }
 
-    console.error("Matter sync failed", { syncRunId, error });
+    console.error("Matter sync failed", { syncRunId, error: sanitizeLogError(error) });
 
     return {
       ok: false,
@@ -338,6 +338,29 @@ function sanitizeSyncError(error: unknown): string {
   return "Matter sync failed because the local database update could not be completed.";
 }
 
+function sanitizeLogError(error: unknown): { name: string; message: string; status?: number; code?: string | null } {
+  if (error instanceof MatterApiError) {
+    return {
+      name: error.name,
+      message: sanitizeSyncError(error),
+      status: error.status,
+      code: error.code,
+    };
+  }
+
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: "Matter sync failed because the local database update could not be completed.",
+    };
+  }
+
+  return {
+    name: "UnknownError",
+    message: "Matter sync failed because the local database update could not be completed.",
+  };
+}
+
 function addDateFromTimestamp(dates: Set<string>, timestamp: string | null | undefined) {
   if (!timestamp) {
     return;
@@ -364,7 +387,6 @@ function maxIsoTimestamp(current: string | null, candidate: string | null | unde
 
   return current;
 }
-
 
 function isNonEmptyString(value: string | null | undefined): value is string {
   return typeof value === "string" && value.trim().length > 0;

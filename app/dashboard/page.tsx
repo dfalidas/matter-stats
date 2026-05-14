@@ -5,6 +5,8 @@ import { getReadingMetrics, METRICS_PERIOD_PRESETS, type MetricsPeriodPreset } f
 
 const DEFAULT_PERIOD: MetricsPeriodPreset = "today";
 
+export const dynamic = "force-dynamic";
+
 type DashboardPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
@@ -12,9 +14,7 @@ type DashboardPageProps = {
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const params = await searchParams;
   const period = normalizePeriod(params?.period);
-  const client = getSupabaseAdminClient();
-
-  const metricsResult = await getDashboardMetrics(client, period);
+  const metricsResult = await getDashboardMetrics(period);
 
   return (
     <PageShell
@@ -32,8 +32,9 @@ function normalizePeriod(value: string | string[] | undefined): MetricsPeriodPre
   return METRICS_PERIOD_PRESETS.includes(candidate as MetricsPeriodPreset) ? (candidate as MetricsPeriodPreset) : DEFAULT_PERIOD;
 }
 
-async function getDashboardMetrics(client: ReturnType<typeof getSupabaseAdminClient>, period: MetricsPeriodPreset) {
+async function getDashboardMetrics(period: MetricsPeriodPreset) {
   try {
+    const client = getSupabaseAdminClient();
     const [metrics, todayMetrics, allTimeMetrics] = await Promise.all([
       getReadingMetrics(client, { preset: period, topLimit: 5, recentLimit: 6 }),
       getReadingMetrics(client, { preset: "today", topLimit: 5, recentLimit: 6 }),
