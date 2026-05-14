@@ -3,6 +3,7 @@ import "server-only";
 import { getMatterAccount, iterateMatterAnnotations, iterateMatterItems, iterateMatterReadingSessions, iterateMatterTags, MatterApiError } from "@/lib/matter-api";
 import {
   createSyncRun,
+  getLatestSuccessfulSyncCheckpoint,
   getSupabaseAdminClient,
   updateSyncRun,
   upsertAnnotations,
@@ -36,10 +37,15 @@ type DailyStatsRecalculation = {
   affectedDates: Set<string>;
 };
 
+type SyncCheckpoint = {
+  next: string | null;
+};
+
 export async function syncMatterData(): Promise<MatterSyncResult> {
   let syncRunId: string | null = null;
 
   try {
+    const previousCheckpoint = await getLatestSuccessfulSyncCheckpoint();
     const startedAt = new Date().toISOString();
     const syncRun = await createSyncRun({ status: "running", started_at: startedAt });
     syncRunId = syncRun.id;
@@ -53,14 +59,14 @@ export async function syncMatterData(): Promise<MatterSyncResult> {
     const tagRowsById = new Map<string, TablesInsert<"matter_tags">>();
     const itemTagRowsByKey = new Map<string, TablesInsert<"item_tags">>();
     const itemIds = new Set<string>();
-    let checkpointTimestamp: string | null = null;
+    const checkpoint: SyncCheckpoint = { next: previousCheckpoint };
 
-    for await (const item of iterateMatterItems({ status: "all" })) {
+    for await (const item of iterateMatterItems({ status: "all", updatedSince: previousCheckpoint ?? undefined })) {
       const itemRow = normalizeMatterItem(item, syncedAt);
       itemRows.push(itemRow);
       itemRowsById.set(itemRow.id, itemRow);
       itemIds.add(itemRow.id);
-      checkpointTimestamp = maxIsoTimestamp(checkpointTimestamp, itemRow.updated_at_matter);
+      advanceCheckpoint(checkpoint, itemRow.updated_at_matter);
 
       const normalizedTags = normalizeMatterItemTags(item);
       for (const tagRow of normalizedTags.matterTags) {
@@ -71,10 +77,10 @@ export async function syncMatterData(): Promise<MatterSyncResult> {
       }
     }
 
-    for await (const tag of iterateOptionalMatterTags()) {
+    for await (const tag of iterateOptionalMatterTags({ updatedSince: previousCheckpoint ?? undefined })) {
       const tagRow = normalizeMatterTag(tag);
       tagRowsById.set(tagRow.id, tagRow);
-      checkpointTimestamp = maxIsoTimestamp(checkpointTimestamp, tagRow.updated_at_matter);
+      advanceCheckpoint(checkpoint, tagRow.updated_at_matter);
     }
 
     await upsertInBatches([...tagRowsById.values()], upsertMatterTags);
@@ -84,14 +90,24 @@ export async function syncMatterData(): Promise<MatterSyncResult> {
     const sessionRows: TablesInsert<"reading_sessions">[] = [];
     const affectedDates = new Set<string>();
 
-    for await (const session of iterateMatterReadingSessions()) {
-      const sessionRow = normalizeReadingSession(session, { item: session.item_id ? itemRowsById.get(session.item_id) : null });
+    for (const affectedDate of await getReadingSessionDatesForItems([...itemIds])) {
+      affectedDates.add(affectedDate);
+    }
+
+    const matterItemLookup = new Map<string, MatterItemRow | null>(itemRowsById);
+
+    for await (const session of iterateMatterReadingSessions({ since: previousCheckpoint ?? undefined })) {
+      const sessionRow = normalizeReadingSession(session, {
+        item: session.item_id ? await getMatterItemById(session.item_id, matterItemLookup) : null,
+      });
       if (!sessionRow) {
         continue;
       }
 
       sessionRows.push(sessionRow);
       addDateFromTimestamp(affectedDates, sessionRow.started_at);
+      advanceCheckpoint(checkpoint, sessionRow.started_at);
+      advanceCheckpoint(checkpoint, sessionRow.ended_at);
     }
 
     await upsertInBatches(sessionRows, upsertReadingSessions);
@@ -106,7 +122,7 @@ export async function syncMatterData(): Promise<MatterSyncResult> {
 
         annotationRows.push(annotationRow);
         addDateFromTimestamp(affectedDates, annotationRow.created_at_matter);
-        checkpointTimestamp = maxIsoTimestamp(checkpointTimestamp, annotationRow.updated_at_matter);
+        advanceCheckpoint(checkpoint, annotationRow.updated_at_matter);
       }
     }
 
@@ -119,7 +135,7 @@ export async function syncMatterData(): Promise<MatterSyncResult> {
       items_synced: itemRows.length,
       sessions_synced: sessionRows.length,
       error_message: null,
-      checkpoint_timestamp: checkpointTimestamp,
+      checkpoint_timestamp: checkpoint.next,
     });
 
     return {
@@ -175,6 +191,52 @@ async function replaceItemTags(itemIds: string[], itemTags: TablesInsert<"item_t
   }
 
   await upsertInBatches(itemTags, upsertItemTags);
+}
+
+async function getReadingSessionDatesForItems(itemIds: string[]): Promise<string[]> {
+  if (itemIds.length === 0) {
+    return [];
+  }
+
+  const dates = new Set<string>();
+  const client = getSupabaseAdminClient();
+
+  for (let index = 0; index < itemIds.length; index += UPSERT_BATCH_SIZE) {
+    const { data, error } = await client
+      .from("reading_sessions")
+      .select("started_at")
+      .in("item_id", itemIds.slice(index, index + UPSERT_BATCH_SIZE));
+
+    if (error) {
+      throw error;
+    }
+
+    for (const session of data ?? []) {
+      addDateFromTimestamp(dates, session.started_at);
+    }
+  }
+
+  return [...dates];
+}
+
+async function getMatterItemById(itemId: string, cache: Map<string, MatterItemRow | null>): Promise<MatterItemRow | null> {
+  if (cache.has(itemId)) {
+    return cache.get(itemId) ?? null;
+  }
+
+  const { data, error } = await getSupabaseAdminClient()
+    .from("matter_items")
+    .select("id, word_count, progress")
+    .eq("id", itemId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  const item = data ? { id: data.id, word_count: data.word_count, progress: data.progress } : null;
+  cache.set(itemId, item);
+  return item;
 }
 
 async function recalculateDailyStats({ affectedDates }: DailyStatsRecalculation) {
@@ -265,9 +327,9 @@ async function calculateDailyStat(date: string): Promise<TablesInsert<"daily_sta
   };
 }
 
-async function* iterateOptionalMatterTags() {
+async function* iterateOptionalMatterTags(params: Parameters<typeof iterateMatterTags>[0] = {}) {
   try {
-    yield* iterateMatterTags();
+    yield* iterateMatterTags(params);
   } catch (error) {
     if (isOptionalMatterEndpointError(error)) {
       return;
@@ -308,6 +370,10 @@ function addDateFromTimestamp(dates: Set<string>, timestamp: string | null | und
   if (Number.isFinite(date.getTime())) {
     dates.add(date.toISOString().slice(0, 10));
   }
+}
+
+function advanceCheckpoint(checkpoint: SyncCheckpoint, candidate: string | null | undefined) {
+  checkpoint.next = maxIsoTimestamp(checkpoint.next, candidate);
 }
 
 function maxIsoTimestamp(current: string | null, candidate: string | null | undefined): string | null {

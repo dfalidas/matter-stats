@@ -126,6 +126,24 @@ export async function upsertDailyStats(stats: TablesInsert<"daily_stats">[]) {
   return data;
 }
 
+export async function getLatestSuccessfulSyncCheckpoint(): Promise<string | null> {
+  const { data, error } = await getSupabaseAdminClient()
+    .from("sync_runs")
+    .select("checkpoint_timestamp")
+    .eq("status", "success")
+    .not("checkpoint_timestamp", "is", null)
+    .order("finished_at", { ascending: false, nullsFirst: false })
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data?.checkpoint_timestamp ?? null;
+}
+
 export async function createSyncRun(syncRun: TablesInsert<"sync_runs">) {
   const { data, error } = await getSupabaseAdminClient().from("sync_runs").insert(syncRun).select().single();
 
