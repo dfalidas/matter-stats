@@ -19,6 +19,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+import { SyncMatterButton } from "./sync-matter-button";
+
 const metrics = [
   { label: "Articles read", value: "0", helper: "Awaiting your first import", icon: Newspaper },
   { label: "Reading time", value: "0h", helper: "Tracked across sessions", icon: Clock },
@@ -45,6 +47,16 @@ const recentActivity = [
 export function DashboardOverview() {
   return (
     <div className="space-y-6">
+      <div className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-background/45 p-5 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">Manual Matter import</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Fetch the latest Matter library, reading sessions, tags, and annotations into Supabase.
+          </p>
+        </div>
+        <SyncMatterButton />
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {metrics.map((metric) => {
           const Icon = metric.icon;
