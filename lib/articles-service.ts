@@ -3,6 +3,7 @@ import type { MatterStatsSupabaseClient } from "@/lib/supabase-queries";
 import { METRICS_PERIOD_PRESETS, resolveMetricsDateRange, type MetricsPeriodPreset } from "@/lib/metrics-service";
 
 export const ARTICLE_PAGE_SIZE = 100;
+export const RELATED_ARTICLES_LIMIT = 5;
 
 export type ArticleLibraryPeriod = MetricsPeriodPreset;
 
@@ -56,6 +57,21 @@ export type ArticleDetail = MatterItem & {
     created_at_matter: string | null;
   }[];
   sessions: Pick<ReadingSession, "id" | "started_at" | "duration_seconds" | "words_estimated" | "source_device">[];
+  relatedArticles: RelatedArticle[];
+  sourcePerformance: ArticleSourcePerformance | null;
+};
+
+export type RelatedArticle = Pick<
+  MatterItem,
+  "id" | "title" | "source" | "author" | "created_at_matter" | "updated_at_matter" | "estimated_reading_time_minutes"
+>;
+
+export type ArticleSourcePerformance = {
+  source: string;
+  sourceArticleCount: number;
+  sourceAverageTimeSeconds: number;
+  articleTimeSeconds: number;
+  percentVsAverage: number | null;
 };
 
 export function normalizeArticlePeriod(value: string | string[] | undefined, fallback: ArticleLibraryPeriod = "all-time"): ArticleLibraryPeriod {
@@ -169,7 +185,7 @@ export async function getArticleDetail(client: MatterStatsSupabaseClient, id: st
     return null;
   }
 
-  const [tagsByItemId, annotationsResult, sessionsResult] = await Promise.all([
+  const [tagsByItemId, annotationsResult, sessionsResult, relatedArticles, sourcePerformance] = await Promise.all([
     fetchTagsByItemId(client, [id]),
     client
       .from("annotations")
@@ -182,6 +198,8 @@ export async function getArticleDetail(client: MatterStatsSupabaseClient, id: st
       .eq("item_id", id)
       .order("started_at", { ascending: false, nullsFirst: false })
       .limit(25),
+    fetchRelatedArticles(client, item),
+    fetchSourcePerformance(client, item),
   ]);
 
   if (annotationsResult.error) {
@@ -197,6 +215,8 @@ export async function getArticleDetail(client: MatterStatsSupabaseClient, id: st
     tags: tagsByItemId.get(id) ?? [],
     annotations: annotationsResult.data ?? [],
     sessions: sessionsResult.data ?? [],
+    relatedArticles,
+    sourcePerformance,
   };
 }
 
@@ -289,6 +309,82 @@ async function fetchHighlightCounts(client: MatterStatsSupabaseClient, itemIds: 
   }
 
   return counts;
+}
+
+async function fetchRelatedArticles(client: MatterStatsSupabaseClient, item: MatterItem): Promise<RelatedArticle[]> {
+  const source = item.source?.trim();
+
+  if (!source) {
+    return [];
+  }
+
+  const { data, error } = await client
+    .from("matter_items")
+    .select("id,title,source,author,created_at_matter,updated_at_matter,estimated_reading_time_minutes")
+    .eq("source", source)
+    .neq("id", item.id)
+    .order("created_at_matter", { ascending: false, nullsFirst: false })
+    .order("updated_at_matter", { ascending: false, nullsFirst: false })
+    .limit(RELATED_ARTICLES_LIMIT);
+
+  if (error) {
+    throw error;
+  }
+
+  return data ?? [];
+}
+
+async function fetchSourcePerformance(client: MatterStatsSupabaseClient, item: MatterItem): Promise<ArticleSourcePerformance | null> {
+  const source = item.source?.trim();
+
+  if (!source) {
+    return null;
+  }
+
+  const { data: sourceItems, error: sourceItemsError } = await client.from("matter_items").select("id").eq("source", source);
+
+  if (sourceItemsError) {
+    throw sourceItemsError;
+  }
+
+  const sourceItemIds = (sourceItems ?? []).map((sourceItem) => sourceItem.id);
+
+  if (sourceItemIds.length === 0) {
+    return {
+      source,
+      sourceArticleCount: 0,
+      sourceAverageTimeSeconds: 0,
+      articleTimeSeconds: 0,
+      percentVsAverage: null,
+    };
+  }
+
+  const { data: sourceSessions, error: sourceSessionsError } = await client
+    .from("reading_sessions")
+    .select("item_id,duration_seconds")
+    .in("item_id", sourceItemIds);
+
+  if (sourceSessionsError) {
+    throw sourceSessionsError;
+  }
+
+  const timeByItemId = new Map<string, number>();
+  for (const session of sourceSessions ?? []) {
+    timeByItemId.set(session.item_id, (timeByItemId.get(session.item_id) ?? 0) + (session.duration_seconds ?? 0));
+  }
+
+  const sourceTotalSeconds = [...timeByItemId.values()].reduce((total, seconds) => total + seconds, 0);
+  const sourceAverageTimeSeconds = sourceItemIds.length > 0 ? Math.round(sourceTotalSeconds / sourceItemIds.length) : 0;
+  const articleTimeSeconds = timeByItemId.get(item.id) ?? 0;
+  const percentVsAverage = sourceAverageTimeSeconds > 0 ? ((articleTimeSeconds - sourceAverageTimeSeconds) / sourceAverageTimeSeconds) * 100 : null;
+
+  return {
+    source,
+    sourceArticleCount: sourceItemIds.length,
+    sourceAverageTimeSeconds,
+    articleTimeSeconds,
+    percentVsAverage,
+  };
 }
 
 function escapeIlikePattern(value: string): string {
