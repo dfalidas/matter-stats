@@ -18,6 +18,7 @@ export async function syncMatterAction(previousState: SyncMatterActionState): Pr
   revalidatePath("/authors");
   revalidatePath("/tags");
   revalidatePath("/year-in-reading");
+  revalidatePath("/settings");
 
   return result;
 }

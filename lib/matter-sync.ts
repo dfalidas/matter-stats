@@ -32,6 +32,8 @@ export type MatterSyncResult = {
   syncRunId?: string;
   itemsSynced?: number;
   sessionsSynced?: number;
+  annotationsSynced?: number;
+  tagsSynced?: number;
 };
 
 type SyncCheckpoint = {
@@ -139,16 +141,20 @@ export async function syncMatterData(): Promise<MatterSyncResult> {
       finished_at: new Date().toISOString(),
       items_synced: itemRows.length,
       sessions_synced: sessionRows.length,
+      annotations_synced: annotationRows.length,
+      tags_synced: tagRowsById.size,
       error_message: null,
       checkpoint_timestamp: checkpoint.next,
     });
 
     return {
       ok: true,
-      message: `Sync complete: imported ${finishedRun.items_synced} items and ${finishedRun.sessions_synced} reading sessions.`,
+      message: `Sync complete: imported ${finishedRun.items_synced} items, ${finishedRun.sessions_synced} reading sessions, ${finishedRun.annotations_synced} annotations, and ${finishedRun.tags_synced} tags.`,
       syncRunId: finishedRun.id,
       itemsSynced: finishedRun.items_synced,
       sessionsSynced: finishedRun.sessions_synced,
+      annotationsSynced: finishedRun.annotations_synced,
+      tagsSynced: finishedRun.tags_synced,
     };
   } catch (error) {
     const sanitizedError = sanitizeSyncError(error);
