@@ -11,5 +11,5 @@
     "incremental": false,
     "tsBuildInfoFile": "../.test-build/tsconfig.tsbuildinfo"
   },
-  "include": ["../lib/matter-normalizers.ts", "../lib/metrics-service.ts", "../lib/supabase-queries.ts", "../lib/supabase-types.ts", "./**/*.test.ts"]
+  "include": ["../lib/matter-normalizers.ts", "../lib/metrics-service.ts", "../lib/reading-personality.ts", "../lib/supabase-queries.ts", "../lib/supabase-types.ts", "./**/*.test.ts"]
 }

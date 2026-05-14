@@ -38,6 +38,7 @@ import {
 } from "@/components/dashboard-components";
 import { Button } from "@/components/ui/button";
 import type { ReadingHeatmapDay, ReadingMetrics } from "@/lib/metrics-service";
+import { getDeterministicReadingPersonality, type ReadingPersonalityLabel } from "@/lib/reading-personality";
 import type { ReadingReport } from "@/lib/reports-service";
 
 const WORDS_PER_BOOK = 80_000;
@@ -90,7 +91,7 @@ function YearInReadingContent({ year, report }: { year: number; report: ReadingR
   const topPublication = metrics.topSources[0];
   const topAuthor = metrics.topAuthors[0];
   const booksEquivalent = metrics.totals.wordsRead / WORDS_PER_BOOK;
-  const personality = getReadingPersonality(metrics, activeMonths.length);
+  const personality = getReadingPersonality(metrics);
   const isLowData = metrics.totals.articlesRead < 3 && metrics.totals.wordsRead < WORDS_PER_BOOK / 2;
 
   return (
@@ -354,44 +355,33 @@ function getMostProductiveDay(heatmap: ReadingHeatmapDay[]): ReadingHeatmapDay |
   return topDay ?? null;
 }
 
-function getReadingPersonality(metrics: ReadingMetrics, activeMonthCount: number) {
-  if (metrics.totals.articlesRead === 0) {
-    return {
-      title: "Recap Rookie",
-      description: "Your annual reading story is waiting for its first synced Matter session this year.",
-      icon: Sparkles,
-    };
-  }
-
-  if (metrics.bestStreakDays >= 14) {
-    return {
-      title: "Streak Keeper",
-      description: "You built a dependable reading rhythm and returned to your queue across many consecutive days.",
-      icon: Flame,
-    };
-  }
-
-  if (metrics.totals.wordsRead >= WORDS_PER_BOOK * 3) {
-    return {
-      title: "Deep Diver",
-      description: "Your year leaned longform, with enough words to rival a serious stack of books.",
-      icon: LibraryBig,
-    };
-  }
-
-  if (activeMonthCount >= 6) {
-    return {
-      title: "Steady Explorer",
-      description: "You kept reading across the calendar, building a consistent journey month after month.",
-      icon: CalendarDays,
-    };
-  }
+function getReadingPersonality(metrics: ReadingMetrics) {
+  const personality = getDeterministicReadingPersonality(metrics);
 
   return {
-    title: "Curious Collector",
-    description: "You sampled ideas across your queue. Add more sessions to sharpen this personality over time.",
-    icon: BookOpen,
+    title: personality.label,
+    description: personality.description,
+    icon: getReadingPersonalityIcon(personality.label),
   };
+}
+
+function getReadingPersonalityIcon(label: ReadingPersonalityLabel): DashboardIcon {
+  switch (label) {
+    case "The Systems Analyst":
+      return BarChart3;
+    case "The News Grazer":
+      return Newspaper;
+    case "The Deep Researcher":
+      return LibraryBig;
+    case "The Strategy Reader":
+      return Trophy;
+    case "The Generalist":
+      return BookOpen;
+    default: {
+      const exhaustive: never = label;
+      return exhaustive;
+    }
+  }
 }
 
 function getHeroSentence(metrics: ReadingMetrics, booksEquivalent: number, isLowData: boolean): string {
