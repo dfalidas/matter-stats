@@ -1,9 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { RefreshCw } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
+import { SyncButton } from "@/components/dashboard-components";
 import { syncMatterAction, type SyncMatterActionState } from "./actions";
 
 const initialState: SyncMatterActionState = null;
@@ -14,10 +12,7 @@ export function SyncMatterButton() {
   return (
     <div className="flex flex-col items-start gap-2 md:items-end">
       <form action={formAction}>
-        <Button type="submit" disabled={isPending}>
-          <RefreshCw className={isPending ? "animate-spin" : undefined} aria-hidden />
-          {isPending ? "Syncing Matter..." : "Sync Matter"}
-        </Button>
+        <SyncButton type="submit" isSyncing={isPending} idleLabel="Sync Matter" syncingLabel="Syncing Matter..." />
       </form>
       {state ? (
         <p className={state.ok ? "text-sm text-emerald-400" : "text-sm text-destructive"} role="status" aria-live="polite">

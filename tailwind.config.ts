@@ -39,10 +39,6 @@ const config: Config = {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
         },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
@@ -50,6 +46,29 @@ const config: Config = {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+        dashboard: {
+          background: "hsl(var(--dashboard-background))",
+          card: "hsl(var(--dashboard-card))",
+          border: "hsl(var(--dashboard-border))",
+          text: "hsl(var(--dashboard-text))",
+          muted: "hsl(var(--dashboard-muted))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+          red: "hsl(var(--accent-red))",
+          violet: "hsl(var(--accent-violet))",
+          blue: "hsl(var(--accent-blue))",
+        },
+        success: "hsl(var(--success))",
+        warning: "hsl(var(--warning))",
+        chart: {
+          1: "hsl(var(--chart-1))",
+          2: "hsl(var(--chart-2))",
+          3: "hsl(var(--chart-3))",
+          4: "hsl(var(--chart-4))",
+          5: "hsl(var(--chart-5))",
         },
         ink: "hsl(var(--foreground))",
         paper: "hsl(var(--muted))",
