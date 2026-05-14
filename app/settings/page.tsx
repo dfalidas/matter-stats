@@ -2,11 +2,13 @@ import type { ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, Clock3, Database, Globe2, LogOut, ShieldCheck, Tags } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DEFAULT_READING_SPEED_WORDS_PER_MINUTE } from "@/lib/matter-normalizers";
 import { getDefaultMetricsTimezone } from "@/lib/metrics-service";
 import type { SyncRun } from "@/lib/supabase-types";
+import { sanitizeSyncRunErrorMessage, type SyncRunLogEntry } from "@/lib/sync-run-log";
 import { logout } from "@/lib/auth-actions";
 
 import { PageShell } from "../_components/page-shell";
@@ -28,6 +30,7 @@ type SettingsSyncData = {
   latestRun: SyncRun | null;
   latestSuccessfulRun: Pick<SyncRun, "finished_at" | "started_at"> | null;
   latestErrorRun: Pick<SyncRun, "finished_at" | "started_at" | "error_message"> | null;
+  recentRuns: SyncRunLogEntry[];
   databaseStatus: MatterConnectionStatus;
 };
 
@@ -78,7 +81,7 @@ export default async function SettingsPage() {
               />
               <DiagnosticPanel
                 label="Last sync error"
-                value={syncData.latestErrorRun?.error_message ?? "No sync errors recorded"}
+                value={syncData.latestErrorRun ? sanitizeSyncRunErrorMessage(syncData.latestErrorRun.error_message) : "No sync errors recorded"}
                 helper={syncData.latestErrorRun ? `Failed ${formatTimestamp(syncData.latestErrorRun.finished_at ?? syncData.latestErrorRun.started_at)}` : "The sync audit log has no failed run with an error message."}
                 icon={<AlertTriangle className="h-4 w-4 text-amber-400" aria-hidden />}
                 tone={syncData.latestErrorRun ? "warning" : "default"}
@@ -94,6 +97,18 @@ export default async function SettingsPage() {
             <p className="text-xs text-dashboard-muted">
               Counts reflect the latest sync run{latestRun ? ` (${latestRun.status})` : " once a run exists"}. Credentials are checked only for presence and health; secret values are never rendered.
             </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-dashboard-border bg-dashboard-card/80 shadow-soft backdrop-blur">
+          <CardHeader>
+            <CardTitle className="text-dashboard-text">Recent sync runs</CardTitle>
+            <CardDescription className="text-dashboard-muted">
+              Review the latest imports, counts, and safe failure summaries. Stored errors are redacted before display so tokens and credentials are not exposed.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SyncRunLogTable runs={syncData.recentRuns} />
           </CardContent>
         </Card>
 
@@ -188,6 +203,47 @@ function CountTile({ label, value }: { label: string; value: number | null | und
   );
 }
 
+function SyncRunLogTable({ runs }: { runs: SyncRunLogEntry[] }) {
+  if (runs.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-dashboard-border bg-background/25 p-6 text-sm text-dashboard-muted">
+        No sync runs have been recorded yet. Run a Matter sync to populate recent history.
+      </div>
+    );
+  }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow className="border-dashboard-border hover:bg-transparent">
+          <TableHead className="text-dashboard-muted">Started</TableHead>
+          <TableHead className="text-dashboard-muted">Finished</TableHead>
+          <TableHead className="text-dashboard-muted">Status</TableHead>
+          <TableHead className="text-right text-dashboard-muted">Items</TableHead>
+          <TableHead className="text-right text-dashboard-muted">Sessions</TableHead>
+          <TableHead className="min-w-[240px] text-dashboard-muted">Error message</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {runs.map((run) => (
+          <TableRow key={run.id} className="border-dashboard-border/70 hover:bg-white/[0.03]">
+            <TableCell className="whitespace-nowrap text-dashboard-text">{formatTimestamp(run.started_at)}</TableCell>
+            <TableCell className="whitespace-nowrap text-dashboard-text">{formatTimestamp(run.finished_at)}</TableCell>
+            <TableCell>
+              <Badge className={getSyncRunStatusBadgeClass(run.status)}>{formatStatus(run.status)}</Badge>
+            </TableCell>
+            <TableCell className="text-right tabular-nums text-dashboard-text">{formatInteger(run.items_synced)}</TableCell>
+            <TableCell className="text-right tabular-nums text-dashboard-text">{formatInteger(run.sessions_synced)}</TableCell>
+            <TableCell className="max-w-md break-words text-dashboard-muted">
+              {run.status === "error" ? sanitizeSyncRunErrorMessage(run.error_message) : "—"}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
 async function getMatterConnectionStatus(): Promise<MatterConnectionStatus> {
   const token = process.env.MATTER_API_TOKEN;
 
@@ -236,6 +292,7 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
       latestRun: null,
       latestSuccessfulRun: null,
       latestErrorRun: null,
+      recentRuns: [],
       databaseStatus: {
         state: "not-configured",
         label: "Not configured",
@@ -247,7 +304,7 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
   try {
     const { getSupabaseAdminClient } = await import("@/lib/supabase-admin");
     const client = getSupabaseAdminClient();
-    const [latestRunResult, latestSuccessfulRunResult, latestErrorRunResult] = await Promise.all([
+    const [latestRunResult, latestSuccessfulRunResult, latestErrorRunResult, recentRunsResult] = await Promise.all([
       client.from("sync_runs").select("*").order("started_at", { ascending: false }).limit(1).maybeSingle(),
       client
         .from("sync_runs")
@@ -266,9 +323,14 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
         .order("started_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      client
+        .from("sync_runs")
+        .select("id, started_at, finished_at, status, items_synced, sessions_synced, error_message")
+        .order("started_at", { ascending: false })
+        .limit(8),
     ]);
 
-    const firstError = latestRunResult.error ?? latestSuccessfulRunResult.error ?? latestErrorRunResult.error;
+    const firstError = latestRunResult.error ?? latestSuccessfulRunResult.error ?? latestErrorRunResult.error ?? recentRunsResult.error;
     if (firstError) {
       throw firstError;
     }
@@ -277,6 +339,7 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
       latestRun: latestRunResult.data,
       latestSuccessfulRun: latestSuccessfulRunResult.data,
       latestErrorRun: latestErrorRunResult.data,
+      recentRuns: recentRunsResult.data ?? [],
       databaseStatus: {
         state: "connected",
         label: "Connected",
@@ -288,6 +351,7 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
       latestRun: null,
       latestSuccessfulRun: null,
       latestErrorRun: null,
+      recentRuns: [],
       databaseStatus: {
         state: "error",
         label: "Connection issue",
@@ -317,6 +381,27 @@ function getStatusBadgeClass(state: ConnectionState): string {
     case "not-configured":
       return "border-white/10 bg-muted text-muted-foreground hover:bg-muted";
   }
+}
+
+function getSyncRunStatusBadgeClass(status: string): string {
+  switch (status) {
+    case "success":
+      return "border-emerald-400/25 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/15";
+    case "running":
+      return "border-sky-400/25 bg-sky-400/10 text-sky-300 hover:bg-sky-400/15";
+    case "error":
+      return "border-destructive/25 bg-destructive/10 text-destructive hover:bg-destructive/15";
+    default:
+      return "border-white/10 bg-muted text-muted-foreground hover:bg-muted";
+  }
+}
+
+function formatStatus(status: string): string {
+  return status
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function formatTimestamp(timestamp: string | null | undefined): string {
