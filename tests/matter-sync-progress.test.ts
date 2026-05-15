@@ -13,6 +13,8 @@ import {
   getMatterSyncSessionsLimit,
   getRecentActivityWindowStart,
   isMatterRateLimitActive,
+  matterPageHasMore,
+  normalizeRecentActivityWindow,
   MATTER_SYNC_BATCH_LIMIT,
   parseRetryAfterHeader,
   shouldDisableMatterSyncButton,
@@ -133,4 +135,42 @@ test("preserves checkpoints when storing Matter rate limits after a 429", () => 
   assert.equal(rateLimitedState.rate_limited_until, "2026-05-15T12:01:00.000Z");
   assert.equal(rateLimitedState.recent_activity_checkpoint, storedState.recent_activity_checkpoint);
   assert.equal(rateLimitedState.backfill_items_cursor, storedState.backfill_items_cursor);
+});
+
+test("builds no-session guidance when recent activity returns zero sessions and no more pages", () => {
+  const message = buildMatterSyncMessage({ items: 0, sessions: 0, annotations: 0, tags: 0 }, false, "recent_activity");
+
+  assert.equal(message, "No recent reading sessions found. Try expanding the sync window or confirm Matter has reading-session data.");
+  assert.doesNotMatch(message, /More recent activity remains/);
+});
+
+test("keeps more-remains messaging when Matter returns zero sessions with has_more", () => {
+  const message = buildMatterSyncMessage({ items: 0, sessions: 0, annotations: 0, tags: 0 }, true, "recent_activity");
+
+  assert.match(message, /More recent activity remains — click Sync again/);
+});
+
+test("detects Matter pagination from either has_more or next_cursor", () => {
+  assert.equal(matterPageHasMore({ has_more: false, next_cursor: null }), false);
+  assert.equal(matterPageHasMore({ has_more: true, next_cursor: null }), true);
+  assert.equal(matterPageHasMore({ has_more: false, next_cursor: "cursor_1" }), true);
+});
+
+test("supports selectable recent activity windows", () => {
+  const now = new Date("2026-05-15T12:00:00.000Z");
+
+  assert.equal(getRecentActivityWindowStart(now, "7_days"), "2026-05-08T12:00:00.000Z");
+  assert.equal(getRecentActivityWindowStart(now, "30_days"), "2026-04-15T12:00:00.000Z");
+  assert.equal(getRecentActivityWindowStart(now, "90_days"), "2026-02-14T12:00:00.000Z");
+  assert.equal(getRecentActivityWindowStart(now, "current_year"), "2026-01-01T00:00:00.000Z");
+  assert.equal(getRecentActivityWindowStart(now, "all"), null);
+  assert.equal(normalizeRecentActivityWindow("90_days"), "90_days");
+  assert.equal(normalizeRecentActivityWindow("bad"), "current_year");
+});
+
+test("documents sessions-first flow before linked item import", () => {
+  const sessions = [{ item_id: "item_a" }, { item_id: "item_b" }];
+
+  assert.equal(getMatterSyncInitialPhase("recent_activity"), "sessions");
+  assert.deepEqual(collectLinkedMatterItemIds(sessions), ["item_a", "item_b"]);
 });

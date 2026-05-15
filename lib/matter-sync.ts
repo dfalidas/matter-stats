@@ -46,7 +46,9 @@ import {
   getMatterSyncSessionsLimit,
   getRecentActivityWindowStart,
   isMatterRateLimitActive,
+  matterPageHasMore,
   type MatterBatchCounts,
+  type MatterRecentActivityWindow,
   type MatterSyncMode,
   type MatterSyncPhase,
 } from "@/lib/matter-sync-progress";
@@ -85,6 +87,23 @@ type SyncCheckpoint = {
   next: string | null;
 };
 
+type MatterSyncDiagnostics = {
+  requestCount: number;
+  sessionsReturned: number;
+  itemsReturned: number;
+  lastHasMore: boolean;
+  lastNextCursorPresent: boolean;
+};
+
+function createEmptyMatterSyncDiagnostics(): MatterSyncDiagnostics {
+  return { requestCount: 0, sessionsReturned: 0, itemsReturned: 0, lastHasMore: false, lastNextCursorPresent: false };
+}
+
+function recordMatterPageDiagnostics(diagnostics: MatterSyncDiagnostics, page: MatterListResponse<unknown>) {
+  diagnostics.lastHasMore = page.has_more;
+  diagnostics.lastNextCursorPresent = page.next_cursor !== null && page.next_cursor.trim().length > 0;
+}
+
 export async function getMatterSyncAvailability(): Promise<{ rateLimitedUntil: string | null; message: string | null }> {
   const state = await getMatterSyncState();
   const rateLimitedUntil = state?.rate_limited_until ?? null;
@@ -95,7 +114,10 @@ export async function getMatterSyncAvailability(): Promise<{ rateLimitedUntil: s
   };
 }
 
-export async function syncMatterData(mode: MatterSyncMode = "recent_activity"): Promise<MatterSyncResult> {
+export async function syncMatterData(
+  mode: MatterSyncMode = "recent_activity",
+  options: { recentActivityWindow?: MatterRecentActivityWindow } = {}
+): Promise<MatterSyncResult> {
   let syncRunId: string | null = null;
   let storedState: SyncState | null = null;
 
@@ -112,17 +134,19 @@ export async function syncMatterData(mode: MatterSyncMode = "recent_activity"): 
     }
 
     const startedAt = new Date().toISOString();
-    const syncRun = await createSyncRun({ status: "running", started_at: startedAt });
+    const syncRun = await createSyncRun({ status: "running", started_at: startedAt, sync_mode: mode });
     syncRunId = syncRun.id;
 
     // Validate the configured Matter token before mutating local Matter-derived rows.
     await getMatterAccount();
 
-    const batchState = startBatchState(storedState, legacyCheckpoint, mode);
+    const recentActivitySince = mode === "recent_activity" ? getRecentActivityWindowStart(new Date(startedAt), options.recentActivityWindow) : null;
+    const batchState = startBatchState(storedState, legacyCheckpoint, mode, recentActivitySince);
     const counts = createEmptyMatterBatchCounts();
+    const diagnostics = createEmptyMatterSyncDiagnostics();
     const affectedDates = new Set<string>();
     const checkpoint: SyncCheckpoint = { next: batchState.next_checkpoint_timestamp ?? batchState.active_since_timestamp };
-    const hasMore = await importNextMatterBatch({ state: batchState, counts, affectedDates, checkpoint, mode });
+    const hasMore = await importNextMatterBatch({ state: batchState, counts, affectedDates, checkpoint, mode, diagnostics });
 
     const persistedState = buildPersistedSyncState(batchState, checkpoint.next, hasMore, mode);
 
@@ -135,6 +159,12 @@ export async function syncMatterData(mode: MatterSyncMode = "recent_activity"): 
       sessions_synced: counts.sessions,
       annotations_synced: counts.annotations,
       tags_synced: counts.tags,
+      sync_mode: mode,
+      matter_requests_count: diagnostics.requestCount,
+      matter_sessions_returned: diagnostics.sessionsReturned,
+      matter_items_returned: diagnostics.itemsReturned,
+      matter_has_more: diagnostics.lastHasMore,
+      matter_next_cursor_present: diagnostics.lastNextCursorPresent,
       error_message: null,
       checkpoint_timestamp: (mode === "recent_activity" ? persistedState.recent_activity_checkpoint : persistedState.completed_checkpoint_timestamp) ?? null,
     });
@@ -169,6 +199,7 @@ export async function syncMatterData(mode: MatterSyncMode = "recent_activity"): 
           status: "error",
           finished_at: new Date().toISOString(),
           error_message: sanitizedError,
+          sync_mode: mode,
           checkpoint_timestamp: null,
         });
       } catch (updateError) {
@@ -201,30 +232,37 @@ async function importNextMatterBatch({
   affectedDates,
   checkpoint,
   mode,
+  diagnostics,
 }: {
   state: MutableMatterSyncState;
   counts: MatterBatchCounts;
   affectedDates: Set<string>;
   checkpoint: SyncCheckpoint;
   mode: MatterSyncMode;
+  diagnostics: MatterSyncDiagnostics;
 }): Promise<boolean> {
   if (state.active_phase === "items") {
+    diagnostics.requestCount += 1;
     const itemPage = await listMatterItems({
       status: "all",
       updatedSince: state.active_since_timestamp ?? undefined,
       cursor: (mode === "backfill_library" ? state.backfill_items_cursor : state.item_cursor) ?? undefined,
       limit: getMatterSyncItemsLimit(),
     });
+    diagnostics.itemsReturned += itemPage.results.length;
+    recordMatterPageDiagnostics(diagnostics, itemPage);
     const itemRows = await importMatterItemPage(itemPage, affectedDates, checkpoint);
     counts.items += itemRows.itemCount;
     counts.tags += itemRows.tagCount;
     counts.annotations += itemRows.annotationCount;
 
-    if (itemPage.has_more && itemPage.next_cursor) {
-      if (mode === "backfill_library") {
-        state.backfill_items_cursor = itemPage.next_cursor;
-      } else {
-        state.item_cursor = itemPage.next_cursor;
+    if (matterPageHasMore(itemPage)) {
+      if (itemPage.next_cursor) {
+        if (mode === "backfill_library") {
+          state.backfill_items_cursor = itemPage.next_cursor;
+        } else {
+          state.item_cursor = itemPage.next_cursor;
+        }
       }
       return true;
     }
@@ -238,6 +276,7 @@ async function importNextMatterBatch({
   }
 
   if (state.active_phase === "tags") {
+    diagnostics.requestCount += 1;
     const tagPage = await listOptionalMatterTagsPage({
       updatedSince: state.active_since_timestamp ?? undefined,
       cursor: state.tag_cursor ?? undefined,
@@ -245,6 +284,7 @@ async function importNextMatterBatch({
     });
 
     if (tagPage) {
+      recordMatterPageDiagnostics(diagnostics, tagPage);
       const tagRows = tagPage.results.map((tag) => {
         const tagRow = normalizeMatterTag(tag);
         advanceCheckpoint(checkpoint, tagRow.updated_at_matter);
@@ -253,7 +293,7 @@ async function importNextMatterBatch({
       await upsertInBatches(tagRows, upsertMatterTags);
       counts.tags += tagRows.length;
 
-      if (tagPage.has_more && tagPage.next_cursor) {
+      if (matterPageHasMore(tagPage)) {
         state.tag_cursor = tagPage.next_cursor;
         return true;
       }
@@ -264,18 +304,24 @@ async function importNextMatterBatch({
   }
 
   if (state.active_phase === "sessions") {
+    // Matter reading sessions are a dedicated endpoint, not the library items endpoint.
+    // The API supports ISO `since`, `limit`, and `cursor` query params and returns
+    // `results`, `has_more`, and `next_cursor` for cursor pagination.
+    diagnostics.requestCount += 1;
     const sessionPage = await listMatterReadingSessions({
       since: state.active_since_timestamp ?? undefined,
       cursor: state.session_cursor ?? undefined,
       limit: getMatterSyncSessionsLimit(),
     });
-    const sessionCounts = await importMatterSessionPage(sessionPage, affectedDates, checkpoint);
+    diagnostics.sessionsReturned += sessionPage.results.length;
+    recordMatterPageDiagnostics(diagnostics, sessionPage);
+    const sessionCounts = await importMatterSessionPage(sessionPage, affectedDates, checkpoint, diagnostics);
     counts.sessions += sessionCounts.sessions;
     counts.items += sessionCounts.items;
     counts.tags += sessionCounts.tags;
     counts.annotations += sessionCounts.annotations;
 
-    if (sessionPage.has_more && sessionPage.next_cursor) {
+    if (matterPageHasMore(sessionPage)) {
       state.session_cursor = sessionPage.next_cursor;
       return true;
     }
@@ -351,10 +397,11 @@ async function importMatterItemPage(
 async function importMatterSessionPage(
   sessionPage: Awaited<ReturnType<typeof listMatterReadingSessions>>,
   affectedDates: Set<string>,
-  checkpoint: SyncCheckpoint
+  checkpoint: SyncCheckpoint,
+  diagnostics: MatterSyncDiagnostics
 ): Promise<{ sessions: number; items: number; tags: number; annotations: number }> {
   const linkedItemIds = collectLinkedMatterItemIds(sessionPage.results);
-  const linkedItemCounts = await importLinkedMatterItems(linkedItemIds, affectedDates, checkpoint);
+  const linkedItemCounts = await importLinkedMatterItems(linkedItemIds, affectedDates, checkpoint, diagnostics);
   const sessionRows: TablesInsert<"reading_sessions">[] = [];
   const matterItemLookup = new Map<string, MatterItemRow | null>();
 
@@ -383,7 +430,8 @@ async function importMatterSessionPage(
 async function importLinkedMatterItems(
   itemIds: string[],
   affectedDates: Set<string>,
-  checkpoint: SyncCheckpoint
+  checkpoint: SyncCheckpoint,
+  diagnostics: MatterSyncDiagnostics
 ): Promise<{ itemCount: number; tagCount: number; annotationCount: number }> {
   if (itemIds.length === 0) {
     return { itemCount: 0, tagCount: 0, annotationCount: 0 };
@@ -391,8 +439,10 @@ async function importLinkedMatterItems(
 
   const results = [];
   for (const itemId of itemIds) {
+    diagnostics.requestCount += 1;
     results.push(await getOptionalMatterItem(itemId));
   }
+  diagnostics.itemsReturned += results.filter(Boolean).length;
 
   return importMatterItemPage(
     {
@@ -432,7 +482,12 @@ async function getOptionalMatterItem(itemId: string): Promise<Awaited<ReturnType
   }
 }
 
-function startBatchState(storedState: SyncState | null, legacyCheckpoint: string | null, mode: MatterSyncMode): MutableMatterSyncState {
+function startBatchState(
+  storedState: SyncState | null,
+  legacyCheckpoint: string | null,
+  mode: MatterSyncMode,
+  recentActivitySince: string | null
+): MutableMatterSyncState {
   const completedCheckpoint = storedState?.completed_checkpoint_timestamp ?? legacyCheckpoint;
   const storedPhase = storedState ? normalizePhase(storedState.active_phase, mode) : "complete";
   const modeChanged = storedState?.sync_mode && storedState.sync_mode !== mode;
@@ -441,12 +496,12 @@ function startBatchState(storedState: SyncState | null, legacyCheckpoint: string
   if (storedState && storedPhase !== "complete" && !modeChanged && canResumeMode) {
     return {
       completed_checkpoint_timestamp: completedCheckpoint,
-      active_since_timestamp: storedState.active_since_timestamp ?? getModeCheckpoint(storedState, legacyCheckpoint, mode),
+      active_since_timestamp: storedState.active_since_timestamp ?? getModeCheckpoint(storedState, legacyCheckpoint, mode, recentActivitySince),
       active_phase: storedPhase,
       item_cursor: storedState.item_cursor,
       tag_cursor: storedState.tag_cursor,
       session_cursor: storedState.session_cursor,
-      next_checkpoint_timestamp: storedState.next_checkpoint_timestamp ?? storedState.active_since_timestamp ?? getModeCheckpoint(storedState, legacyCheckpoint, mode),
+      next_checkpoint_timestamp: storedState.next_checkpoint_timestamp ?? storedState.active_since_timestamp ?? getModeCheckpoint(storedState, legacyCheckpoint, mode, recentActivitySince),
       rate_limited_until: storedState.rate_limited_until,
       sync_mode: mode,
       recent_activity_checkpoint: storedState.recent_activity_checkpoint,
@@ -454,7 +509,7 @@ function startBatchState(storedState: SyncState | null, legacyCheckpoint: string
     };
   }
 
-  const activeSince = getModeCheckpoint(storedState, legacyCheckpoint, mode);
+  const activeSince = getModeCheckpoint(storedState, legacyCheckpoint, mode, recentActivitySince);
 
   return {
     completed_checkpoint_timestamp: completedCheckpoint,
@@ -471,9 +526,14 @@ function startBatchState(storedState: SyncState | null, legacyCheckpoint: string
   };
 }
 
-function getModeCheckpoint(storedState: SyncState | null, legacyCheckpoint: string | null, mode: MatterSyncMode): string | null {
+function getModeCheckpoint(
+  storedState: SyncState | null,
+  legacyCheckpoint: string | null,
+  mode: MatterSyncMode,
+  recentActivitySince: string | null
+): string | null {
   if (mode === "recent_activity") {
-    return storedState?.recent_activity_checkpoint ?? storedState?.completed_checkpoint_timestamp ?? legacyCheckpoint ?? getRecentActivityWindowStart();
+    return recentActivitySince;
   }
 
   return storedState?.completed_checkpoint_timestamp ?? legacyCheckpoint;
