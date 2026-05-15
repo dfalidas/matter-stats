@@ -7,6 +7,7 @@ import {
   listMatterReadingSessions,
   listMatterTags,
   MatterApiError,
+  MatterRateLimitError,
   type MatterListResponse,
   type MatterTag,
 } from "@/lib/matter-api";
@@ -36,7 +37,11 @@ import {
 import {
   buildMatterSyncMessage,
   createEmptyMatterBatchCounts,
-  MATTER_SYNC_BATCH_LIMIT,
+  buildMatterRateLimitMessage,
+  buildRateLimitedMatterSyncState,
+  getMatterSyncItemsLimit,
+  getMatterSyncSessionsLimit,
+  isMatterRateLimitActive,
   type MatterBatchCounts,
   type MatterSyncPhase,
 } from "@/lib/matter-sync-progress";
@@ -53,6 +58,7 @@ type MutableMatterSyncState = Pick<
   | "tag_cursor"
   | "session_cursor"
   | "next_checkpoint_timestamp"
+  | "rate_limited_until"
 >;
 
 export type MatterSyncResult = {
@@ -64,17 +70,39 @@ export type MatterSyncResult = {
   annotationsSynced?: number;
   tagsSynced?: number;
   hasMore?: boolean;
+  rateLimitedUntil?: string | null;
 };
 
 type SyncCheckpoint = {
   next: string | null;
 };
 
+export async function getMatterSyncAvailability(): Promise<{ rateLimitedUntil: string | null; message: string | null }> {
+  const state = await getMatterSyncState();
+  const rateLimitedUntil = state?.rate_limited_until ?? null;
+
+  return {
+    rateLimitedUntil,
+    message: isMatterRateLimitActive(rateLimitedUntil) ? buildMatterRateLimitMessage(rateLimitedUntil) : null,
+  };
+}
+
 export async function syncMatterData(): Promise<MatterSyncResult> {
   let syncRunId: string | null = null;
+  let storedState: SyncState | null = null;
 
   try {
-    const [storedState, legacyCheckpoint] = await Promise.all([getMatterSyncState(), getLatestSuccessfulSyncCheckpoint()]);
+    const [loadedState, legacyCheckpoint] = await Promise.all([getMatterSyncState(), getLatestSuccessfulSyncCheckpoint()]);
+    storedState = loadedState;
+
+    if (isMatterRateLimitActive(storedState?.rate_limited_until)) {
+      return {
+        ok: false,
+        message: buildMatterRateLimitMessage(storedState?.rate_limited_until ?? null),
+        rateLimitedUntil: storedState?.rate_limited_until ?? null,
+      };
+    }
+
     const startedAt = new Date().toISOString();
     const syncRun = await createSyncRun({ status: "running", started_at: startedAt });
     syncRunId = syncRun.id;
@@ -116,7 +144,16 @@ export async function syncMatterData(): Promise<MatterSyncResult> {
       hasMore,
     };
   } catch (error) {
+    const rateLimitedUntil = getRateLimitedUntil(error);
     const sanitizedError = sanitizeSyncError(error);
+
+    if (rateLimitedUntil) {
+      try {
+        await upsertMatterSyncState(buildRateLimitedSyncState(storedState, rateLimitedUntil));
+      } catch (stateError) {
+        console.error("Matter sync rate-limit state update failed", { error: sanitizeLogError(stateError) });
+      }
+    }
 
     if (syncRunId) {
       try {
@@ -132,6 +169,15 @@ export async function syncMatterData(): Promise<MatterSyncResult> {
     }
 
     console.error("Matter sync failed", { syncRunId, error: sanitizeLogError(error) });
+
+    if (rateLimitedUntil) {
+      return {
+        ok: false,
+        message: buildMatterRateLimitMessage(rateLimitedUntil),
+        syncRunId: syncRunId ?? undefined,
+        rateLimitedUntil,
+      };
+    }
 
     return {
       ok: false,
@@ -157,7 +203,7 @@ async function importNextMatterBatch({
       status: "all",
       updatedSince: state.active_since_timestamp ?? undefined,
       cursor: state.item_cursor ?? undefined,
-      limit: MATTER_SYNC_BATCH_LIMIT,
+      limit: getMatterSyncItemsLimit(),
     });
     const itemRows = await importMatterItemPage(itemPage, affectedDates, checkpoint);
     counts.items += itemRows.itemCount;
@@ -177,7 +223,7 @@ async function importNextMatterBatch({
     const tagPage = await listOptionalMatterTagsPage({
       updatedSince: state.active_since_timestamp ?? undefined,
       cursor: state.tag_cursor ?? undefined,
-      limit: MATTER_SYNC_BATCH_LIMIT,
+      limit: getMatterSyncItemsLimit(),
     });
 
     if (tagPage) {
@@ -203,7 +249,7 @@ async function importNextMatterBatch({
     const sessionPage = await listMatterReadingSessions({
       since: state.active_since_timestamp ?? undefined,
       cursor: state.session_cursor ?? undefined,
-      limit: MATTER_SYNC_BATCH_LIMIT,
+      limit: getMatterSyncSessionsLimit(),
     });
     const sessionCount = await importMatterSessionPage(sessionPage, affectedDates, checkpoint);
     counts.sessions += sessionCount;
@@ -323,6 +369,7 @@ function startBatchState(storedState: SyncState | null, legacyCheckpoint: string
       tag_cursor: storedState.tag_cursor,
       session_cursor: storedState.session_cursor,
       next_checkpoint_timestamp: storedState.next_checkpoint_timestamp ?? storedState.active_since_timestamp ?? completedCheckpoint,
+      rate_limited_until: storedState.rate_limited_until,
     };
   }
 
@@ -334,6 +381,7 @@ function startBatchState(storedState: SyncState | null, legacyCheckpoint: string
     tag_cursor: null,
     session_cursor: null,
     next_checkpoint_timestamp: completedCheckpoint,
+    rate_limited_until: storedState?.rate_limited_until ?? null,
   };
 }
 
@@ -348,6 +396,7 @@ function buildPersistedSyncState(state: MutableMatterSyncState, nextCheckpoint: 
       tag_cursor: null,
       session_cursor: null,
       next_checkpoint_timestamp: null,
+      rate_limited_until: null,
     };
   }
 
@@ -360,7 +409,25 @@ function buildPersistedSyncState(state: MutableMatterSyncState, nextCheckpoint: 
     tag_cursor: state.tag_cursor,
     session_cursor: state.session_cursor,
     next_checkpoint_timestamp: nextCheckpoint,
+    rate_limited_until: null,
   };
+}
+
+function buildRateLimitedSyncState(storedState: SyncState | null, rateLimitedUntil: string): TablesInsert<"sync_state"> {
+  return buildRateLimitedMatterSyncState(storedState, rateLimitedUntil);
+}
+
+function getRateLimitedUntil(error: unknown): string | null {
+  if (!(error instanceof MatterRateLimitError)) {
+    return null;
+  }
+
+  const retryAfterSeconds = error.rateLimit.retryAfterSeconds;
+  if (retryAfterSeconds === null) {
+    return null;
+  }
+
+  return new Date(Date.now() + retryAfterSeconds * 1_000).toISOString();
 }
 
 function normalizePhase(phase: string): MatterSyncPhase {

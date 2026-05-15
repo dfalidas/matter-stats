@@ -31,7 +31,11 @@ APP_ACCESS_PASSWORD=use-a-long-password-manager-value
 MATTER_API_TOKEN=your-matter-api-token
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
+MATTER_SYNC_ITEMS_LIMIT=25
+MATTER_SYNC_SESSIONS_LIMIT=25
 ```
+
+The two `MATTER_SYNC_*_LIMIT` values are optional and default to `25`; keep them at `25` unless you intentionally want smaller sync pages.
 
 Security rules:
 

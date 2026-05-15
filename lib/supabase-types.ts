@@ -248,6 +248,7 @@ export type Database = {
           tag_cursor: string | null;
           session_cursor: string | null;
           next_checkpoint_timestamp: string | null;
+          rate_limited_until: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -260,6 +261,7 @@ export type Database = {
           tag_cursor?: string | null;
           session_cursor?: string | null;
           next_checkpoint_timestamp?: string | null;
+          rate_limited_until?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -272,6 +274,7 @@ export type Database = {
           tag_cursor?: string | null;
           session_cursor?: string | null;
           next_checkpoint_timestamp?: string | null;
+          rate_limited_until?: string | null;
           created_at?: string;
           updated_at?: string;
         };

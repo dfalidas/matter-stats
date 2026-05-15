@@ -1,4 +1,7 @@
-export const MATTER_SYNC_BATCH_LIMIT = 100;
+const DEFAULT_MATTER_SYNC_ITEMS_LIMIT = 25;
+const DEFAULT_MATTER_SYNC_SESSIONS_LIMIT = 25;
+
+export const MATTER_SYNC_BATCH_LIMIT = DEFAULT_MATTER_SYNC_ITEMS_LIMIT;
 
 export type MatterSyncPhase = "items" | "tags" | "sessions" | "complete";
 
@@ -8,6 +11,22 @@ export type MatterBatchCounts = {
   annotations: number;
   tags: number;
 };
+
+type MatterSyncLimitEnv = { [key: string]: string | undefined };
+
+export type MatterSyncButtonState = {
+  isPending: boolean;
+  rateLimitedUntil?: string | null;
+  now?: Date;
+};
+
+export function getMatterSyncItemsLimit(env: MatterSyncLimitEnv = process.env): number {
+  return parseMatterSyncLimit(env.MATTER_SYNC_ITEMS_LIMIT, DEFAULT_MATTER_SYNC_ITEMS_LIMIT);
+}
+
+export function getMatterSyncSessionsLimit(env: MatterSyncLimitEnv = process.env): number {
+  return parseMatterSyncLimit(env.MATTER_SYNC_SESSIONS_LIMIT, DEFAULT_MATTER_SYNC_SESSIONS_LIMIT);
+}
 
 export function createEmptyMatterBatchCounts(): MatterBatchCounts {
   return {
@@ -36,4 +55,102 @@ export function buildMatterSyncMessage(counts: MatterBatchCounts, hasMore: boole
   }
 
   return `Sync complete. ${imported} ${details}`;
+}
+
+
+export function parseRetryAfterHeader(value: string | null, now: number = Date.now()): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const seconds = Number.parseInt(value, 10);
+  if (Number.isFinite(seconds)) {
+    return Math.max(seconds, 0);
+  }
+
+  const retryAt = Date.parse(value);
+  if (Number.isFinite(retryAt)) {
+    return Math.max(Math.ceil((retryAt - now) / 1_000), 0);
+  }
+
+  return null;
+}
+
+
+export type MatterSyncStateSnapshot = {
+  completed_checkpoint_timestamp: string | null;
+  active_since_timestamp: string | null;
+  active_phase: MatterSyncPhase | string;
+  item_cursor: string | null;
+  tag_cursor: string | null;
+  session_cursor: string | null;
+  next_checkpoint_timestamp: string | null;
+};
+
+export function buildRateLimitedMatterSyncState<T extends MatterSyncStateSnapshot>(
+  storedState: T | null,
+  rateLimitedUntil: string
+): MatterSyncStateSnapshot & { id: "matter"; rate_limited_until: string } {
+  return {
+    id: "matter",
+    completed_checkpoint_timestamp: storedState?.completed_checkpoint_timestamp ?? null,
+    active_since_timestamp: storedState?.active_since_timestamp ?? null,
+    active_phase: storedState?.active_phase ?? "complete",
+    item_cursor: storedState?.item_cursor ?? null,
+    tag_cursor: storedState?.tag_cursor ?? null,
+    session_cursor: storedState?.session_cursor ?? null,
+    next_checkpoint_timestamp: storedState?.next_checkpoint_timestamp ?? null,
+    rate_limited_until: rateLimitedUntil,
+  };
+}
+
+export function buildMatterRateLimitMessage(rateLimitedUntil: string | null): string {
+  return `Matter rate limit reached. Try again after ${formatMatterRetryTime(rateLimitedUntil)}.`;
+}
+
+export function isMatterRateLimitActive(rateLimitedUntil: string | null | undefined, now: Date = new Date()): boolean {
+  if (!rateLimitedUntil) {
+    return false;
+  }
+
+  const retryAt = Date.parse(rateLimitedUntil);
+  return Number.isFinite(retryAt) && retryAt > now.getTime();
+}
+
+export function shouldDisableMatterSyncButton({ isPending, rateLimitedUntil, now = new Date() }: MatterSyncButtonState): boolean {
+  return isPending || isMatterRateLimitActive(rateLimitedUntil, now);
+}
+
+export function formatMatterRetryTime(rateLimitedUntil: string | null): string {
+  if (!rateLimitedUntil) {
+    return "the time Matter provides";
+  }
+
+  const retryAt = new Date(rateLimitedUntil);
+  if (!Number.isFinite(retryAt.getTime())) {
+    return "the time Matter provides";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZoneName: "short",
+  }).format(retryAt);
+}
+
+function parseMatterSyncLimit(rawValue: string | undefined, fallback: number): number {
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+
+  return parsed;
 }
