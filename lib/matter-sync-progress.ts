@@ -4,6 +4,9 @@ const DEFAULT_MATTER_SYNC_SESSIONS_LIMIT = 25;
 export const MATTER_SYNC_BATCH_LIMIT = DEFAULT_MATTER_SYNC_ITEMS_LIMIT;
 
 export type MatterSyncPhase = "items" | "tags" | "sessions" | "complete";
+export type MatterSyncMode = "recent_activity" | "backfill_library";
+
+export const DEFAULT_MATTER_SYNC_MODE: MatterSyncMode = "recent_activity";
 
 export type MatterBatchCounts = {
   items: number;
@@ -46,15 +49,35 @@ export function addMatterBatchCounts(current: MatterBatchCounts, next: MatterBat
   };
 }
 
-export function buildMatterSyncMessage(counts: MatterBatchCounts, hasMore: boolean): string {
-  const imported = `Imported ${counts.items} items and ${counts.sessions} sessions`;
-  const details = `(${counts.annotations} annotations and ${counts.tags} tags).`;
+export function buildMatterSyncMessage(
+  counts: MatterBatchCounts,
+  hasMore: boolean,
+  mode: MatterSyncMode = DEFAULT_MATTER_SYNC_MODE
+): string {
+  const modeLabel = mode === "backfill_library" ? "Backfill library" : "Recent activity sync";
+  const imported = `Imported ${counts.sessions} sessions, ${counts.items} linked items, ${counts.annotations} annotations, and ${counts.tags} tags.`;
 
   if (hasMore) {
-    return `Sync started. ${imported} ${details} More data remains — click Sync again.`;
+    return `${modeLabel} started. ${imported} More ${mode === "backfill_library" ? "library data" : "recent activity"} remains — click Sync again.`;
   }
 
-  return `Sync complete. ${imported} ${details}`;
+  return `${modeLabel} complete. ${imported}`;
+}
+
+export function getMatterSyncInitialPhase(mode: MatterSyncMode): MatterSyncPhase {
+  return mode === "backfill_library" ? "items" : "sessions";
+}
+
+export function getRecentActivityWindowStart(now: Date = new Date()): string {
+  return new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0)).toISOString();
+}
+
+export function collectLinkedMatterItemIds(sessions: Array<{ item_id?: string | null }>): string[] {
+  return [...new Set(sessions.map((session) => session.item_id?.trim()).filter(isNonEmptyString))];
+}
+
+function isNonEmptyString(value: string | null | undefined): value is string {
+  return typeof value === "string" && value.length > 0;
 }
 
 
@@ -85,6 +108,9 @@ export type MatterSyncStateSnapshot = {
   tag_cursor: string | null;
   session_cursor: string | null;
   next_checkpoint_timestamp: string | null;
+  sync_mode?: MatterSyncMode | string;
+  recent_activity_checkpoint?: string | null;
+  backfill_items_cursor?: string | null;
 };
 
 export function buildRateLimitedMatterSyncState<T extends MatterSyncStateSnapshot>(
@@ -101,6 +127,9 @@ export function buildRateLimitedMatterSyncState<T extends MatterSyncStateSnapsho
     session_cursor: storedState?.session_cursor ?? null,
     next_checkpoint_timestamp: storedState?.next_checkpoint_timestamp ?? null,
     rate_limited_until: rateLimitedUntil,
+    sync_mode: storedState?.sync_mode ?? DEFAULT_MATTER_SYNC_MODE,
+    recent_activity_checkpoint: storedState?.recent_activity_checkpoint ?? null,
+    backfill_items_cursor: storedState?.backfill_items_cursor ?? null,
   };
 }
 

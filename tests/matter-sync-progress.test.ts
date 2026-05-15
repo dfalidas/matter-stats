@@ -6,9 +6,12 @@ import {
   buildMatterRateLimitMessage,
   buildMatterSyncMessage,
   buildRateLimitedMatterSyncState,
+  collectLinkedMatterItemIds,
   createEmptyMatterBatchCounts,
+  getMatterSyncInitialPhase,
   getMatterSyncItemsLimit,
   getMatterSyncSessionsLimit,
+  getRecentActivityWindowStart,
   isMatterRateLimitActive,
   MATTER_SYNC_BATCH_LIMIT,
   parseRetryAfterHeader,
@@ -31,17 +34,39 @@ test("allows Matter sync limits to be configured with environment variables", ()
 test("builds clear messaging when a bounded batch has more data remaining", () => {
   const message = buildMatterSyncMessage({ items: 25, sessions: 0, annotations: 4, tags: 12 }, true);
 
-  assert.match(message, /Sync started/);
-  assert.match(message, /Imported 25 items and 0 sessions/);
-  assert.match(message, /More data remains — click Sync again/);
+  assert.match(message, /Recent activity sync started/);
+  assert.match(message, /Imported 0 sessions, 25 linked items, 4 annotations, and 12 tags/);
+  assert.match(message, /More recent activity remains — click Sync again/);
 });
 
 test("builds clear messaging when sync completes", () => {
   const message = buildMatterSyncMessage({ items: 0, sessions: 25, annotations: 0, tags: 0 }, false);
 
-  assert.match(message, /Sync complete/);
-  assert.match(message, /Imported 0 items and 25 sessions/);
+  assert.match(message, /Recent activity sync complete/);
+  assert.match(message, /Imported 25 sessions, 0 linked items, 0 annotations, and 0 tags/);
   assert.doesNotMatch(message, /More data remains/);
+});
+
+test("starts recent activity sync at sessions and library backfill at items", () => {
+  assert.equal(getMatterSyncInitialPhase("recent_activity"), "sessions");
+  assert.equal(getMatterSyncInitialPhase("backfill_library"), "items");
+});
+
+test("uses the current year as the default recent activity window", () => {
+  assert.equal(getRecentActivityWindowStart(new Date("2026-05-15T12:00:00.000Z")), "2026-01-01T00:00:00.000Z");
+});
+
+test("deduplicates linked Matter item IDs for session-first sync", () => {
+  assert.deepEqual(
+    collectLinkedMatterItemIds([
+      { item_id: " item_a " },
+      { item_id: "item_b" },
+      { item_id: "item_a" },
+      { item_id: null },
+      {},
+    ]),
+    ["item_a", "item_b"]
+  );
 });
 
 test("adds batch counts without mutating the previous count objects", () => {
@@ -95,6 +120,9 @@ test("preserves checkpoints when storing Matter rate limits after a 429", () => 
     tag_cursor: null,
     session_cursor: null,
     next_checkpoint_timestamp: "2026-05-14T00:05:00.000Z",
+    sync_mode: "recent_activity",
+    recent_activity_checkpoint: "2026-05-14T00:02:00.000Z",
+    backfill_items_cursor: "item_cursor_1",
   };
 
   const rateLimitedState = buildRateLimitedMatterSyncState(storedState, "2026-05-15T12:01:00.000Z");
@@ -103,4 +131,6 @@ test("preserves checkpoints when storing Matter rate limits after a 429", () => 
   assert.equal(rateLimitedState.next_checkpoint_timestamp, storedState.next_checkpoint_timestamp);
   assert.equal(rateLimitedState.item_cursor, storedState.item_cursor);
   assert.equal(rateLimitedState.rate_limited_until, "2026-05-15T12:01:00.000Z");
+  assert.equal(rateLimitedState.recent_activity_checkpoint, storedState.recent_activity_checkpoint);
+  assert.equal(rateLimitedState.backfill_items_cursor, storedState.backfill_items_cursor);
 });

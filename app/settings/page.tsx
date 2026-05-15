@@ -68,10 +68,10 @@ export default async function SettingsPage() {
             <div>
               <CardTitle className="text-dashboard-text">Matter sync health</CardTitle>
               <CardDescription className="mt-1 text-dashboard-muted">
-                Use these values to confirm when the last import succeeded and whether the latest run failed.
+                Recent activity sync is the default and imports sessions first, plus only the linked items needed for analytics. Use library backfill only when you intentionally want to fill older item metadata.
               </CardDescription>
             </div>
-            <SyncMatterButton />
+            <SyncMatterButton showBackfill />
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
@@ -91,10 +91,10 @@ export default async function SettingsPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <CountTile label="Items synced" value={latestRun?.items_synced} />
-              <CountTile label="Sessions synced" value={latestRun?.sessions_synced} />
-              <CountTile label="Annotations synced" value={latestRun?.annotations_synced} />
-              <CountTile label="Tags synced" value={latestRun?.tags_synced} />
+              <CountTile label="Sessions imported" value={latestRun?.sessions_synced} />
+              <CountTile label="Linked items imported" value={latestRun?.items_synced} />
+              <CountTile label="Annotations imported" value={latestRun?.annotations_synced} />
+              <CountTile label="Tags imported" value={latestRun?.tags_synced} />
             </div>
             <p className="text-xs text-dashboard-muted">
               Counts reflect the latest sync run{latestRun ? ` (${latestRun.status})` : " once a run exists"}. Credentials are checked only for presence and health; secret values are never rendered.
@@ -209,7 +209,7 @@ function SyncRunLogTable({ runs }: { runs: SyncRunLogEntry[] }) {
   if (runs.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-dashboard-border bg-background/25 p-6 text-sm text-dashboard-muted">
-        No sync runs have been recorded yet. Run a Matter sync to populate recent history.
+        No sync runs have been recorded yet. Run a recent activity sync to populate recent history.
       </div>
     );
   }
@@ -221,8 +221,8 @@ function SyncRunLogTable({ runs }: { runs: SyncRunLogEntry[] }) {
           <TableHead className="text-dashboard-muted">Started</TableHead>
           <TableHead className="text-dashboard-muted">Finished</TableHead>
           <TableHead className="text-dashboard-muted">Status</TableHead>
-          <TableHead className="text-right text-dashboard-muted">Items</TableHead>
           <TableHead className="text-right text-dashboard-muted">Sessions</TableHead>
+          <TableHead className="text-right text-dashboard-muted">Linked items</TableHead>
           <TableHead className="min-w-[240px] text-dashboard-muted">Error message</TableHead>
         </TableRow>
       </TableHeader>
@@ -234,8 +234,8 @@ function SyncRunLogTable({ runs }: { runs: SyncRunLogEntry[] }) {
             <TableCell>
               <Badge className={getSyncRunStatusBadgeClass(run.status)}>{formatStatus(run.status)}</Badge>
             </TableCell>
-            <TableCell className="text-right tabular-nums text-dashboard-text">{formatInteger(run.items_synced)}</TableCell>
             <TableCell className="text-right tabular-nums text-dashboard-text">{formatInteger(run.sessions_synced)}</TableCell>
+            <TableCell className="text-right tabular-nums text-dashboard-text">{formatInteger(run.items_synced)}</TableCell>
             <TableCell className="max-w-md break-words text-dashboard-muted">
               {run.status === "error" ? sanitizeSyncRunErrorMessage(run.error_message) : "—"}
             </TableCell>
