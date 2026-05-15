@@ -3,28 +3,44 @@ import test from "node:test";
 
 import {
   addMatterBatchCounts,
+  buildMatterRateLimitMessage,
   buildMatterSyncMessage,
+  buildRateLimitedMatterSyncState,
   createEmptyMatterBatchCounts,
+  getMatterSyncItemsLimit,
+  getMatterSyncSessionsLimit,
+  isMatterRateLimitActive,
   MATTER_SYNC_BATCH_LIMIT,
+  parseRetryAfterHeader,
+  shouldDisableMatterSyncButton,
 } from "../lib/matter-sync-progress";
 
-test("uses a conservative Matter batch limit for Vercel-safe sync runs", () => {
-  assert.equal(MATTER_SYNC_BATCH_LIMIT, 100);
+test("uses conservative Matter sync limits by default", () => {
+  assert.equal(MATTER_SYNC_BATCH_LIMIT, 25);
+  assert.equal(getMatterSyncItemsLimit({}), 25);
+  assert.equal(getMatterSyncSessionsLimit({}), 25);
+});
+
+test("allows Matter sync limits to be configured with environment variables", () => {
+  assert.equal(getMatterSyncItemsLimit({ MATTER_SYNC_ITEMS_LIMIT: "10" }), 10);
+  assert.equal(getMatterSyncSessionsLimit({ MATTER_SYNC_SESSIONS_LIMIT: "15" }), 15);
+  assert.equal(getMatterSyncItemsLimit({ MATTER_SYNC_ITEMS_LIMIT: "0" }), 25);
+  assert.equal(getMatterSyncSessionsLimit({ MATTER_SYNC_SESSIONS_LIMIT: "not-a-number" }), 25);
 });
 
 test("builds clear messaging when a bounded batch has more data remaining", () => {
-  const message = buildMatterSyncMessage({ items: 100, sessions: 0, annotations: 4, tags: 12 }, true);
+  const message = buildMatterSyncMessage({ items: 25, sessions: 0, annotations: 4, tags: 12 }, true);
 
   assert.match(message, /Sync started/);
-  assert.match(message, /Imported 100 items and 0 sessions/);
+  assert.match(message, /Imported 25 items and 0 sessions/);
   assert.match(message, /More data remains — click Sync again/);
 });
 
 test("builds clear messaging when sync completes", () => {
-  const message = buildMatterSyncMessage({ items: 0, sessions: 42, annotations: 0, tags: 0 }, false);
+  const message = buildMatterSyncMessage({ items: 0, sessions: 25, annotations: 0, tags: 0 }, false);
 
   assert.match(message, /Sync complete/);
-  assert.match(message, /Imported 0 items and 42 sessions/);
+  assert.match(message, /Imported 0 items and 25 sessions/);
   assert.doesNotMatch(message, /More data remains/);
 });
 
@@ -35,4 +51,56 @@ test("adds batch counts without mutating the previous count objects", () => {
 
   assert.deepEqual(combined, second);
   assert.deepEqual(first, { items: 0, sessions: 0, annotations: 0, tags: 0 });
+});
+
+test("parses Retry-After seconds and HTTP dates", () => {
+  const now = Date.parse("2026-05-15T12:00:00.000Z");
+
+  assert.equal(parseRetryAfterHeader("120", now), 120);
+  assert.equal(parseRetryAfterHeader("Fri, 15 May 2026 12:01:30 GMT", now), 90);
+  assert.equal(parseRetryAfterHeader("Fri, 15 May 2026 11:59:00 GMT", now), 0);
+  assert.equal(parseRetryAfterHeader("invalid", now), null);
+  assert.equal(parseRetryAfterHeader(null, now), null);
+});
+
+test("builds friendly rate-limit messages", () => {
+  const retryAt = "2026-05-15T12:01:30.000Z";
+
+  assert.match(buildMatterRateLimitMessage(retryAt), /Matter rate limit reached\. Try again after/);
+  assert.match(buildMatterRateLimitMessage(retryAt), /2026/);
+});
+
+test("detects active rate limits for server-side and client-side protection", () => {
+  const now = new Date("2026-05-15T12:00:00.000Z");
+
+  assert.equal(isMatterRateLimitActive("2026-05-15T12:01:00.000Z", now), true);
+  assert.equal(isMatterRateLimitActive("2026-05-15T11:59:00.000Z", now), false);
+  assert.equal(isMatterRateLimitActive(null, now), false);
+});
+
+test("disables the sync button while pending or while rate-limited", () => {
+  const now = new Date("2026-05-15T12:00:00.000Z");
+
+  assert.equal(shouldDisableMatterSyncButton({ isPending: true, now }), true);
+  assert.equal(shouldDisableMatterSyncButton({ isPending: false, rateLimitedUntil: "2026-05-15T12:01:00.000Z", now }), true);
+  assert.equal(shouldDisableMatterSyncButton({ isPending: false, rateLimitedUntil: "2026-05-15T11:59:00.000Z", now }), false);
+});
+
+test("preserves checkpoints when storing Matter rate limits after a 429", () => {
+  const storedState = {
+    completed_checkpoint_timestamp: "2026-05-14T00:00:00.000Z",
+    active_since_timestamp: "2026-05-14T00:00:00.000Z",
+    active_phase: "items",
+    item_cursor: "cursor_1",
+    tag_cursor: null,
+    session_cursor: null,
+    next_checkpoint_timestamp: "2026-05-14T00:05:00.000Z",
+  };
+
+  const rateLimitedState = buildRateLimitedMatterSyncState(storedState, "2026-05-15T12:01:00.000Z");
+
+  assert.equal(rateLimitedState.completed_checkpoint_timestamp, storedState.completed_checkpoint_timestamp);
+  assert.equal(rateLimitedState.next_checkpoint_timestamp, storedState.next_checkpoint_timestamp);
+  assert.equal(rateLimitedState.item_cursor, storedState.item_cursor);
+  assert.equal(rateLimitedState.rate_limited_until, "2026-05-15T12:01:00.000Z");
 });

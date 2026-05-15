@@ -61,11 +61,13 @@ Replace `your-project-ref` with the reference from your Supabase project URL or 
 | `MATTER_API_TOKEN` | Your Matter API token. | Server-only secret |
 | `SUPABASE_URL` | Supabase Project URL. | Server-only secret |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role or secret server key. | Server-only secret |
+| `MATTER_SYNC_ITEMS_LIMIT` | Optional; defaults to `25` items per sync request. | Server-only config |
+| `MATTER_SYNC_SESSIONS_LIMIT` | Optional; defaults to `25` reading sessions per sync request. | Server-only config |
 
 5. Select **Save** after adding each variable.
 6. If you edited variables after a deployment already ran, trigger a new deployment so Vercel rebuilds with the new values.
 
-Do not add `NEXT_PUBLIC_` to `MATTER_API_TOKEN`, `APP_ACCESS_PASSWORD`, `SUPABASE_URL`, or `SUPABASE_SERVICE_ROLE_KEY`. The current private app does not require any browser-exposed Supabase keys.
+Do not add `NEXT_PUBLIC_` to `MATTER_API_TOKEN`, `APP_ACCESS_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `MATTER_SYNC_ITEMS_LIMIT`, or `MATTER_SYNC_SESSIONS_LIMIT`. The current private app does not require any browser-exposed Supabase keys.
 
 ## 4. Deploy from GitHub to Vercel
 
