@@ -4,8 +4,10 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import { SyncButton } from "@/components/dashboard-components";
 import {
   buildMatterRateLimitMessage,
+  DEFAULT_RECENT_ACTIVITY_WINDOW,
   formatMatterRetryTime,
   isMatterRateLimitActive,
+  MATTER_RECENT_ACTIVITY_WINDOW_OPTIONS,
   shouldDisableMatterSyncButton,
 } from "@/lib/matter-sync-progress";
 import { getMatterSyncAvailabilityAction, syncMatterAction, type SyncMatterActionState } from "./actions";
@@ -68,7 +70,21 @@ export function SyncMatterButton({ showBackfill = false }: { showBackfill?: bool
 
   return (
     <div className="flex flex-col items-start gap-2 md:items-end">
-      <form action={formAction} className="flex flex-wrap justify-end gap-2">
+      <form action={formAction} className="flex flex-wrap items-center justify-end gap-2">
+        <label className="sr-only" htmlFor="recentActivityWindow">Recent activity window</label>
+        <select
+          id="recentActivityWindow"
+          name="recentActivityWindow"
+          defaultValue={DEFAULT_RECENT_ACTIVITY_WINDOW}
+          disabled={isDisabled}
+          className="h-9 rounded-md border border-white/10 bg-dashboard-card px-3 text-sm text-dashboard-text shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {MATTER_RECENT_ACTIVITY_WINDOW_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
         <SyncButton
           type="submit"
           name="mode"

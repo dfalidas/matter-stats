@@ -5,8 +5,18 @@ export const MATTER_SYNC_BATCH_LIMIT = DEFAULT_MATTER_SYNC_ITEMS_LIMIT;
 
 export type MatterSyncPhase = "items" | "tags" | "sessions" | "complete";
 export type MatterSyncMode = "recent_activity" | "backfill_library";
+export type MatterRecentActivityWindow = "7_days" | "30_days" | "90_days" | "current_year" | "all";
 
 export const DEFAULT_MATTER_SYNC_MODE: MatterSyncMode = "recent_activity";
+export const DEFAULT_RECENT_ACTIVITY_WINDOW: MatterRecentActivityWindow = "current_year";
+
+export const MATTER_RECENT_ACTIVITY_WINDOW_OPTIONS: Array<{ value: MatterRecentActivityWindow; label: string }> = [
+  { value: "7_days", label: "7 days" },
+  { value: "30_days", label: "30 days" },
+  { value: "90_days", label: "90 days" },
+  { value: "current_year", label: "Current year" },
+  { value: "all", label: "All available sessions" },
+];
 
 export type MatterBatchCounts = {
   items: number;
@@ -61,6 +71,10 @@ export function buildMatterSyncMessage(
     return `${modeLabel} started. ${imported} More ${mode === "backfill_library" ? "library data" : "recent activity"} remains — click Sync again.`;
   }
 
+  if (mode === "recent_activity" && counts.sessions === 0) {
+    return "No recent reading sessions found. Try expanding the sync window or confirm Matter has reading-session data.";
+  }
+
   return `${modeLabel} complete. ${imported}`;
 }
 
@@ -68,8 +82,38 @@ export function getMatterSyncInitialPhase(mode: MatterSyncMode): MatterSyncPhase
   return mode === "backfill_library" ? "items" : "sessions";
 }
 
-export function getRecentActivityWindowStart(now: Date = new Date()): string {
-  return new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0)).toISOString();
+export function getRecentActivityWindowStart(
+  now: Date = new Date(),
+  window: MatterRecentActivityWindow = DEFAULT_RECENT_ACTIVITY_WINDOW
+): string | null {
+  switch (window) {
+    case "7_days":
+      return subtractUtcDays(now, 7).toISOString();
+    case "30_days":
+      return subtractUtcDays(now, 30).toISOString();
+    case "90_days":
+      return subtractUtcDays(now, 90).toISOString();
+    case "current_year":
+      return new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0)).toISOString();
+    case "all":
+      return null;
+  }
+}
+
+export function normalizeRecentActivityWindow(value: unknown): MatterRecentActivityWindow {
+  return value === "7_days" || value === "30_days" || value === "90_days" || value === "current_year" || value === "all"
+    ? value
+    : DEFAULT_RECENT_ACTIVITY_WINDOW;
+}
+
+export function matterPageHasMore(page: { has_more?: boolean | null; next_cursor?: string | null }): boolean {
+  return page.has_more === true || isNonEmptyString(page.next_cursor);
+}
+
+function subtractUtcDays(now: Date, days: number): Date {
+  const date = new Date(now.getTime());
+  date.setUTCDate(date.getUTCDate() - days);
+  return date;
 }
 
 export function collectLinkedMatterItemIds(sessions: Array<{ item_id?: string | null }>): string[] {
@@ -77,7 +121,7 @@ export function collectLinkedMatterItemIds(sessions: Array<{ item_id?: string | 
 }
 
 function isNonEmptyString(value: string | null | undefined): value is string {
-  return typeof value === "string" && value.length > 0;
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 

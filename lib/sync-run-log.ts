@@ -2,7 +2,7 @@ import type { SyncRun } from "@/lib/supabase-types";
 
 export type SyncRunLogEntry = Pick<
   SyncRun,
-  "id" | "started_at" | "finished_at" | "status" | "items_synced" | "sessions_synced" | "error_message"
+  "id" | "started_at" | "finished_at" | "status" | "items_synced" | "sessions_synced" | "error_message" | "sync_mode"
 >;
 
 const MAX_SAFE_ERROR_LENGTH = 280;

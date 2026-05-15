@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DEFAULT_READING_SPEED_WORDS_PER_MINUTE } from "@/lib/matter-normalizers";
 import { getDefaultMetricsTimezone } from "@/lib/metrics-service";
-import type { SyncRun } from "@/lib/supabase-types";
+import type { SyncRun, SyncState } from "@/lib/supabase-types";
 import { sanitizeSyncRunErrorMessage, type SyncRunLogEntry } from "@/lib/sync-run-log";
 import { logout } from "@/lib/auth-actions";
 
@@ -33,6 +33,7 @@ type SettingsSyncData = {
   latestSuccessfulRun: Pick<SyncRun, "finished_at" | "started_at"> | null;
   latestErrorRun: Pick<SyncRun, "finished_at" | "started_at" | "error_message"> | null;
   recentRuns: SyncRunLogEntry[];
+  syncState: SyncState | null;
   databaseStatus: MatterConnectionStatus;
 };
 
@@ -99,6 +100,23 @@ export default async function SettingsPage() {
             <p className="text-xs text-dashboard-muted">
               Counts reflect the latest sync run{latestRun ? ` (${latestRun.status})` : " once a run exists"}. Credentials are checked only for presence and health; secret values are never rendered.
             </p>
+
+            <div className="rounded-2xl border border-dashboard-border bg-background/35 p-4">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-dashboard-muted">
+                <Database className="h-3.5 w-3.5" aria-hidden /> Recent activity diagnostics
+              </div>
+              <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <DiagnosticField label="Last sync mode" value={formatStatus(latestRun?.sync_mode ?? "unknown")} />
+                <DiagnosticField label="Sessions returned by Matter" value={formatInteger(latestRun?.matter_sessions_returned ?? 0)} />
+                <DiagnosticField label="Linked items upserted" value={formatInteger(latestRun?.items_synced ?? 0)} />
+                <DiagnosticField label="Matter has_more" value={formatBoolean(latestRun?.matter_has_more)} />
+                <DiagnosticField label="Matter next_cursor" value={formatBoolean(latestRun?.matter_next_cursor_present)} />
+                <DiagnosticField label="Session cursor/checkpoint" value={syncData.syncState?.session_cursor ?? syncData.syncState?.recent_activity_checkpoint ?? "None"} />
+                <DiagnosticField label="Rate limited until" value={formatTimestamp(syncData.syncState?.rate_limited_until)} />
+                <DiagnosticField label="Matter requests" value={formatInteger(latestRun?.matter_requests_count ?? 0)} />
+              </dl>
+              <p className="mt-3 text-xs text-dashboard-muted">Only safe counters, booleans, mode labels, and cursor/checkpoint metadata are shown. The Matter API token is never stored or rendered.</p>
+            </div>
           </CardContent>
         </Card>
 
@@ -205,6 +223,15 @@ function CountTile({ label, value }: { label: string; value: number | null | und
   );
 }
 
+function DiagnosticField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-dashboard-muted">{label}</dt>
+      <dd className="mt-1 break-words font-medium text-dashboard-text">{value}</dd>
+    </div>
+  );
+}
+
 function SyncRunLogTable({ runs }: { runs: SyncRunLogEntry[] }) {
   if (runs.length === 0) {
     return (
@@ -221,6 +248,7 @@ function SyncRunLogTable({ runs }: { runs: SyncRunLogEntry[] }) {
           <TableHead className="text-dashboard-muted">Started</TableHead>
           <TableHead className="text-dashboard-muted">Finished</TableHead>
           <TableHead className="text-dashboard-muted">Status</TableHead>
+          <TableHead className="text-dashboard-muted">Mode</TableHead>
           <TableHead className="text-right text-dashboard-muted">Sessions</TableHead>
           <TableHead className="text-right text-dashboard-muted">Linked items</TableHead>
           <TableHead className="min-w-[240px] text-dashboard-muted">Error message</TableHead>
@@ -234,6 +262,7 @@ function SyncRunLogTable({ runs }: { runs: SyncRunLogEntry[] }) {
             <TableCell>
               <Badge className={getSyncRunStatusBadgeClass(run.status)}>{formatStatus(run.status)}</Badge>
             </TableCell>
+            <TableCell className="whitespace-nowrap text-dashboard-muted">{formatStatus(run.sync_mode ?? "unknown")}</TableCell>
             <TableCell className="text-right tabular-nums text-dashboard-text">{formatInteger(run.sessions_synced)}</TableCell>
             <TableCell className="text-right tabular-nums text-dashboard-text">{formatInteger(run.items_synced)}</TableCell>
             <TableCell className="max-w-md break-words text-dashboard-muted">
@@ -295,6 +324,7 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
       latestSuccessfulRun: null,
       latestErrorRun: null,
       recentRuns: [],
+      syncState: null,
       databaseStatus: {
         state: "not-configured",
         label: "Not configured",
@@ -306,7 +336,7 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
   try {
     const { getSupabaseAdminClient } = await import("@/lib/supabase-admin");
     const client = getSupabaseAdminClient();
-    const [latestRunResult, latestSuccessfulRunResult, latestErrorRunResult, recentRunsResult] = await Promise.all([
+    const [latestRunResult, latestSuccessfulRunResult, latestErrorRunResult, recentRunsResult, syncStateResult] = await Promise.all([
       client.from("sync_runs").select("*").order("started_at", { ascending: false }).limit(1).maybeSingle(),
       client
         .from("sync_runs")
@@ -327,12 +357,13 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
         .maybeSingle(),
       client
         .from("sync_runs")
-        .select("id, started_at, finished_at, status, items_synced, sessions_synced, error_message")
+        .select("id, started_at, finished_at, status, items_synced, sessions_synced, error_message, sync_mode")
         .order("started_at", { ascending: false })
         .limit(8),
+      client.from("sync_state").select("*").eq("id", "matter").maybeSingle(),
     ]);
 
-    const firstError = latestRunResult.error ?? latestSuccessfulRunResult.error ?? latestErrorRunResult.error ?? recentRunsResult.error;
+    const firstError = latestRunResult.error ?? latestSuccessfulRunResult.error ?? latestErrorRunResult.error ?? recentRunsResult.error ?? syncStateResult.error;
     if (firstError) {
       throw firstError;
     }
@@ -342,6 +373,7 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
       latestSuccessfulRun: latestSuccessfulRunResult.data,
       latestErrorRun: latestErrorRunResult.data,
       recentRuns: recentRunsResult.data ?? [],
+      syncState: syncStateResult.data,
       databaseStatus: {
         state: "connected",
         label: "Connected",
@@ -354,6 +386,7 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
       latestSuccessfulRun: null,
       latestErrorRun: null,
       recentRuns: [],
+      syncState: null,
       databaseStatus: {
         state: "error",
         label: "Connection issue",
@@ -404,6 +437,14 @@ function formatStatus(status: string): string {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatBoolean(value: boolean | null | undefined): string {
+  if (value === null || value === undefined) {
+    return "Unknown";
+  }
+
+  return value ? "Yes" : "No";
 }
 
 function formatTimestamp(timestamp: string | null | undefined): string {

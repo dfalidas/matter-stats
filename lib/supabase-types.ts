@@ -299,6 +299,12 @@ export type Database = {
           sessions_synced: number;
           annotations_synced: number;
           tags_synced: number;
+          sync_mode: string;
+          matter_requests_count: number;
+          matter_sessions_returned: number;
+          matter_items_returned: number;
+          matter_has_more: boolean | null;
+          matter_next_cursor_present: boolean | null;
           error_message: string | null;
           checkpoint_timestamp: string | null;
           created_at: string;
@@ -313,6 +319,12 @@ export type Database = {
           sessions_synced?: number;
           annotations_synced?: number;
           tags_synced?: number;
+          sync_mode?: string;
+          matter_requests_count?: number;
+          matter_sessions_returned?: number;
+          matter_items_returned?: number;
+          matter_has_more?: boolean | null;
+          matter_next_cursor_present?: boolean | null;
           error_message?: string | null;
           checkpoint_timestamp?: string | null;
           created_at?: string;
@@ -327,6 +339,12 @@ export type Database = {
           sessions_synced?: number;
           annotations_synced?: number;
           tags_synced?: number;
+          sync_mode?: string;
+          matter_requests_count?: number;
+          matter_sessions_returned?: number;
+          matter_items_returned?: number;
+          matter_has_more?: boolean | null;
+          matter_next_cursor_present?: boolean | null;
           error_message?: string | null;
           checkpoint_timestamp?: string | null;
           created_at?: string;

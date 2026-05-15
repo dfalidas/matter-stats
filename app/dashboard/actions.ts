@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 
 import { ACCESS_COOKIE_NAME, isValidAccessToken } from "@/lib/auth-cookie";
 import { getMatterSyncAvailability, syncMatterData, type MatterSyncResult } from "@/lib/matter-sync";
-import type { MatterSyncMode } from "@/lib/matter-sync-progress";
+import { normalizeRecentActivityWindow, type MatterSyncMode } from "@/lib/matter-sync-progress";
 
 export type SyncMatterActionState = MatterSyncResult | null;
 
@@ -23,6 +23,7 @@ export async function getMatterSyncAvailabilityAction() {
 export async function syncMatterAction(previousState: SyncMatterActionState, formData?: FormData): Promise<MatterSyncResult> {
   void previousState;
   const mode = parseSyncMode(formData?.get("mode"));
+  const recentActivityWindow = normalizeRecentActivityWindow(formData?.get("recentActivityWindow"));
 
   const cookieStore = await cookies();
   const hasAccess = await isValidAccessToken(cookieStore.get(ACCESS_COOKIE_NAME)?.value);
@@ -34,7 +35,7 @@ export async function syncMatterAction(previousState: SyncMatterActionState, for
     };
   }
 
-  const result = await syncMatterData(mode);
+  const result = await syncMatterData(mode, { recentActivityWindow });
 
   revalidatePath("/dashboard");
   revalidatePath("/articles");
