@@ -238,6 +238,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      sync_state: {
+        Row: {
+          id: string;
+          completed_checkpoint_timestamp: string | null;
+          active_since_timestamp: string | null;
+          active_phase: string;
+          item_cursor: string | null;
+          tag_cursor: string | null;
+          session_cursor: string | null;
+          next_checkpoint_timestamp: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          completed_checkpoint_timestamp?: string | null;
+          active_since_timestamp?: string | null;
+          active_phase?: string;
+          item_cursor?: string | null;
+          tag_cursor?: string | null;
+          session_cursor?: string | null;
+          next_checkpoint_timestamp?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          completed_checkpoint_timestamp?: string | null;
+          active_since_timestamp?: string | null;
+          active_phase?: string;
+          item_cursor?: string | null;
+          tag_cursor?: string | null;
+          session_cursor?: string | null;
+          next_checkpoint_timestamp?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       sync_runs: {
         Row: {
           id: string;
@@ -301,4 +340,5 @@ export type MatterTag = Tables<"matter_tags">;
 export type ItemTag = Tables<"item_tags">;
 export type Annotation = Tables<"annotations">;
 export type DailyStat = Tables<"daily_stats">;
+export type SyncState = Tables<"sync_state">;
 export type SyncRun = Tables<"sync_runs">;

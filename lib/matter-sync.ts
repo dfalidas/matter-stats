@@ -1,19 +1,30 @@
 import "server-only";
 
-import { getMatterAccount, iterateMatterAnnotations, iterateMatterItems, iterateMatterReadingSessions, iterateMatterTags, MatterApiError } from "@/lib/matter-api";
+import {
+  getMatterAccount,
+  iterateMatterAnnotations,
+  listMatterItems,
+  listMatterReadingSessions,
+  listMatterTags,
+  MatterApiError,
+  type MatterListResponse,
+  type MatterTag,
+} from "@/lib/matter-api";
 import {
   createSyncRun,
   getLatestSuccessfulSyncCheckpoint,
+  getMatterSyncState,
   getSupabaseAdminClient,
   updateSyncRun,
   upsertAnnotations,
   upsertItemTags,
   upsertMatterItems,
+  upsertMatterSyncState,
   upsertMatterTags,
   upsertReadingSessions,
 } from "@/lib/supabase-admin";
 import { recalculateDailyStats } from "@/lib/daily-stats";
-import type { TablesInsert } from "@/lib/supabase-types";
+import type { SyncState, TablesInsert } from "@/lib/supabase-types";
 import {
   normalizeAnnotation,
   normalizeMatterItem,
@@ -22,9 +33,27 @@ import {
   normalizeReadingSession,
   type MatterItemRow,
 } from "@/lib/matter-normalizers";
+import {
+  buildMatterSyncMessage,
+  createEmptyMatterBatchCounts,
+  MATTER_SYNC_BATCH_LIMIT,
+  type MatterBatchCounts,
+  type MatterSyncPhase,
+} from "@/lib/matter-sync-progress";
 
 const UPSERT_BATCH_SIZE = 100;
 const OPTIONAL_MATTER_STATUSES = new Set([403, 404]);
+
+type MutableMatterSyncState = Pick<
+  SyncState,
+  | "completed_checkpoint_timestamp"
+  | "active_since_timestamp"
+  | "active_phase"
+  | "item_cursor"
+  | "tag_cursor"
+  | "session_cursor"
+  | "next_checkpoint_timestamp"
+>;
 
 export type MatterSyncResult = {
   ok: boolean;
@@ -34,6 +63,7 @@ export type MatterSyncResult = {
   sessionsSynced?: number;
   annotationsSynced?: number;
   tagsSynced?: number;
+  hasMore?: boolean;
 };
 
 type SyncCheckpoint = {
@@ -44,7 +74,7 @@ export async function syncMatterData(): Promise<MatterSyncResult> {
   let syncRunId: string | null = null;
 
   try {
-    const previousCheckpoint = await getLatestSuccessfulSyncCheckpoint();
+    const [storedState, legacyCheckpoint] = await Promise.all([getMatterSyncState(), getLatestSuccessfulSyncCheckpoint()]);
     const startedAt = new Date().toISOString();
     const syncRun = await createSyncRun({ status: "running", started_at: startedAt });
     syncRunId = syncRun.id;
@@ -52,109 +82,38 @@ export async function syncMatterData(): Promise<MatterSyncResult> {
     // Validate the configured Matter token before mutating local Matter-derived rows.
     await getMatterAccount();
 
-    const syncedAt = new Date().toISOString();
-    const itemRows: MatterItemRow[] = [];
-    const itemRowsById = new Map<string, MatterItemRow>();
-    const tagRowsById = new Map<string, TablesInsert<"matter_tags">>();
-    const itemTagRowsByKey = new Map<string, TablesInsert<"item_tags">>();
-    const itemIds = new Set<string>();
-    const checkpoint: SyncCheckpoint = { next: previousCheckpoint };
-
-    for await (const item of iterateMatterItems({ status: "all", updatedSince: previousCheckpoint ?? undefined })) {
-      const itemRow = normalizeMatterItem(item, syncedAt);
-      itemRows.push(itemRow);
-      itemRowsById.set(itemRow.id, itemRow);
-      itemIds.add(itemRow.id);
-      advanceCheckpoint(checkpoint, itemRow.updated_at_matter);
-
-      const normalizedTags = normalizeMatterItemTags(item);
-      for (const tagRow of normalizedTags.matterTags) {
-        tagRowsById.set(tagRow.id, tagRow);
-      }
-      for (const itemTagRow of normalizedTags.itemTags) {
-        itemTagRowsByKey.set(`${itemTagRow.item_id}:${itemTagRow.tag_id}`, itemTagRow);
-      }
-    }
-
-    for await (const tag of iterateOptionalMatterTags({ updatedSince: previousCheckpoint ?? undefined })) {
-      const tagRow = normalizeMatterTag(tag);
-      tagRowsById.set(tagRow.id, tagRow);
-      advanceCheckpoint(checkpoint, tagRow.updated_at_matter);
-    }
-
-    await upsertInBatches([...tagRowsById.values()], upsertMatterTags);
-    await upsertInBatches(itemRows, upsertMatterItems);
-    await replaceItemTags([...itemIds], [...itemTagRowsByKey.values()]);
-
-    const sessionRows: TablesInsert<"reading_sessions">[] = [];
+    const batchState = startBatchState(storedState, legacyCheckpoint);
+    const counts = createEmptyMatterBatchCounts();
     const affectedDates = new Set<string>();
+    const checkpoint: SyncCheckpoint = { next: batchState.next_checkpoint_timestamp ?? batchState.active_since_timestamp };
+    const hasMore = await importNextMatterBatch({ state: batchState, counts, affectedDates, checkpoint });
 
-    for (const affectedDate of await getReadingSessionDatesForItems([...itemIds])) {
-      affectedDates.add(affectedDate);
-    }
+    const persistedState = buildPersistedSyncState(batchState, checkpoint.next, hasMore);
 
-    const matterItemLookup = new Map<string, MatterItemRow | null>(itemRowsById);
-
-    for await (const session of iterateMatterReadingSessions({ since: previousCheckpoint ?? undefined })) {
-      const sessionRow = normalizeReadingSession(session, {
-        item: session.item_id ? await getMatterItemById(session.item_id, matterItemLookup) : null,
-      });
-      if (!sessionRow) {
-        continue;
-      }
-
-      sessionRows.push(sessionRow);
-      addDateFromTimestamp(affectedDates, sessionRow.started_at);
-      advanceCheckpoint(checkpoint, sessionRow.started_at);
-      advanceCheckpoint(checkpoint, sessionRow.ended_at);
-    }
-
-    for (const affectedDate of await getReadingSessionDatesForSessionIds(sessionRows.map((session) => session.id))) {
-      affectedDates.add(affectedDate);
-    }
-
-    await upsertInBatches(sessionRows, upsertReadingSessions);
-
-    const annotationRows: TablesInsert<"annotations">[] = [];
-    for (const itemId of itemIds) {
-      for await (const annotation of iterateOptionalMatterAnnotations(itemId)) {
-        const annotationRow = normalizeAnnotation(annotation);
-        if (!annotationRow) {
-          continue;
-        }
-
-        annotationRows.push(annotationRow);
-        addDateFromTimestamp(affectedDates, annotationRow.created_at_matter);
-        advanceCheckpoint(checkpoint, annotationRow.updated_at_matter);
-      }
-    }
-
-    for (const affectedDate of await getAnnotationDatesForAnnotationIds(annotationRows.map((annotation) => annotation.id))) {
-      affectedDates.add(affectedDate);
-    }
-
-    await upsertInBatches(annotationRows, upsertAnnotations);
     await recalculateDailyStats({ affectedDates });
 
     const finishedRun = await updateSyncRun(syncRunId, {
       status: "success",
       finished_at: new Date().toISOString(),
-      items_synced: itemRows.length,
-      sessions_synced: sessionRows.length,
-      annotations_synced: annotationRows.length,
-      tags_synced: tagRowsById.size,
+      items_synced: counts.items,
+      sessions_synced: counts.sessions,
+      annotations_synced: counts.annotations,
+      tags_synced: counts.tags,
       error_message: null,
-      checkpoint_timestamp: checkpoint.next,
+      checkpoint_timestamp: persistedState.completed_checkpoint_timestamp ?? null,
     });
+
+    await upsertMatterSyncState(persistedState);
 
     return {
       ok: true,
-      message: `Sync complete: imported ${finishedRun.items_synced} items, ${finishedRun.sessions_synced} reading sessions, ${finishedRun.annotations_synced} annotations, and ${finishedRun.tags_synced} tags.`,
+      message: buildMatterSyncMessage(counts, hasMore),
       syncRunId: finishedRun.id,
       itemsSynced: finishedRun.items_synced,
       sessionsSynced: finishedRun.sessions_synced,
       annotationsSynced: finishedRun.annotations_synced,
       tagsSynced: finishedRun.tags_synced,
+      hasMore,
     };
   } catch (error) {
     const sanitizedError = sanitizeSyncError(error);
@@ -165,6 +124,7 @@ export async function syncMatterData(): Promise<MatterSyncResult> {
           status: "error",
           finished_at: new Date().toISOString(),
           error_message: sanitizedError,
+          checkpoint_timestamp: null,
         });
       } catch (updateError) {
         console.error("Matter sync run error update failed", { syncRunId, error: sanitizeLogError(updateError) });
@@ -175,10 +135,240 @@ export async function syncMatterData(): Promise<MatterSyncResult> {
 
     return {
       ok: false,
-      message: "Matter sync failed. Check the latest sync run for details.",
+      message: `Matter sync failed safely. ${sanitizedError} No sync checkpoint was advanced; click Sync again after fixing the issue.`,
       syncRunId: syncRunId ?? undefined,
     };
   }
+}
+
+async function importNextMatterBatch({
+  state,
+  counts,
+  affectedDates,
+  checkpoint,
+}: {
+  state: MutableMatterSyncState;
+  counts: MatterBatchCounts;
+  affectedDates: Set<string>;
+  checkpoint: SyncCheckpoint;
+}): Promise<boolean> {
+  if (state.active_phase === "items") {
+    const itemPage = await listMatterItems({
+      status: "all",
+      updatedSince: state.active_since_timestamp ?? undefined,
+      cursor: state.item_cursor ?? undefined,
+      limit: MATTER_SYNC_BATCH_LIMIT,
+    });
+    const itemRows = await importMatterItemPage(itemPage, affectedDates, checkpoint);
+    counts.items += itemRows.itemCount;
+    counts.tags += itemRows.tagCount;
+    counts.annotations += itemRows.annotationCount;
+
+    if (itemPage.has_more && itemPage.next_cursor) {
+      state.item_cursor = itemPage.next_cursor;
+      return true;
+    }
+
+    state.item_cursor = null;
+    state.active_phase = "tags";
+  }
+
+  if (state.active_phase === "tags") {
+    const tagPage = await listOptionalMatterTagsPage({
+      updatedSince: state.active_since_timestamp ?? undefined,
+      cursor: state.tag_cursor ?? undefined,
+      limit: MATTER_SYNC_BATCH_LIMIT,
+    });
+
+    if (tagPage) {
+      const tagRows = tagPage.results.map((tag) => {
+        const tagRow = normalizeMatterTag(tag);
+        advanceCheckpoint(checkpoint, tagRow.updated_at_matter);
+        return tagRow;
+      });
+      await upsertInBatches(tagRows, upsertMatterTags);
+      counts.tags += tagRows.length;
+
+      if (tagPage.has_more && tagPage.next_cursor) {
+        state.tag_cursor = tagPage.next_cursor;
+        return true;
+      }
+    }
+
+    state.tag_cursor = null;
+    state.active_phase = "sessions";
+  }
+
+  if (state.active_phase === "sessions") {
+    const sessionPage = await listMatterReadingSessions({
+      since: state.active_since_timestamp ?? undefined,
+      cursor: state.session_cursor ?? undefined,
+      limit: MATTER_SYNC_BATCH_LIMIT,
+    });
+    const sessionCount = await importMatterSessionPage(sessionPage, affectedDates, checkpoint);
+    counts.sessions += sessionCount;
+
+    if (sessionPage.has_more && sessionPage.next_cursor) {
+      state.session_cursor = sessionPage.next_cursor;
+      return true;
+    }
+
+    state.session_cursor = null;
+    state.active_phase = "complete";
+  }
+
+  return false;
+}
+
+async function importMatterItemPage(
+  itemPage: Awaited<ReturnType<typeof listMatterItems>>,
+  affectedDates: Set<string>,
+  checkpoint: SyncCheckpoint
+): Promise<{ itemCount: number; tagCount: number; annotationCount: number }> {
+  const syncedAt = new Date().toISOString();
+  const itemRows: MatterItemRow[] = [];
+  const tagRowsById = new Map<string, TablesInsert<"matter_tags">>();
+  const itemTagRowsByKey = new Map<string, TablesInsert<"item_tags">>();
+  const itemIds = new Set<string>();
+
+  for (const item of itemPage.results) {
+    const itemRow = normalizeMatterItem(item, syncedAt);
+    itemRows.push(itemRow);
+    itemIds.add(itemRow.id);
+    advanceCheckpoint(checkpoint, itemRow.updated_at_matter);
+
+    const normalizedTags = normalizeMatterItemTags(item);
+    for (const tagRow of normalizedTags.matterTags) {
+      tagRowsById.set(tagRow.id, tagRow);
+    }
+    for (const itemTagRow of normalizedTags.itemTags) {
+      itemTagRowsByKey.set(`${itemTagRow.item_id}:${itemTagRow.tag_id}`, itemTagRow);
+    }
+  }
+
+  for (const affectedDate of await getReadingSessionDatesForItems([...itemIds])) {
+    affectedDates.add(affectedDate);
+  }
+
+  await upsertInBatches([...tagRowsById.values()], upsertMatterTags);
+  await upsertInBatches(itemRows, upsertMatterItems);
+  await replaceItemTags([...itemIds], [...itemTagRowsByKey.values()]);
+
+  const annotationRows: TablesInsert<"annotations">[] = [];
+  for (const itemId of itemIds) {
+    for await (const annotation of iterateOptionalMatterAnnotations(itemId)) {
+      const annotationRow = normalizeAnnotation(annotation);
+      if (!annotationRow) {
+        continue;
+      }
+
+      annotationRows.push(annotationRow);
+      addDateFromTimestamp(affectedDates, annotationRow.created_at_matter);
+      advanceCheckpoint(checkpoint, annotationRow.updated_at_matter);
+    }
+  }
+
+  for (const affectedDate of await getAnnotationDatesForAnnotationIds(annotationRows.map((annotation) => annotation.id))) {
+    affectedDates.add(affectedDate);
+  }
+
+  await upsertInBatches(annotationRows, upsertAnnotations);
+
+  return {
+    itemCount: itemRows.length,
+    tagCount: tagRowsById.size,
+    annotationCount: annotationRows.length,
+  };
+}
+
+async function importMatterSessionPage(
+  sessionPage: Awaited<ReturnType<typeof listMatterReadingSessions>>,
+  affectedDates: Set<string>,
+  checkpoint: SyncCheckpoint
+): Promise<number> {
+  const sessionRows: TablesInsert<"reading_sessions">[] = [];
+  const matterItemLookup = new Map<string, MatterItemRow | null>();
+
+  for (const session of sessionPage.results) {
+    const sessionRow = normalizeReadingSession(session, {
+      item: session.item_id ? await getMatterItemById(session.item_id, matterItemLookup) : null,
+    });
+    if (!sessionRow) {
+      continue;
+    }
+
+    sessionRows.push(sessionRow);
+    addDateFromTimestamp(affectedDates, sessionRow.started_at);
+    advanceCheckpoint(checkpoint, sessionRow.started_at);
+    advanceCheckpoint(checkpoint, sessionRow.ended_at);
+  }
+
+  for (const affectedDate of await getReadingSessionDatesForSessionIds(sessionRows.map((session) => session.id))) {
+    affectedDates.add(affectedDate);
+  }
+
+  await upsertInBatches(sessionRows, upsertReadingSessions);
+  return sessionRows.length;
+}
+
+function startBatchState(storedState: SyncState | null, legacyCheckpoint: string | null): MutableMatterSyncState {
+  const completedCheckpoint = storedState?.completed_checkpoint_timestamp ?? legacyCheckpoint;
+
+  if (storedState && storedState.active_phase !== "complete") {
+    return {
+      completed_checkpoint_timestamp: completedCheckpoint,
+      active_since_timestamp: storedState.active_since_timestamp ?? completedCheckpoint,
+      active_phase: normalizePhase(storedState.active_phase),
+      item_cursor: storedState.item_cursor,
+      tag_cursor: storedState.tag_cursor,
+      session_cursor: storedState.session_cursor,
+      next_checkpoint_timestamp: storedState.next_checkpoint_timestamp ?? storedState.active_since_timestamp ?? completedCheckpoint,
+    };
+  }
+
+  return {
+    completed_checkpoint_timestamp: completedCheckpoint,
+    active_since_timestamp: completedCheckpoint,
+    active_phase: "items",
+    item_cursor: null,
+    tag_cursor: null,
+    session_cursor: null,
+    next_checkpoint_timestamp: completedCheckpoint,
+  };
+}
+
+function buildPersistedSyncState(state: MutableMatterSyncState, nextCheckpoint: string | null, hasMore: boolean): TablesInsert<"sync_state"> {
+  if (!hasMore && state.active_phase === "complete") {
+    return {
+      id: "matter",
+      completed_checkpoint_timestamp: nextCheckpoint,
+      active_since_timestamp: null,
+      active_phase: "complete",
+      item_cursor: null,
+      tag_cursor: null,
+      session_cursor: null,
+      next_checkpoint_timestamp: null,
+    };
+  }
+
+  return {
+    id: "matter",
+    completed_checkpoint_timestamp: state.completed_checkpoint_timestamp,
+    active_since_timestamp: state.active_since_timestamp,
+    active_phase: state.active_phase,
+    item_cursor: state.item_cursor,
+    tag_cursor: state.tag_cursor,
+    session_cursor: state.session_cursor,
+    next_checkpoint_timestamp: nextCheckpoint,
+  };
+}
+
+function normalizePhase(phase: string): MatterSyncPhase {
+  if (phase === "items" || phase === "tags" || phase === "sessions" || phase === "complete") {
+    return phase;
+  }
+
+  return "items";
 }
 
 async function upsertInBatches<Row>(rows: Row[], upsert: (batch: Row[]) => Promise<unknown>) {
@@ -304,12 +494,12 @@ async function getMatterItemById(itemId: string, cache: Map<string, MatterItemRo
   return item;
 }
 
-async function* iterateOptionalMatterTags(params: Parameters<typeof iterateMatterTags>[0] = {}) {
+async function listOptionalMatterTagsPage(params: Parameters<typeof listMatterTags>[0]): Promise<MatterListResponse<MatterTag> | null> {
   try {
-    yield* iterateMatterTags(params);
+    return await listMatterTags(params);
   } catch (error) {
     if (isOptionalMatterEndpointError(error)) {
-      return;
+      return null;
     }
     throw error;
   }
