@@ -249,6 +249,9 @@ export type Database = {
           session_cursor: string | null;
           next_checkpoint_timestamp: string | null;
           rate_limited_until: string | null;
+          sync_mode: string;
+          recent_activity_checkpoint: string | null;
+          backfill_items_cursor: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -262,6 +265,9 @@ export type Database = {
           session_cursor?: string | null;
           next_checkpoint_timestamp?: string | null;
           rate_limited_until?: string | null;
+          sync_mode?: string;
+          recent_activity_checkpoint?: string | null;
+          backfill_items_cursor?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -275,6 +281,9 @@ export type Database = {
           session_cursor?: string | null;
           next_checkpoint_timestamp?: string | null;
           rate_limited_until?: string | null;
+          sync_mode?: string;
+          recent_activity_checkpoint?: string | null;
+          backfill_items_cursor?: string | null;
           created_at?: string;
           updated_at?: string;
         };

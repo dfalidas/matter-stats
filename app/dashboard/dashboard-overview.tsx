@@ -142,7 +142,7 @@ export function DashboardOverview({
         />
         <EmptyState
           title="No Matter reading data yet"
-          description="Run your first sync to import Matter reads, sessions, tags, and annotations. The dashboard will populate automatically once Supabase has data."
+          description="Run a recent activity sync to import Matter sessions first. The dashboard will populate once recent reading sessions are available, even before your full library is backfilled."
           icon={BookOpen}
           action={<SyncMatterButton />}
         />
@@ -342,8 +342,8 @@ export function DashboardOverview({
                 {metrics.recentReads.map((read) => (
                   <ArticleRow
                     key={read.itemId}
-                    title={read.title ?? "Untitled read"}
-                    source={read.source ?? read.author ?? "Matter"}
+                    title={read.title ?? "Unknown item"}
+                    source={read.source ?? read.author ?? "Unknown source"}
                     meta={`${formatDuration(read.readingTimeSeconds)} • ${read.readAt ? formatDateLabel(read.readAt) : "Unknown date"}`}
                     href={read.url ?? undefined}
                   />

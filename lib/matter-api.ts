@@ -274,6 +274,10 @@ export async function listMatterItems(params: ListMatterItemsParams = {}): Promi
   return matterFetch<MatterListResponse<MatterItem>>("/items", { query: toMatterItemsQuery(params) });
 }
 
+export async function getMatterItem(itemId: string): Promise<MatterItem> {
+  return matterFetch<MatterItem>(`/items/${encodeURIComponent(itemId)}`);
+}
+
 export async function listMatterReadingSessions(
   params: ListMatterReadingSessionsParams = {}
 ): Promise<MatterListResponse<MatterReadingSession>> {

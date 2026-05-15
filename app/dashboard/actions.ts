@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 
 import { ACCESS_COOKIE_NAME, isValidAccessToken } from "@/lib/auth-cookie";
 import { getMatterSyncAvailability, syncMatterData, type MatterSyncResult } from "@/lib/matter-sync";
+import type { MatterSyncMode } from "@/lib/matter-sync-progress";
 
 export type SyncMatterActionState = MatterSyncResult | null;
 
@@ -19,8 +20,9 @@ export async function getMatterSyncAvailabilityAction() {
   return getMatterSyncAvailability();
 }
 
-export async function syncMatterAction(previousState: SyncMatterActionState): Promise<MatterSyncResult> {
+export async function syncMatterAction(previousState: SyncMatterActionState, formData?: FormData): Promise<MatterSyncResult> {
   void previousState;
+  const mode = parseSyncMode(formData?.get("mode"));
 
   const cookieStore = await cookies();
   const hasAccess = await isValidAccessToken(cookieStore.get(ACCESS_COOKIE_NAME)?.value);
@@ -32,7 +34,7 @@ export async function syncMatterAction(previousState: SyncMatterActionState): Pr
     };
   }
 
-  const result = await syncMatterData();
+  const result = await syncMatterData(mode);
 
   revalidatePath("/dashboard");
   revalidatePath("/articles");
@@ -44,4 +46,8 @@ export async function syncMatterAction(previousState: SyncMatterActionState): Pr
   revalidatePath("/settings");
 
   return result;
+}
+
+function parseSyncMode(value: FormDataEntryValue | null | undefined): MatterSyncMode {
+  return value === "backfill_library" ? "backfill_library" : "recent_activity";
 }

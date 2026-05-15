@@ -12,7 +12,7 @@ import { getMatterSyncAvailabilityAction, syncMatterAction, type SyncMatterActio
 
 const initialState: SyncMatterActionState = null;
 
-export function SyncMatterButton() {
+export function SyncMatterButton({ showBackfill = false }: { showBackfill?: boolean } = {}) {
   const [state, formAction, isPending] = useActionState(syncMatterAction, initialState);
   const [rateLimitedUntil, setRateLimitedUntil] = useState<string | null>(null);
   const [availabilityMessage, setAvailabilityMessage] = useState<string | null>(null);
@@ -68,14 +68,29 @@ export function SyncMatterButton() {
 
   return (
     <div className="flex flex-col items-start gap-2 md:items-end">
-      <form action={formAction}>
+      <form action={formAction} className="flex flex-wrap justify-end gap-2">
         <SyncButton
           type="submit"
+          name="mode"
+          value="recent_activity"
           isSyncing={isPending}
           disabled={isDisabled}
-          idleLabel="Sync Matter"
+          idleLabel="Sync Recent Activity"
           syncingLabel="Sync started..."
         />
+        {showBackfill ? (
+          <SyncButton
+            type="submit"
+            name="mode"
+            value="backfill_library"
+            variant="outline"
+            className="border-white/10 bg-transparent hover:bg-white/[0.05]"
+            isSyncing={isPending}
+            disabled={isDisabled}
+            idleLabel="Backfill Library"
+            syncingLabel="Sync started..."
+          />
+        ) : null}
       </form>
       {rateLimitNotice ? <p className="text-sm text-warning">{rateLimitNotice}</p> : null}
       {state || (availabilityMessage && isRateLimited) ? (

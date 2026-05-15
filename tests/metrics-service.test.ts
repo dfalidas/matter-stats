@@ -376,3 +376,45 @@ test("ignores empty and non-positive session fields when building critical metri
     },
   ]);
 });
+
+test("dashboard metrics work with partial item metadata", async () => {
+  const metrics = await getReadingMetrics(
+    createClient({
+      sessions: [
+        {
+          id: "partial_1",
+          item_id: "linked_item_without_metadata",
+          started_at: "2026-05-14T10:00:00.000Z",
+          ended_at: "2026-05-14T10:05:00.000Z",
+          duration_seconds: 300,
+          words_estimated: 1_125,
+          matter_items: { id: "linked_item_without_metadata", title: null, url: null, source: null, author: null },
+        },
+      ],
+    }),
+    { preset: "today", now: "2026-05-14T12:00:00Z", timezone: "UTC" }
+  );
+
+  assert.deepEqual(metrics.totals, {
+    totalReadingTimeSeconds: 300,
+    wordsRead: 1_125,
+    articlesRead: 1,
+    sessionsCount: 1,
+    averageSessionLengthSeconds: 300,
+  });
+  assert.equal(metrics.currentStreakDays, 1);
+  assert.deepEqual(metrics.topSources, []);
+  assert.deepEqual(metrics.topAuthors, []);
+  assert.deepEqual(metrics.recentReads, [
+    {
+      itemId: "linked_item_without_metadata",
+      title: null,
+      url: null,
+      source: null,
+      author: null,
+      readAt: "2026-05-14T10:00:00.000Z",
+      readingTimeSeconds: 300,
+      wordsRead: 1_125,
+    },
+  ]);
+});
