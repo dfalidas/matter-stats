@@ -7,6 +7,7 @@ import {
   listMatterItems,
   listMatterReadingSessions,
   listMatterTags,
+  logMatterApiError,
   MatterApiError,
   MatterRateLimitError,
   type MatterListResponse,
@@ -464,6 +465,10 @@ async function importLinkedMatterItems(
     return { itemCount: 0, tagCount: 0, annotationCount: 0 };
   }
 
+  const syncedAt = new Date().toISOString();
+  const placeholderRows = itemIds.map((itemId) => normalizeMatterItem(createPlaceholderMatterItem(itemId), syncedAt));
+  await upsertInBatches(placeholderRows, upsertMatterItems);
+
   const embeddedItemsById = new Map(embeddedItems.map((item) => [item.id, item]));
   const results = [];
   let returnedItemObjects = 0;
@@ -481,13 +486,11 @@ async function importLinkedMatterItems(
     if (fetchedItem) {
       results.push(fetchedItem);
       returnedItemObjects += 1;
-    } else {
-      results.push(createPlaceholderMatterItem(itemId));
     }
   }
   diagnostics.itemsReturned += returnedItemObjects;
 
-  return importMatterItemPage(
+  const enrichedCounts = await importMatterItemPage(
     {
       object: "list",
       results,
@@ -497,13 +500,20 @@ async function importLinkedMatterItems(
     affectedDates,
     checkpoint
   );
+
+  return {
+    itemCount: itemIds.length,
+    tagCount: enrichedCounts.tagCount,
+    annotationCount: enrichedCounts.annotationCount,
+  };
 }
 
 async function getOptionalMatterItem(itemId: string): Promise<Awaited<ReturnType<typeof getMatterItem>> | null> {
   try {
     return await getMatterItem(itemId);
   } catch (error) {
-    if (isOptionalMatterEndpointError(error)) {
+    if (isOptionalMatterEndpointError(error) || error instanceof MatterRateLimitError) {
+      logMatterApiError(error, `get optional Matter item ${itemId}`);
       return null;
     }
     throw error;

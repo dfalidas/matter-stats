@@ -65,13 +65,14 @@ test("deduplicates linked Matter item IDs for session-first sync", () => {
       { item_id: " item_a " },
       { item_id: "item_b" },
       { itemId: "item_c" },
+      { object: "itm_123" },
       { item: { id: "item_d" } },
       { item: "item_e" },
       { item_id: "item_a" },
       { item_id: null },
       {},
     ]),
-    ["item_a", "item_b", "item_c", "item_d", "item_e"]
+    ["item_a", "item_b", "item_c", "itm_123", "item_d", "item_e"]
   );
 });
 
@@ -173,7 +174,7 @@ test("supports selectable recent activity windows", () => {
 });
 
 test("documents sessions-first flow before linked item import", () => {
-  const sessions = [{ item_id: "item_a" }, { item_id: "item_b" }];
+  const sessions = [{ item_id: "item_a" }, { object: "item_b" }];
 
   assert.equal(getMatterSyncInitialPhase("recent_activity"), "sessions");
   assert.deepEqual(collectLinkedMatterItemIds(sessions), ["item_a", "item_b"]);
@@ -212,8 +213,13 @@ test("imports linked matter_items before upserting reading_sessions", () => {
   const sessionImportStart = source.indexOf("async function importMatterSessionPage");
   const linkedImportIndex = source.indexOf("await importLinkedMatterItems", sessionImportStart);
   const sessionUpsertIndex = source.indexOf("await upsertInBatches(sessionRows, upsertReadingSessions)", sessionImportStart);
+  const linkedImportStart = source.indexOf("async function importLinkedMatterItems");
+  const placeholderUpsertIndex = source.indexOf("await upsertInBatches(placeholderRows, upsertMatterItems)", linkedImportStart);
+  const metadataFetchIndex = source.indexOf("await getOptionalMatterItem(itemId)", linkedImportStart);
 
   assert.notEqual(sessionImportStart, -1);
   assert.ok(linkedImportIndex > sessionImportStart);
   assert.ok(sessionUpsertIndex > linkedImportIndex);
+  assert.ok(placeholderUpsertIndex > linkedImportStart);
+  assert.ok(metadataFetchIndex > placeholderUpsertIndex);
 });
