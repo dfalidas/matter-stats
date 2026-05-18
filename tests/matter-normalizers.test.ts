@@ -3,10 +3,13 @@ import test from "node:test";
 
 import {
   DEFAULT_READING_SPEED_WORDS_PER_MINUTE,
+  createPlaceholderMatterItem,
+  extractMatterReadingSessionItemId,
   normalizeAnnotation,
   normalizeMatterItem,
   normalizeMatterItemTags,
   normalizeReadingSession,
+  summarizeReadingSessionShape,
 } from "../lib/matter-normalizers";
 
 test("normalizes Matter items with deterministic metadata fallbacks", () => {
@@ -227,4 +230,57 @@ test("returns null word estimates when both duration and item progress facts are
       words_estimated: null,
     }
   );
+});
+
+
+test("extracts Matter reading-session item IDs from likely API shapes", () => {
+  assert.equal(extractMatterReadingSessionItemId({ id: "s_1", item_id: " itm_snake " }), "itm_snake");
+  assert.equal(extractMatterReadingSessionItemId({ id: "s_2", itemId: "itm_camel" }), "itm_camel");
+  assert.equal(extractMatterReadingSessionItemId({ id: "s_3", item: { id: "itm_embedded", title: "Private title" } }), "itm_embedded");
+  assert.equal(extractMatterReadingSessionItemId({ id: "s_4", item: "itm_string" }), "itm_string");
+  assert.equal(extractMatterReadingSessionItemId({ id: "s_5", library_item_id: "itm_library" }), "itm_library");
+  assert.equal(extractMatterReadingSessionItemId({ id: "s_6", target: { id: "itm_target" } }), "itm_target");
+});
+
+test("normalizes reading session fixtures from snake_case, camelCase, embedded item, and string item shapes", () => {
+  const snake = normalizeReadingSession({ id: "s_1", item_id: "itm_1", started_at: "2026-05-14T10:00:00Z", ended_at: "2026-05-14T10:05:00Z", duration_seconds: 300 });
+  const camel = normalizeReadingSession({ id: "s_2", itemId: "itm_2", startedAt: "2026-05-14T11:00:00Z", endedAt: "2026-05-14T11:02:00Z", durationSeconds: 120 });
+  const embedded = normalizeReadingSession({ id: "s_3", item: { id: "itm_3", title: "Example", word_count: 1000, reading_progress: 0.25 }, started_at: "2026-05-14T12:00:00Z", ended_at: "2026-05-14T12:01:00Z" });
+  const stringItem = normalizeReadingSession({ id: "s_4", item: "itm_4", started_at: "2026-05-14T13:00:00Z", ended_at: "2026-05-14T13:01:00Z" });
+
+  assert.equal(snake?.item_id, "itm_1");
+  assert.equal(snake?.duration_seconds, 300);
+  assert.equal(camel?.item_id, "itm_2");
+  assert.equal(camel?.duration_seconds, 120);
+  assert.equal(embedded?.item_id, "itm_3");
+  assert.equal(embedded?.words_estimated, 250);
+  assert.equal(stringItem?.item_id, "itm_4");
+});
+
+test("creates placeholder Matter items with safe Unknown item fallback", () => {
+  const row = normalizeMatterItem(createPlaceholderMatterItem("itm_missing"), "2026-05-18T00:00:00Z");
+
+  assert.equal(row.id, "itm_missing");
+  assert.equal(row.title, "Unknown item");
+  assert.equal(row.url, null);
+  assert.equal(row.progress, 0);
+});
+
+test("summarizes first reading-session raw shape without private content", () => {
+  const shape = summarizeReadingSessionShape({
+    id: "s_1",
+    item: { id: "itm_1", title: "Do not store this title", url: "https://private.example" },
+    startedAt: "2026-05-14T10:00:00Z",
+    durationSeconds: 10,
+  });
+
+  assert.deepEqual(shape, {
+    topLevelKeys: ["durationSeconds", "id", "item", "startedAt"],
+    hasItemLikeField: true,
+    hasSessionId: true,
+    hasDurationField: true,
+    hasStartedAtField: true,
+    hasEndedAtField: false,
+  });
+  assert.doesNotMatch(JSON.stringify(shape), /Do not store this title|private\.example/);
 });

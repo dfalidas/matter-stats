@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -63,11 +64,14 @@ test("deduplicates linked Matter item IDs for session-first sync", () => {
     collectLinkedMatterItemIds([
       { item_id: " item_a " },
       { item_id: "item_b" },
+      { itemId: "item_c" },
+      { item: { id: "item_d" } },
+      { item: "item_e" },
       { item_id: "item_a" },
       { item_id: null },
       {},
     ]),
-    ["item_a", "item_b"]
+    ["item_a", "item_b", "item_c", "item_d", "item_e"]
   );
 });
 
@@ -173,4 +177,43 @@ test("documents sessions-first flow before linked item import", () => {
 
   assert.equal(getMatterSyncInitialPhase("recent_activity"), "sessions");
   assert.deepEqual(collectLinkedMatterItemIds(sessions), ["item_a", "item_b"]);
+});
+
+
+test("warns when Matter returns sessions but none are imported", () => {
+  const message = buildMatterSyncMessage(
+    { items: 0, sessions: 0, annotations: 0, tags: 0 },
+    true,
+    "recent_activity",
+    { sessionsReturned: 25, sessionsSkipped: 25 }
+  );
+
+  assert.match(message, /needs attention/);
+  assert.match(message, /Matter returned 25 sessions, but 0 were imported/);
+  assert.doesNotMatch(message, /Recent activity sync started/);
+});
+
+test("reports partial session skips without hiding successful imports", () => {
+  const message = buildMatterSyncMessage(
+    { items: 2, sessions: 24, annotations: 0, tags: 0 },
+    true,
+    "recent_activity",
+    { sessionsReturned: 25, sessionsSkipped: 1 }
+  );
+
+  assert.match(message, /Imported 24 sessions, 2 linked items/);
+  assert.match(message, /Skipped 1 sessions/);
+  assert.match(message, /More recent activity remains/);
+});
+
+
+test("imports linked matter_items before upserting reading_sessions", () => {
+  const source = readFileSync("lib/matter-sync.ts", "utf8");
+  const sessionImportStart = source.indexOf("async function importMatterSessionPage");
+  const linkedImportIndex = source.indexOf("await importLinkedMatterItems", sessionImportStart);
+  const sessionUpsertIndex = source.indexOf("await upsertInBatches(sessionRows, upsertReadingSessions)", sessionImportStart);
+
+  assert.notEqual(sessionImportStart, -1);
+  assert.ok(linkedImportIndex > sessionImportStart);
+  assert.ok(sessionUpsertIndex > linkedImportIndex);
 });

@@ -9,17 +9,42 @@ export type MatterTagRow = Database["public"]["Tables"]["matter_tags"]["Insert"]
 export type ItemTagRow = Database["public"]["Tables"]["item_tags"]["Insert"];
 export type AnnotationRow = Database["public"]["Tables"]["annotations"]["Insert"];
 
-type NormalizableMatterItem = Partial<MatterItem> & Pick<MatterItem, "id">;
+export type NormalizableMatterItem = Partial<MatterItem> & Pick<MatterItem, "id">;
 type NormalizableMatterTag = Partial<MatterTag> & Pick<MatterTag, "id">;
 type NormalizableMatterAnnotation = Partial<MatterAnnotation> & Pick<MatterAnnotation, "id">;
 type NormalizableMatterReadingSession = Partial<MatterReadingSession> & Pick<MatterReadingSession, "id">;
 
+type JsonRecord = Record<string, unknown>;
+
 type ReadingSessionWithOptionalApiFields = NormalizableMatterReadingSession & {
+  itemId?: string | null;
+  library_item_id?: string | null;
+  libraryItemId?: string | null;
+  target_id?: string | null;
+  targetId?: string | null;
+  item?: string | Partial<MatterItem> | null;
+  library_item?: string | Partial<MatterItem> | null;
+  libraryItem?: string | Partial<MatterItem> | null;
+  target?: string | Partial<MatterItem> | null;
   started_at?: string | null;
+  startedAt?: string | null;
   ended_at?: string | null;
+  endedAt?: string | null;
   duration_seconds?: number | null;
+  durationSeconds?: number | null;
+  secondsRead?: number | null;
   source_device?: string | null;
+  sourceDevice?: string | null;
   device?: string | null;
+};
+
+export type SafeReadingSessionShapeDiagnostics = {
+  topLevelKeys: string[];
+  hasItemLikeField: boolean;
+  hasSessionId: boolean;
+  hasDurationField: boolean;
+  hasStartedAtField: boolean;
+  hasEndedAtField: boolean;
 };
 
 export type NormalizeReadingSessionOptions = {
@@ -60,14 +85,16 @@ export function normalizeReadingSession(
   session: ReadingSessionWithOptionalApiFields,
   options: NormalizeReadingSessionOptions = {}
 ): ReadingSessionRow | null {
-  const itemId = nullIfBlank(session.item_id);
+  const itemId = extractMatterReadingSessionItemId(session);
   if (!itemId) {
     return null;
   }
 
-  const durationSeconds = normalizeNonNegativeInteger(session.duration_seconds ?? session.seconds_read);
-  const startedAt = normalizeIsoTimestamp(session.started_at ?? session.date);
-  const endedAt = normalizeSessionEndTimestamp(session.ended_at, startedAt, durationSeconds);
+  const durationSeconds = normalizeNonNegativeInteger(
+    session.duration_seconds ?? session.durationSeconds ?? session.seconds_read ?? session.secondsRead
+  );
+  const startedAt = normalizeIsoTimestamp(session.started_at ?? session.startedAt ?? session.date);
+  const endedAt = normalizeSessionEndTimestamp(session.ended_at ?? session.endedAt, startedAt, durationSeconds);
 
   return {
     id: session.id,
@@ -75,12 +102,88 @@ export function normalizeReadingSession(
     started_at: startedAt,
     ended_at: endedAt,
     duration_seconds: durationSeconds,
-    source_device: firstPresentText(session.source_device, session.device),
+    source_device: firstPresentText(session.source_device, session.sourceDevice, session.device),
     words_estimated: estimateWordsRead({
       durationSeconds,
-      item: options.item,
+      item: options.item ?? extractEmbeddedMatterItem(session),
       readingSpeedWordsPerMinute: options.readingSpeedWordsPerMinute,
     }),
+  };
+}
+
+export function extractMatterReadingSessionItemId(session: unknown): string | null {
+  if (!isRecord(session)) {
+    return null;
+  }
+
+  return firstPresentText(
+    textFromUnknown(session.item_id),
+    textFromUnknown(session.itemId),
+    textFromUnknown(session.library_item_id),
+    textFromUnknown(session.libraryItemId),
+    textFromUnknown(session.target_id),
+    textFromUnknown(session.targetId),
+    extractItemIdFromItemLike(session.item),
+    extractItemIdFromItemLike(session.library_item),
+    extractItemIdFromItemLike(session.libraryItem),
+    extractItemIdFromItemLike(session.target)
+  );
+}
+
+export function extractEmbeddedMatterItem(session: unknown): NormalizableMatterItem | null {
+  if (!isRecord(session)) {
+    return null;
+  }
+
+  for (const key of ["item", "library_item", "libraryItem", "target"]) {
+    const value = session[key];
+    if (isRecord(value) && isNonEmptyText(value.id)) {
+      return value as NormalizableMatterItem;
+    }
+  }
+
+  return null;
+}
+
+export function createPlaceholderMatterItem(itemId: string): NormalizableMatterItem {
+  return {
+    object: "item",
+    id: itemId,
+    title: "Unknown item",
+    url: "",
+    status: "queue",
+    is_favorite: false,
+    content_type: "article",
+    reading_progress: 0,
+    tags: [],
+    updated_at: new Date(0).toISOString(),
+  };
+}
+
+export function summarizeReadingSessionShape(session: unknown): SafeReadingSessionShapeDiagnostics | null {
+  if (!isRecord(session)) {
+    return null;
+  }
+
+  const keys = Object.keys(session).sort();
+  return {
+    topLevelKeys: keys,
+    hasItemLikeField: [
+      "item_id",
+      "itemId",
+      "item",
+      "library_item_id",
+      "libraryItemId",
+      "library_item",
+      "libraryItem",
+      "target_id",
+      "targetId",
+      "target",
+    ].some((key) => key in session),
+    hasSessionId: isNonEmptyText(session.id),
+    hasDurationField: ["duration_seconds", "durationSeconds", "seconds_read", "secondsRead"].some((key) => key in session),
+    hasStartedAtField: ["started_at", "startedAt", "date"].some((key) => key in session),
+    hasEndedAtField: ["ended_at", "endedAt"].some((key) => key in session),
   };
 }
 
@@ -120,6 +223,30 @@ export function normalizeAnnotation(annotation: NormalizableMatterAnnotation): A
     created_at_matter: normalizeIsoTimestamp(annotation.created_at),
     updated_at_matter: normalizeIsoTimestamp(annotation.updated_at),
   };
+}
+
+function textFromUnknown(value: unknown): string | null {
+  return isNonEmptyText(value) ? value : null;
+}
+
+function extractItemIdFromItemLike(value: unknown): string | null {
+  if (isNonEmptyText(value)) {
+    return value.trim();
+  }
+
+  if (isRecord(value)) {
+    return firstPresentText(textFromUnknown(value.id));
+  }
+
+  return null;
+}
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNonEmptyText(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 function estimateReadingTimeMinutes(wordCount: number | null): number | null {

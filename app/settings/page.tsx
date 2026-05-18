@@ -109,6 +109,8 @@ export default async function SettingsPage() {
                 <DiagnosticField label="Last sync mode" value={formatStatus(latestRun?.sync_mode ?? "unknown")} />
                 <DiagnosticField label="Sessions returned by Matter" value={formatInteger(latestRun?.matter_sessions_returned ?? 0)} />
                 <DiagnosticField label="Linked items upserted" value={formatInteger(latestRun?.items_synced ?? 0)} />
+                <DiagnosticField label="Sessions skipped" value={formatInteger(latestRun?.matter_sessions_skipped ?? 0)} />
+                <DiagnosticField label="First session shape" value={formatSessionShape(latestRun?.matter_first_session_shape)} />
                 <DiagnosticField label="Matter has_more" value={formatBoolean(latestRun?.matter_has_more)} />
                 <DiagnosticField label="Matter next_cursor" value={formatBoolean(latestRun?.matter_next_cursor_present)} />
                 <DiagnosticField label="Session cursor/checkpoint" value={syncData.syncState?.session_cursor ?? syncData.syncState?.recent_activity_checkpoint ?? "None"} />
@@ -437,6 +439,24 @@ function formatStatus(status: string): string {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatSessionShape(value: unknown): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return "None";
+  }
+
+  const shape = value as { topLevelKeys?: unknown; hasItemLikeField?: unknown; hasSessionId?: unknown; hasDurationField?: unknown; hasStartedAtField?: unknown; hasEndedAtField?: unknown };
+  const keys = Array.isArray(shape.topLevelKeys) ? shape.topLevelKeys.filter((key): key is string => typeof key === "string") : [];
+  const flags = [
+    `item:${formatBoolean(shape.hasItemLikeField === true)}`,
+    `id:${formatBoolean(shape.hasSessionId === true)}`,
+    `duration:${formatBoolean(shape.hasDurationField === true)}`,
+    `start:${formatBoolean(shape.hasStartedAtField === true)}`,
+    `end:${formatBoolean(shape.hasEndedAtField === true)}`,
+  ].join(" ");
+
+  return `keys: ${keys.join(", ") || "None"}; ${flags}`;
 }
 
 function formatBoolean(value: boolean | null | undefined): string {
