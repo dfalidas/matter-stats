@@ -1,3 +1,5 @@
+import { extractMatterReadingSessionItemId } from "./matter-normalizers";
+
 const DEFAULT_MATTER_SYNC_ITEMS_LIMIT = 25;
 const DEFAULT_MATTER_SYNC_SESSIONS_LIMIT = 25;
 
@@ -25,7 +27,13 @@ export type MatterBatchCounts = {
   tags: number;
 };
 
+export type MatterSyncMessageDiagnostics = {
+  sessionsReturned?: number;
+  sessionsSkipped?: number;
+};
+
 type MatterSyncLimitEnv = { [key: string]: string | undefined };
+
 
 export type MatterSyncButtonState = {
   isPending: boolean;
@@ -62,20 +70,28 @@ export function addMatterBatchCounts(current: MatterBatchCounts, next: MatterBat
 export function buildMatterSyncMessage(
   counts: MatterBatchCounts,
   hasMore: boolean,
-  mode: MatterSyncMode = DEFAULT_MATTER_SYNC_MODE
+  mode: MatterSyncMode = DEFAULT_MATTER_SYNC_MODE,
+  diagnostics: MatterSyncMessageDiagnostics = {}
 ): string {
   const modeLabel = mode === "backfill_library" ? "Backfill library" : "Recent activity sync";
   const imported = `Imported ${counts.sessions} sessions, ${counts.items} linked items, ${counts.annotations} annotations, and ${counts.tags} tags.`;
+  const skipped = diagnostics.sessionsSkipped ?? 0;
+
+  if ((diagnostics.sessionsReturned ?? 0) > 0 && counts.sessions === 0) {
+    return `${modeLabel} needs attention. Matter returned ${diagnostics.sessionsReturned} sessions, but 0 were imported${skipped > 0 ? ` (${skipped} skipped)` : ""}. Check recent-activity diagnostics before advancing sync.`;
+  }
+
+  const skippedSuffix = skipped > 0 ? ` Skipped ${skipped} sessions with missing required fields.` : "";
 
   if (hasMore) {
-    return `${modeLabel} started. ${imported} More ${mode === "backfill_library" ? "library data" : "recent activity"} remains — click Sync again.`;
+    return `${modeLabel} started. ${imported}${skippedSuffix} More ${mode === "backfill_library" ? "library data" : "recent activity"} remains — click Sync again.`;
   }
 
   if (mode === "recent_activity" && counts.sessions === 0) {
     return "No recent reading sessions found. Try expanding the sync window or confirm Matter has reading-session data.";
   }
 
-  return `${modeLabel} complete. ${imported}`;
+  return `${modeLabel} complete. ${imported}${skippedSuffix}`;
 }
 
 export function getMatterSyncInitialPhase(mode: MatterSyncMode): MatterSyncPhase {
@@ -116,8 +132,8 @@ function subtractUtcDays(now: Date, days: number): Date {
   return date;
 }
 
-export function collectLinkedMatterItemIds(sessions: Array<{ item_id?: string | null }>): string[] {
-  return [...new Set(sessions.map((session) => session.item_id?.trim()).filter(isNonEmptyString))];
+export function collectLinkedMatterItemIds(sessions: unknown[]): string[] {
+  return [...new Set(sessions.map(extractMatterReadingSessionItemId).filter(isNonEmptyString))];
 }
 
 function isNonEmptyString(value: string | null | undefined): value is string {

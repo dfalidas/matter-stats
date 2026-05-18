@@ -126,11 +126,30 @@ export type ListMatterItemsParams = MatterPageParams & {
 };
 
 export type MatterReadingSession = {
-  object: "reading_session";
+  object?: "reading_session";
   id: string;
-  date: string;
-  seconds_read: number;
+  date?: string | null;
+  started_at?: string | null;
+  startedAt?: string | null;
+  ended_at?: string | null;
+  endedAt?: string | null;
+  seconds_read?: number | null;
+  secondsRead?: number | null;
+  duration_seconds?: number | null;
+  durationSeconds?: number | null;
   item_id?: string | null;
+  itemId?: string | null;
+  library_item_id?: string | null;
+  libraryItemId?: string | null;
+  target_id?: string | null;
+  targetId?: string | null;
+  item?: string | Partial<MatterItem> | null;
+  library_item?: string | Partial<MatterItem> | null;
+  libraryItem?: string | Partial<MatterItem> | null;
+  target?: string | Partial<MatterItem> | null;
+  source_device?: string | null;
+  sourceDevice?: string | null;
+  device?: string | null;
 };
 
 export type ListMatterReadingSessionsParams = MatterPageParams & {

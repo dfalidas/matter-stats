@@ -26,14 +26,19 @@ import {
   upsertReadingSessions,
 } from "@/lib/supabase-admin";
 import { recalculateDailyStats } from "@/lib/daily-stats";
-import type { SyncState, TablesInsert } from "@/lib/supabase-types";
+import type { Json, SyncState, TablesInsert } from "@/lib/supabase-types";
 import {
+  createPlaceholderMatterItem,
+  extractEmbeddedMatterItem,
+  extractMatterReadingSessionItemId,
   normalizeAnnotation,
   normalizeMatterItem,
   normalizeMatterItemTags,
   normalizeMatterTag,
   normalizeReadingSession,
+  summarizeReadingSessionShape,
   type MatterItemRow,
+  type NormalizableMatterItem,
 } from "@/lib/matter-normalizers";
 import {
   buildMatterSyncMessage,
@@ -93,10 +98,20 @@ type MatterSyncDiagnostics = {
   itemsReturned: number;
   lastHasMore: boolean;
   lastNextCursorPresent: boolean;
+  sessionsSkipped: number;
+  firstSessionShape: Json | null;
 };
 
 function createEmptyMatterSyncDiagnostics(): MatterSyncDiagnostics {
-  return { requestCount: 0, sessionsReturned: 0, itemsReturned: 0, lastHasMore: false, lastNextCursorPresent: false };
+  return {
+    requestCount: 0,
+    sessionsReturned: 0,
+    itemsReturned: 0,
+    lastHasMore: false,
+    lastNextCursorPresent: false,
+    sessionsSkipped: 0,
+    firstSessionShape: null,
+  };
 }
 
 function recordMatterPageDiagnostics(diagnostics: MatterSyncDiagnostics, page: MatterListResponse<unknown>) {
@@ -163,9 +178,13 @@ export async function syncMatterData(
       matter_requests_count: diagnostics.requestCount,
       matter_sessions_returned: diagnostics.sessionsReturned,
       matter_items_returned: diagnostics.itemsReturned,
+      matter_sessions_skipped: diagnostics.sessionsSkipped,
+      matter_first_session_shape: diagnostics.firstSessionShape,
       matter_has_more: diagnostics.lastHasMore,
       matter_next_cursor_present: diagnostics.lastNextCursorPresent,
-      error_message: null,
+      error_message: diagnostics.sessionsReturned > 0 && counts.sessions === 0
+        ? `Matter returned ${diagnostics.sessionsReturned} reading sessions, but none were imported. Inspect first-session shape diagnostics and item-link extraction.`
+        : null,
       checkpoint_timestamp: (mode === "recent_activity" ? persistedState.recent_activity_checkpoint : persistedState.completed_checkpoint_timestamp) ?? null,
     });
 
@@ -173,7 +192,7 @@ export async function syncMatterData(
 
     return {
       ok: true,
-      message: buildMatterSyncMessage(counts, hasMore, mode),
+      message: buildMatterSyncMessage(counts, hasMore, mode, { sessionsReturned: diagnostics.sessionsReturned, sessionsSkipped: diagnostics.sessionsSkipped }),
       syncRunId: finishedRun.id,
       itemsSynced: finishedRun.items_synced,
       sessionsSynced: finishedRun.sessions_synced,
@@ -334,7 +353,7 @@ async function importNextMatterBatch({
 }
 
 async function importMatterItemPage(
-  itemPage: Awaited<ReturnType<typeof listMatterItems>>,
+  itemPage: MatterListResponse<NormalizableMatterItem>,
   affectedDates: Set<string>,
   checkpoint: SyncCheckpoint
 ): Promise<{ itemCount: number; tagCount: number; annotationCount: number }> {
@@ -400,16 +419,23 @@ async function importMatterSessionPage(
   checkpoint: SyncCheckpoint,
   diagnostics: MatterSyncDiagnostics
 ): Promise<{ sessions: number; items: number; tags: number; annotations: number }> {
+  if (sessionPage.results.length > 0 && diagnostics.firstSessionShape === null) {
+    diagnostics.firstSessionShape = summarizeReadingSessionShape(sessionPage.results[0]) as Json;
+  }
+
+  const embeddedItems = sessionPage.results.map(extractEmbeddedMatterItem).filter((item): item is NonNullable<typeof item> => item !== null);
   const linkedItemIds = collectLinkedMatterItemIds(sessionPage.results);
-  const linkedItemCounts = await importLinkedMatterItems(linkedItemIds, affectedDates, checkpoint, diagnostics);
+  const linkedItemCounts = await importLinkedMatterItems(linkedItemIds, embeddedItems, affectedDates, checkpoint, diagnostics);
   const sessionRows: TablesInsert<"reading_sessions">[] = [];
   const matterItemLookup = new Map<string, MatterItemRow | null>();
 
   for (const session of sessionPage.results) {
+    const itemId = extractMatterReadingSessionItemId(session);
     const sessionRow = normalizeReadingSession(session, {
-      item: session.item_id ? await getMatterItemById(session.item_id, matterItemLookup) : null,
+      item: itemId ? await getMatterItemById(itemId, matterItemLookup) : extractEmbeddedMatterItem(session),
     });
     if (!sessionRow) {
+      diagnostics.sessionsSkipped += 1;
       continue;
     }
 
@@ -429,6 +455,7 @@ async function importMatterSessionPage(
 
 async function importLinkedMatterItems(
   itemIds: string[],
+  embeddedItems: Array<NonNullable<ReturnType<typeof extractEmbeddedMatterItem>>>,
   affectedDates: Set<string>,
   checkpoint: SyncCheckpoint,
   diagnostics: MatterSyncDiagnostics
@@ -437,38 +464,39 @@ async function importLinkedMatterItems(
     return { itemCount: 0, tagCount: 0, annotationCount: 0 };
   }
 
+  const embeddedItemsById = new Map(embeddedItems.map((item) => [item.id, item]));
   const results = [];
+  let returnedItemObjects = 0;
+
   for (const itemId of itemIds) {
+    const embeddedItem = embeddedItemsById.get(itemId);
+    if (embeddedItem) {
+      results.push(embeddedItem);
+      returnedItemObjects += 1;
+      continue;
+    }
+
     diagnostics.requestCount += 1;
-    results.push(await getOptionalMatterItem(itemId));
+    const fetchedItem = await getOptionalMatterItem(itemId);
+    if (fetchedItem) {
+      results.push(fetchedItem);
+      returnedItemObjects += 1;
+    } else {
+      results.push(createPlaceholderMatterItem(itemId));
+    }
   }
-  diagnostics.itemsReturned += results.filter(Boolean).length;
+  diagnostics.itemsReturned += returnedItemObjects;
 
   return importMatterItemPage(
     {
       object: "list",
-      results: results.map((item, index) => item ?? createPlaceholderMatterItem(itemIds[index])),
+      results,
       has_more: false,
       next_cursor: null,
     },
     affectedDates,
     checkpoint
   );
-}
-
-function createPlaceholderMatterItem(itemId: string): Awaited<ReturnType<typeof getMatterItem>> {
-  return {
-    object: "item",
-    id: itemId,
-    title: "",
-    url: "",
-    status: "queue",
-    is_favorite: false,
-    content_type: "article",
-    reading_progress: 0,
-    tags: [],
-    updated_at: new Date(0).toISOString(),
-  };
 }
 
 async function getOptionalMatterItem(itemId: string): Promise<Awaited<ReturnType<typeof getMatterItem>> | null> {

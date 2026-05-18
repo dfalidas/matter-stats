@@ -303,6 +303,8 @@ export type Database = {
           matter_requests_count: number;
           matter_sessions_returned: number;
           matter_items_returned: number;
+          matter_sessions_skipped: number;
+          matter_first_session_shape: Json | null;
           matter_has_more: boolean | null;
           matter_next_cursor_present: boolean | null;
           error_message: string | null;
@@ -323,6 +325,8 @@ export type Database = {
           matter_requests_count?: number;
           matter_sessions_returned?: number;
           matter_items_returned?: number;
+          matter_sessions_skipped?: number;
+          matter_first_session_shape?: Json | null;
           matter_has_more?: boolean | null;
           matter_next_cursor_present?: boolean | null;
           error_message?: string | null;
@@ -343,6 +347,8 @@ export type Database = {
           matter_requests_count?: number;
           matter_sessions_returned?: number;
           matter_items_returned?: number;
+          matter_sessions_skipped?: number;
+          matter_first_session_shape?: Json | null;
           matter_has_more?: boolean | null;
           matter_next_cursor_present?: boolean | null;
           error_message?: string | null;
