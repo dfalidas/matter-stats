@@ -18,6 +18,7 @@ type JsonRecord = Record<string, unknown>;
 
 type ReadingSessionWithOptionalApiFields = NormalizableMatterReadingSession & {
   itemId?: string | null;
+  object?: string | null;
   library_item_id?: string | null;
   libraryItemId?: string | null;
   target_id?: string | null;
@@ -85,19 +86,20 @@ export function normalizeReadingSession(
   session: ReadingSessionWithOptionalApiFields,
   options: NormalizeReadingSessionOptions = {}
 ): ReadingSessionRow | null {
+  const sessionId = firstPresentText(textFromUnknown(session.id));
   const itemId = extractMatterReadingSessionItemId(session);
-  if (!itemId) {
-    return null;
-  }
-
   const durationSeconds = normalizeNonNegativeInteger(
     session.duration_seconds ?? session.durationSeconds ?? session.seconds_read ?? session.secondsRead
   );
   const startedAt = normalizeIsoTimestamp(session.started_at ?? session.startedAt ?? session.date);
+
+  if (!sessionId || !itemId || !startedAt || durationSeconds === null) {
+    return null;
+  }
   const endedAt = normalizeSessionEndTimestamp(session.ended_at ?? session.endedAt, startedAt, durationSeconds);
 
   return {
-    id: session.id,
+    id: sessionId,
     item_id: itemId,
     started_at: startedAt,
     ended_at: endedAt,
@@ -119,6 +121,7 @@ export function extractMatterReadingSessionItemId(session: unknown): string | nu
   return firstPresentText(
     textFromUnknown(session.item_id),
     textFromUnknown(session.itemId),
+    textFromMatterSessionObject(session.object),
     textFromUnknown(session.library_item_id),
     textFromUnknown(session.libraryItemId),
     textFromUnknown(session.target_id),
@@ -171,6 +174,7 @@ export function summarizeReadingSessionShape(session: unknown): SafeReadingSessi
     hasItemLikeField: [
       "item_id",
       "itemId",
+      "object",
       "item",
       "library_item_id",
       "libraryItemId",
@@ -227,6 +231,16 @@ export function normalizeAnnotation(annotation: NormalizableMatterAnnotation): A
 
 function textFromUnknown(value: unknown): string | null {
   return isNonEmptyText(value) ? value : null;
+}
+
+function textFromMatterSessionObject(value: unknown): string | null {
+  const objectValue = textFromUnknown(value);
+
+  if (!objectValue || objectValue === "reading_session") {
+    return null;
+  }
+
+  return objectValue;
 }
 
 function extractItemIdFromItemLike(value: unknown): string | null {

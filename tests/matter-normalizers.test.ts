@@ -88,6 +88,33 @@ test("normalizes reading sessions and estimates words from fixed reading speed w
   });
 });
 
+
+test("normalizes production reading sessions that link the item through object", () => {
+  const row = normalizeReadingSession({
+    id: "rs_1",
+    date: "2026-05-18T14:00:00Z",
+    object: "itm_123",
+    seconds_read: 120,
+  });
+
+  assert.equal(row?.id, "rs_1");
+  assert.equal(row?.item_id, "itm_123");
+  assert.equal(row?.started_at, "2026-05-18T14:00:00.000Z");
+  assert.equal(row?.ended_at, "2026-05-18T14:02:00.000Z");
+  assert.equal(row?.duration_seconds, 120);
+  assert.notEqual(row, null);
+  assert.equal(extractMatterReadingSessionItemId({ object: "itm_123" }), "itm_123");
+});
+
+
+test("keeps support for prior reading session item link shapes", () => {
+  assert.equal(extractMatterReadingSessionItemId({ item_id: "item_1" }), "item_1");
+  assert.equal(extractMatterReadingSessionItemId({ itemId: "item_2" }), "item_2");
+  assert.equal(extractMatterReadingSessionItemId({ item: { id: "item_3" } }), "item_3");
+  assert.equal(extractMatterReadingSessionItemId({ item: "item_4" }), "item_4");
+  assert.equal(extractMatterReadingSessionItemId({ object: "reading_session", item_id: "item_5" }), "item_5");
+});
+
 test("normalizes reading session words from word count and progress when available", () => {
   const row = normalizeReadingSession(
     {
@@ -217,18 +244,10 @@ test("normalizes reading sessions with API aliases, explicit end times, and cust
   );
 });
 
-test("returns null word estimates when both duration and item progress facts are missing", () => {
-  assert.deepEqual(
+test("skips reading sessions with missing required timestamps or duration", () => {
+  assert.equal(
     normalizeReadingSession({ object: "reading_session", id: "session_5", item_id: "item_5", date: "bad", seconds_read: Number.NaN }),
-    {
-      id: "session_5",
-      item_id: "item_5",
-      started_at: null,
-      ended_at: null,
-      duration_seconds: null,
-      source_device: null,
-      words_estimated: null,
-    }
+    null
   );
 });
 
@@ -245,8 +264,8 @@ test("extracts Matter reading-session item IDs from likely API shapes", () => {
 test("normalizes reading session fixtures from snake_case, camelCase, embedded item, and string item shapes", () => {
   const snake = normalizeReadingSession({ id: "s_1", item_id: "itm_1", started_at: "2026-05-14T10:00:00Z", ended_at: "2026-05-14T10:05:00Z", duration_seconds: 300 });
   const camel = normalizeReadingSession({ id: "s_2", itemId: "itm_2", startedAt: "2026-05-14T11:00:00Z", endedAt: "2026-05-14T11:02:00Z", durationSeconds: 120 });
-  const embedded = normalizeReadingSession({ id: "s_3", item: { id: "itm_3", title: "Example", word_count: 1000, reading_progress: 0.25 }, started_at: "2026-05-14T12:00:00Z", ended_at: "2026-05-14T12:01:00Z" });
-  const stringItem = normalizeReadingSession({ id: "s_4", item: "itm_4", started_at: "2026-05-14T13:00:00Z", ended_at: "2026-05-14T13:01:00Z" });
+  const embedded = normalizeReadingSession({ id: "s_3", item: { id: "itm_3", title: "Example", word_count: 1000, reading_progress: 0.25 }, started_at: "2026-05-14T12:00:00Z", ended_at: "2026-05-14T12:01:00Z", duration_seconds: 60 });
+  const stringItem = normalizeReadingSession({ id: "s_4", item: "itm_4", started_at: "2026-05-14T13:00:00Z", ended_at: "2026-05-14T13:01:00Z", duration_seconds: 60 });
 
   assert.equal(snake?.item_id, "itm_1");
   assert.equal(snake?.duration_seconds, 300);
@@ -264,6 +283,7 @@ test("creates placeholder Matter items with safe Unknown item fallback", () => {
   assert.equal(row.title, "Unknown item");
   assert.equal(row.url, null);
   assert.equal(row.progress, 0);
+  assert.equal(row.last_synced_at, "2026-05-18T00:00:00.000Z");
 });
 
 test("summarizes first reading-session raw shape without private content", () => {

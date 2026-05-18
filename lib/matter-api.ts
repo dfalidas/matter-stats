@@ -126,7 +126,7 @@ export type ListMatterItemsParams = MatterPageParams & {
 };
 
 export type MatterReadingSession = {
-  object?: "reading_session";
+  object?: "reading_session" | string | null;
   id: string;
   date?: string | null;
   started_at?: string | null;
