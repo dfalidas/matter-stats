@@ -223,3 +223,17 @@ test("imports linked matter_items before upserting reading_sessions", () => {
   assert.ok(placeholderUpsertIndex > linkedImportStart);
   assert.ok(metadataFetchIndex > placeholderUpsertIndex);
 });
+
+test("live sync path handles Matter session object mapping and explicit skip reasons", () => {
+  const source = readFileSync("lib/matter-sync.ts", "utf8");
+
+  assert.match(source, /extractMatterReadingSessionItemId\(session\)/);
+  assert.match(source, /normalizeReadingSession\(session/);
+  assert.match(source, /missing_item_object/);
+  assert.match(source, /invalid_date/);
+  assert.match(source, /invalid_seconds_read/);
+  assert.match(source, /database_upsert_error/);
+  assert.match(source, /objectSamplePrefix/);
+  assert.match(source, /secondsReadType/);
+  assert.match(source, /dateType/);
+});
