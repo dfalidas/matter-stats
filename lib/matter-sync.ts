@@ -100,6 +100,7 @@ type MatterSyncDiagnostics = {
   lastHasMore: boolean;
   lastNextCursorPresent: boolean;
   sessionsSkipped: number;
+  firstSkipReason: string | null;
   firstSessionShape: Json | null;
 };
 
@@ -111,6 +112,7 @@ function createEmptyMatterSyncDiagnostics(): MatterSyncDiagnostics {
     lastHasMore: false,
     lastNextCursorPresent: false,
     sessionsSkipped: 0,
+    firstSkipReason: null,
     firstSessionShape: null,
   };
 }
@@ -420,9 +422,7 @@ async function importMatterSessionPage(
   checkpoint: SyncCheckpoint,
   diagnostics: MatterSyncDiagnostics
 ): Promise<{ sessions: number; items: number; tags: number; annotations: number }> {
-  if (sessionPage.results.length > 0 && diagnostics.firstSessionShape === null) {
-    diagnostics.firstSessionShape = summarizeReadingSessionShape(sessionPage.results[0]) as Json;
-  }
+  let firstSkippedSession: unknown = null;
 
   const embeddedItems = sessionPage.results.map(extractEmbeddedMatterItem).filter((item): item is NonNullable<typeof item> => item !== null);
   const linkedItemIds = collectLinkedMatterItemIds(sessionPage.results);
@@ -432,11 +432,24 @@ async function importMatterSessionPage(
 
   for (const session of sessionPage.results) {
     const itemId = extractMatterReadingSessionItemId(session);
+    const skipReason = classifySessionSkipReason(session, itemId);
+    if (skipReason) {
+      diagnostics.sessionsSkipped += 1;
+      if (diagnostics.firstSkipReason === null) {
+        diagnostics.firstSkipReason = skipReason;
+        firstSkippedSession = session;
+      }
+      continue;
+    }
     const sessionRow = normalizeReadingSession(session, {
       item: itemId ? await getMatterItemById(itemId, matterItemLookup) : extractEmbeddedMatterItem(session),
     });
     if (!sessionRow) {
       diagnostics.sessionsSkipped += 1;
+      if (diagnostics.firstSkipReason === null) {
+        diagnostics.firstSkipReason = "database_upsert_error";
+        firstSkippedSession = session;
+      }
       continue;
     }
 
@@ -450,8 +463,63 @@ async function importMatterSessionPage(
     affectedDates.add(affectedDate);
   }
 
-  await upsertInBatches(sessionRows, upsertReadingSessions);
+  if (sessionPage.results.length > 0 && diagnostics.firstSessionShape === null) {
+    diagnostics.firstSessionShape = summarizeReadingSessionShapeWithSkip(sessionPage.results[0], diagnostics.firstSkipReason, firstSkippedSession) as Json;
+  } else if (diagnostics.firstSessionShape && diagnostics.firstSkipReason) {
+    diagnostics.firstSessionShape = {
+      ...(diagnostics.firstSessionShape as Record<string, unknown>),
+      skipReason: diagnostics.firstSkipReason,
+    } as Json;
+  }
+
+  try {
+    await upsertInBatches(sessionRows, upsertReadingSessions);
+  } catch (error) {
+    diagnostics.firstSkipReason ??= "database_upsert_error";
+    throw error;
+  }
   return { sessions: sessionRows.length, items: linkedItemCounts.itemCount, tags: linkedItemCounts.tagCount, annotations: linkedItemCounts.annotationCount };
+}
+
+function classifySessionSkipReason(session: unknown, itemId: string | null): string | null {
+  const sessionId = typeof (session as { id?: unknown })?.id === "string" ? (session as { id?: string }).id : null;
+  if (!isNonEmptyString(sessionId)) {
+    return "missing_session_id";
+  }
+  if (!itemId) {
+    return "missing_item_object";
+  }
+  const startedAt = normalizeReadingSession(session as Parameters<typeof normalizeReadingSession>[0])?.started_at;
+  if (!startedAt) {
+    return "invalid_date";
+  }
+  const duration = normalizeReadingSession(session as Parameters<typeof normalizeReadingSession>[0])?.duration_seconds;
+  if (duration === null || duration === undefined) {
+    return "invalid_seconds_read";
+  }
+  return null;
+}
+
+function summarizeReadingSessionShapeWithSkip(session: unknown, skipReason: string | null, skippedSession: unknown): Record<string, unknown> | null {
+  const summary = summarizeReadingSessionShape(session) as Record<string, unknown> | null;
+  if (!summary || typeof session !== "object" || session === null || Array.isArray(session)) {
+    return summary;
+  }
+  const first = session as Record<string, unknown>;
+  const objectValue = first.object;
+  const objectText = typeof objectValue === "string" ? objectValue : null;
+  const skipTarget = typeof skippedSession === "object" && skippedSession !== null && !Array.isArray(skippedSession)
+    ? (skippedSession as Record<string, unknown>)
+    : null;
+  return {
+    ...summary,
+    objectType: typeof objectValue,
+    objectLooksLikeItemId: typeof objectText === "string" && objectText.trim().length > 0 && objectText !== "reading_session",
+    objectSamplePrefix: typeof objectText === "string" ? objectText.trim().slice(0, 12) : null,
+    dateType: typeof first.date,
+    secondsReadType: typeof first.seconds_read,
+    skipReason: skipReason ?? classifySessionSkipReason(skipTarget, skipTarget ? extractMatterReadingSessionItemId(skipTarget) : null),
+  };
 }
 
 async function importLinkedMatterItems(
