@@ -20,6 +20,7 @@ import {
 import { ArticleRow, ChartCard, EmptyState, ErrorState, MetricCard, PeriodSelector, RankingList } from "@/components/dashboard-components";
 import type { ReadingHeatmapDay } from "@/lib/metrics-service";
 import type { ReadingReport, ReportPeriod } from "@/lib/reports-service";
+import { SESSION_METADATA_EMPTY_STATE } from "@/lib/metadata-coverage";
 
 import { SyncMatterButton } from "../dashboard/sync-matter-button";
 
@@ -131,14 +132,13 @@ function ReportContent({ report }: { report: ReadingReport }) {
         <MetricCard label="Total Reading Time" value={formatDuration(metrics.totals.totalReadingTimeSeconds)} helper={comparisonLabel} trend={<ComparisonTrend value={metrics.comparison.delta.totalReadingTimePercentChange} />} icon={Clock} accent="violet" />
         <MetricCard label="Words Read" value={formatInteger(metrics.totals.wordsRead)} helper={comparisonLabel} trend={<ComparisonTrend value={metrics.comparison.delta.wordsReadPercentChange} />} icon={BookOpen} accent="blue" />
         <MetricCard label="Sessions" value={formatInteger(metrics.totals.sessionsCount)} helper={`Avg ${formatDuration(metrics.totals.averageSessionLengthSeconds)} • ${comparisonLabel}`} trend={<ComparisonTrend value={metrics.comparison.delta.sessionsCountPercentChange} />} icon={Timer} accent="amber" />
-        <MetricCard label="Articles" value={formatInteger(metrics.totals.articlesRead)} helper={comparisonLabel} trend={<ComparisonTrend value={metrics.comparison.delta.articlesReadPercentChange} />} icon={Newspaper} accent="red" />
+        <MetricCard label="Reading Sessions" value={formatInteger(metrics.totals.sessionsCount)} helper={comparisonLabel} trend={<ComparisonTrend value={metrics.comparison.delta.sessionsCountPercentChange} />} icon={Newspaper} accent="red" />
       </div>
 
       <ChartCard title={report.period === "monthly" ? "Month-over-month comparison" : "Previous period comparison"} description={`Compared with ${formatComparisonRange(report)}.`}>
         <div className="grid gap-3 md:grid-cols-4">
           <ComparisonStat label="Reading time" current={formatDuration(metrics.totals.totalReadingTimeSeconds)} previous={formatDuration(metrics.comparison.totals.totalReadingTimeSeconds)} change={metrics.comparison.delta.totalReadingTimePercentChange} />
           <ComparisonStat label="Words" current={formatInteger(metrics.totals.wordsRead)} previous={formatInteger(metrics.comparison.totals.wordsRead)} change={metrics.comparison.delta.wordsReadPercentChange} />
-          <ComparisonStat label="Articles" current={formatInteger(metrics.totals.articlesRead)} previous={formatInteger(metrics.comparison.totals.articlesRead)} change={metrics.comparison.delta.articlesReadPercentChange} />
           <ComparisonStat label="Sessions" current={formatInteger(metrics.totals.sessionsCount)} previous={formatInteger(metrics.comparison.totals.sessionsCount)} change={metrics.comparison.delta.sessionsCountPercentChange} />
         </div>
       </ChartCard>
@@ -199,7 +199,7 @@ function ReportContent({ report }: { report: ReadingReport }) {
               <RankingList items={mixData.map((item) => ({ id: item.name, label: item.name, value: item.minutes, helper: `${formatInteger(item.articles)} articles • ${formatInteger(item.words)} words`, accent: "blue" }))} maxValue={Math.max(...mixData.map((item) => item.minutes), 1)} />
             </div>
           ) : (
-            <EmptyState title="No topic or source mix" description="Tags and sources appear here when synced Matter items include metadata." icon={Tags} />
+            <EmptyState title="No topic or source mix" description={SESSION_METADATA_EMPTY_STATE} icon={Tags} />
           )}
         </ChartCard>
 
@@ -217,7 +217,7 @@ function ReportContent({ report }: { report: ReadingReport }) {
           {metrics.topAuthors.length > 0 ? (
             <RankingList items={metrics.topAuthors.map((author) => ({ id: author.name, label: author.name, value: Math.round(author.readingTimeSeconds / 60), helper: `${formatInteger(author.articlesRead)} articles • ${formatInteger(author.wordsRead)} words`, accent: "violet" }))} maxValue={Math.max(...metrics.topAuthors.map((author) => Math.round(author.readingTimeSeconds / 60)), 1)} />
           ) : (
-            <EmptyState title="No authors yet" description="Author rankings appear when synced sessions include author metadata." icon={Users} />
+            <EmptyState title="No authors yet" description={SESSION_METADATA_EMPTY_STATE} icon={Users} />
           )}
         </ChartCard>
 
@@ -225,7 +225,7 @@ function ReportContent({ report }: { report: ReadingReport }) {
           {metrics.topSources.length > 0 ? (
             <RankingList items={metrics.topSources.map((source) => ({ id: source.name, label: source.name, value: Math.round(source.readingTimeSeconds / 60), helper: `${formatInteger(source.articlesRead)} articles • ${formatInteger(source.wordsRead)} words`, accent: "blue" }))} maxValue={Math.max(...metrics.topSources.map((source) => Math.round(source.readingTimeSeconds / 60)), 1)} />
           ) : (
-            <EmptyState title="No sources yet" description="Source rankings appear when synced sessions include source metadata." icon={FileText} />
+            <EmptyState title="No sources yet" description={SESSION_METADATA_EMPTY_STATE} icon={FileText} />
           )}
         </ChartCard>
       </div>

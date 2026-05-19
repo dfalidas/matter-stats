@@ -28,6 +28,13 @@ type MatterConnectionStatus = {
   detail: string;
 };
 
+type DataCoverageCounts = {
+  totalReadingSessions: number;
+  sessionsWithoutLinkedItem: number;
+  totalSyncedItems: number;
+  totalDailyStatsRows: number;
+};
+
 type SettingsSyncData = {
   latestRun: SyncRun | null;
   latestSuccessfulRun: Pick<SyncRun, "finished_at" | "started_at"> | null;
@@ -35,6 +42,7 @@ type SettingsSyncData = {
   recentRuns: SyncRunLogEntry[];
   syncState: SyncState | null;
   databaseStatus: MatterConnectionStatus;
+  dataCoverageCounts: DataCoverageCounts;
 };
 
 export default async function SettingsPage() {
@@ -122,6 +130,26 @@ export default async function SettingsPage() {
                 <DiagnosticField label="Matter requests" value={formatInteger(latestRun?.matter_requests_count ?? 0)} />
               </dl>
               <p className="mt-3 text-xs text-dashboard-muted">Only safe counters, booleans, mode labels, and cursor/checkpoint metadata are shown. The Matter API token is never stored or rendered.</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-dashboard-border bg-dashboard-card/80 shadow-soft backdrop-blur">
+          <CardHeader>
+            <CardTitle className="text-dashboard-text">Current data model</CardTitle>
+            <CardDescription className="text-dashboard-muted">
+              Reading-time analytics are powered by Matter reading sessions. Session imports currently include date and duration data, but linked item metadata for those sessions may be unavailable.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-dashboard-muted">
+              Time-based metrics (reading time, sessions, words estimate, and daily trends) are reliable today. Source, author, and tag analytics may be partial until session-to-article metadata linking is available from Matter session responses.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <CountTile label="Total reading sessions" value={syncData.dataCoverageCounts.totalReadingSessions} helper="All imported session rows" />
+              <CountTile label="Sessions without linked item" value={syncData.dataCoverageCounts.sessionsWithoutLinkedItem} helper="Session rows with null item_id" />
+              <CountTile label="Total synced items" value={syncData.dataCoverageCounts.totalSyncedItems} helper="Rows in matter_items" />
+              <CountTile label="Total daily stats rows" value={syncData.dataCoverageCounts.totalDailyStatsRows} helper="Rows in daily_stats" />
             </div>
           </CardContent>
         </Card>
@@ -217,14 +245,14 @@ function DiagnosticPanel({ label, value, helper, icon, tone = "default" }: { lab
   );
 }
 
-function CountTile({ label, value }: { label: string; value: number | null | undefined }) {
+function CountTile({ label, value, helper = "Latest run" }: { label: string; value: number | null | undefined; helper?: string }) {
   return (
     <div className="rounded-2xl border border-dashboard-border bg-background/35 p-4">
       <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-dashboard-muted">
         <Tags className="h-3.5 w-3.5" aria-hidden /> {label}
       </div>
       <p className="mt-2 text-3xl font-bold tracking-tight text-dashboard-text">{formatInteger(value ?? 0)}</p>
-      <p className="mt-1 text-sm text-dashboard-muted">Latest run</p>
+      <p className="mt-1 text-sm text-dashboard-muted">{helper}</p>
     </div>
   );
 }
@@ -331,6 +359,7 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
       latestErrorRun: null,
       recentRuns: [],
       syncState: null,
+      dataCoverageCounts: { totalReadingSessions: 0, sessionsWithoutLinkedItem: 0, totalSyncedItems: 0, totalDailyStatsRows: 0 },
       databaseStatus: {
         state: "not-configured",
         label: "Not configured",
@@ -342,7 +371,7 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
   try {
     const { getSupabaseAdminClient } = await import("@/lib/supabase-admin");
     const client = getSupabaseAdminClient();
-    const [latestRunResult, latestSuccessfulRunResult, latestErrorRunResult, recentRunsResult, syncStateResult] = await Promise.all([
+    const [latestRunResult, latestSuccessfulRunResult, latestErrorRunResult, recentRunsResult, syncStateResult, totalSessionsCountResult, sessionsWithoutLinkedItemCountResult, totalSyncedItemsCountResult, totalDailyStatsRowsCountResult] = await Promise.all([
       client.from("sync_runs").select("*").order("started_at", { ascending: false }).limit(1).maybeSingle(),
       client
         .from("sync_runs")
@@ -367,9 +396,13 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
         .order("started_at", { ascending: false })
         .limit(8),
       client.from("sync_state").select("*").eq("id", "matter").maybeSingle(),
+      client.from("reading_sessions").select("id", { count: "exact", head: true }),
+      client.from("reading_sessions").select("id", { count: "exact", head: true }).is("item_id", null),
+      client.from("matter_items").select("id", { count: "exact", head: true }),
+      client.from("daily_stats").select("date", { count: "exact", head: true }),
     ]);
 
-    const firstError = latestRunResult.error ?? latestSuccessfulRunResult.error ?? latestErrorRunResult.error ?? recentRunsResult.error ?? syncStateResult.error;
+    const firstError = latestRunResult.error ?? latestSuccessfulRunResult.error ?? latestErrorRunResult.error ?? recentRunsResult.error ?? syncStateResult.error ?? totalSessionsCountResult.error ?? sessionsWithoutLinkedItemCountResult.error ?? totalSyncedItemsCountResult.error ?? totalDailyStatsRowsCountResult.error;
     if (firstError) {
       throw firstError;
     }
@@ -380,6 +413,12 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
       latestErrorRun: latestErrorRunResult.data,
       recentRuns: recentRunsResult.data ?? [],
       syncState: syncStateResult.data,
+      dataCoverageCounts: {
+        totalReadingSessions: totalSessionsCountResult.count ?? 0,
+        sessionsWithoutLinkedItem: sessionsWithoutLinkedItemCountResult.count ?? 0,
+        totalSyncedItems: totalSyncedItemsCountResult.count ?? 0,
+        totalDailyStatsRows: totalDailyStatsRowsCountResult.count ?? 0,
+      },
       databaseStatus: {
         state: "connected",
         label: "Connected",
@@ -393,6 +432,7 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
       latestErrorRun: null,
       recentRuns: [],
       syncState: null,
+      dataCoverageCounts: { totalReadingSessions: 0, sessionsWithoutLinkedItem: 0, totalSyncedItems: 0, totalDailyStatsRows: 0 },
       databaseStatus: {
         state: "error",
         label: "Connection issue",
