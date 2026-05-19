@@ -109,6 +109,8 @@ function ReportContent({ report }: { report: ReadingReport }) {
   const comparisonLabel = getComparisonLabel(report);
   const activeDays = buildMostActiveDays(metrics.heatmap);
   const mixData = buildTopicSourceMix(report);
+  const showWeeklyFallback = report.period === "weekly" && isEmpty && !!report.latestWeekWithDataStartDate && report.metrics.range.startDate !== report.latestWeekWithDataStartDate;
+  const weeklyFallbackHref = showWeeklyFallback ? `/reports?period=weekly&weekStart=${report.latestWeekWithDataStartDate}` : null;
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, ease: "easeOut" }} className="space-y-5">
@@ -126,7 +128,23 @@ function ReportContent({ report }: { report: ReadingReport }) {
         </div>
       </section>
 
-      {isEmpty ? <EmptyState title={`No reading in this ${periodNouns[report.period]} yet`} description="Sync Matter or choose a different period to populate report cards, charts, rankings, and timelines." icon={Sparkles} action={<SyncMatterButton />} /> : null}
+      {isEmpty ? (
+        <EmptyState
+          title={report.period === "weekly" ? "No reading sessions found for this week." : `No reading in this ${periodNouns[report.period]} yet`}
+          description="Sync Matter or choose a different period to populate report cards, charts, rankings, and timelines."
+          icon={Sparkles}
+          action={
+            <div className="flex flex-wrap gap-2">
+              {weeklyFallbackHref ? (
+                <a className="inline-flex items-center rounded-xl border border-dashboard-border bg-dashboard-card px-3 py-2 text-sm font-medium text-dashboard-text transition hover:border-primary/60 hover:text-primary" href={weeklyFallbackHref}>
+                  View latest week with data
+                </a>
+              ) : null}
+              <SyncMatterButton />
+            </div>
+          }
+        />
+      ) : null}
 
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(210px,1fr))]">
         <MetricCard label="Total Reading Time" value={formatDuration(metrics.totals.totalReadingTimeSeconds)} helper={comparisonLabel} trend={<ComparisonTrend value={metrics.comparison.delta.totalReadingTimePercentChange} />} icon={Clock} accent="violet" />
@@ -225,7 +243,7 @@ function ReportContent({ report }: { report: ReadingReport }) {
           {metrics.topSources.length > 0 ? (
             <RankingList items={metrics.topSources.map((source) => ({ id: source.name, label: source.name, value: Math.round(source.readingTimeSeconds / 60), helper: `${formatInteger(source.articlesRead)} articles • ${formatInteger(source.wordsRead)} words`, accent: "blue" }))} maxValue={Math.max(...metrics.topSources.map((source) => Math.round(source.readingTimeSeconds / 60)), 1)} />
           ) : (
-            <EmptyState title="No sources yet" description={SESSION_METADATA_EMPTY_STATE} icon={FileText} />
+            <EmptyState title="Source analytics unavailable" description="Source analytics are unavailable because Matter reading sessions do not currently include article metadata." icon={FileText} />
           )}
         </ChartCard>
       </div>
