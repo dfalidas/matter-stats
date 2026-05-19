@@ -2,6 +2,12 @@
 
 Matter Stats is a private, single-user reading analytics dashboard for a Matter account. It uses the Next.js App Router, TypeScript, Tailwind CSS, Supabase, and a server-side Matter sync.
 
+## Current Matter API limitation
+
+- In the currently observed Matter reading session response shape, session records reliably include reading-time fields (timestamps and duration), but often do not include a linked item/article identifier.
+- Because of that, `reading_sessions.item_id` is allowed to be null for imported sessions.
+- Time-based analytics (reading time, session counts, daily trends, estimated words) remain reliable, while source/author/tag and article-level breakdowns can be partial until session-to-article metadata linking is available.
+
 ## Production-readiness notes
 
 - Every app route except `/login` and static Next.js assets is protected by the `matter_stats_access` HTTP-only password cookie.

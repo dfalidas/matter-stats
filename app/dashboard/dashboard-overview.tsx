@@ -37,6 +37,7 @@ import type {
   ReadingHeatmapDay,
   ReadingMetrics,
 } from "@/lib/metrics-service";
+import { SESSION_METADATA_EMPTY_STATE } from "@/lib/metadata-coverage";
 
 import { SyncMatterButton } from "./sync-matter-button";
 
@@ -201,12 +202,12 @@ export function DashboardOverview({
             tooltip="Words read from synced Matter items during this period."
           />
           <MetricCard
-            label="Articles"
-            value={formatInteger(metrics.totals.articlesRead)}
-            helper={`${formatSignedPercent(metrics.comparison.delta.articlesReadPercentChange)} vs previous period`}
+            label="Reading Sessions"
+            value={formatInteger(metrics.totals.sessionsCount)}
+            helper={`${formatSignedPercent(metrics.comparison.delta.sessionsCountPercentChange)} vs previous period`}
             icon={Newspaper}
             accent="red"
-            tooltip="Articles with reading activity in the selected period."
+            tooltip="Matter reading sessions imported during the selected period."
           />
           <MetricCard
             label="Current Streak"
@@ -325,7 +326,7 @@ export function DashboardOverview({
             ) : (
               <EmptyState
                 title="No sources yet"
-                description="Sources appear after Matter sessions include article source metadata."
+                description={SESSION_METADATA_EMPTY_STATE}
               />
             )}
           </ChartCard>
@@ -342,9 +343,9 @@ export function DashboardOverview({
                 {metrics.recentReads.map((read) => (
                   <ArticleRow
                     key={read.itemId}
-                    title={read.title ?? "Unknown item"}
-                    source={read.source ?? read.author ?? "Unknown source"}
-                    meta={`${formatDuration(read.readingTimeSeconds)} • ${read.readAt ? formatDateLabel(read.readAt) : "Unknown date"}`}
+                    title={read.title ?? "Reading session"}
+                    source={read.source ?? read.author ?? "Matter"}
+                    meta={`${read.readAt ? formatDateLabel(read.readAt) : "Unknown time"} • ${formatDuration(read.readingTimeSeconds)}`}
                     href={read.url ?? undefined}
                   />
                 ))}
@@ -405,7 +406,7 @@ export function DashboardOverview({
             ) : (
               <EmptyState
                 title="No topics yet"
-                description="Tagged Matter reads will appear here after sync."
+                description={SESSION_METADATA_EMPTY_STATE}
               />
             )}
           </ChartCard>
