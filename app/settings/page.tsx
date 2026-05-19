@@ -108,6 +108,10 @@ export default async function SettingsPage() {
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
                 <DiagnosticField label="Last sync mode" value={formatStatus(latestRun?.sync_mode ?? "unknown")} />
                 <DiagnosticField label="Sessions returned by Matter" value={formatInteger(latestRun?.matter_sessions_returned ?? 0)} />
+                <DiagnosticField
+                  label="Sessions without linked item"
+                  value={formatInteger(latestRun?.matter_sessions_without_linked_item ?? 0)}
+                />
                 <DiagnosticField label="Linked items upserted" value={formatInteger(latestRun?.items_synced ?? 0)} />
                 <DiagnosticField label="Sessions skipped" value={formatInteger(latestRun?.matter_sessions_skipped ?? 0)} />
                 <DiagnosticField label="First session shape" value={formatSessionShape(latestRun?.matter_first_session_shape)} />

@@ -370,6 +370,9 @@ async function fetchSourcePerformance(client: MatterStatsSupabaseClient, item: M
 
   const timeByItemId = new Map<string, number>();
   for (const session of sourceSessions ?? []) {
+    if (!session.item_id) {
+      continue;
+    }
     timeByItemId.set(session.item_id, (timeByItemId.get(session.item_id) ?? 0) + (session.duration_seconds ?? 0));
   }
 

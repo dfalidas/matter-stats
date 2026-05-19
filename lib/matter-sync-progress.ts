@@ -30,6 +30,7 @@ export type MatterBatchCounts = {
 export type MatterSyncMessageDiagnostics = {
   sessionsReturned?: number;
   sessionsSkipped?: number;
+  sessionsWithoutLinkedItem?: number;
 };
 
 type MatterSyncLimitEnv = { [key: string]: string | undefined };
@@ -74,24 +75,22 @@ export function buildMatterSyncMessage(
   diagnostics: MatterSyncMessageDiagnostics = {}
 ): string {
   const modeLabel = mode === "backfill_library" ? "Backfill library" : "Recent activity sync";
-  const imported = `Imported ${counts.sessions} sessions, ${counts.items} linked items, ${counts.annotations} annotations, and ${counts.tags} tags.`;
+  const imported = `Imported ${counts.sessions} reading sessions, ${counts.items} linked items, ${counts.annotations} annotations, and ${counts.tags} tags.`;
   const skipped = diagnostics.sessionsSkipped ?? 0;
-
-  if ((diagnostics.sessionsReturned ?? 0) > 0 && counts.sessions === 0) {
-    return `${modeLabel} needs attention. Matter returned ${diagnostics.sessionsReturned} sessions, but 0 were imported${skipped > 0 ? ` (${skipped} skipped)` : ""}. Check recent-activity diagnostics before advancing sync.`;
-  }
+  const withoutLinkedItem = diagnostics.sessionsWithoutLinkedItem ?? 0;
 
   const skippedSuffix = skipped > 0 ? ` Skipped ${skipped} sessions with missing required fields.` : "";
+  const unlinkedSuffix = withoutLinkedItem > 0 ? " Item metadata unavailable for these sessions." : "";
 
   if (hasMore) {
-    return `${modeLabel} started. ${imported}${skippedSuffix} More ${mode === "backfill_library" ? "library data" : "recent activity"} remains — click Sync again.`;
+    return `${modeLabel} started. ${imported}${unlinkedSuffix}${skippedSuffix} More ${mode === "backfill_library" ? "library data" : "recent activity"} remains — click Sync again.`;
   }
 
   if (mode === "recent_activity" && counts.sessions === 0) {
     return "No recent reading sessions found. Try expanding the sync window or confirm Matter has reading-session data.";
   }
 
-  return `${modeLabel} complete. ${imported}${skippedSuffix}`;
+  return `${modeLabel} complete. ${imported}${unlinkedSuffix}${skippedSuffix}`;
 }
 
 export function getMatterSyncInitialPhase(mode: MatterSyncMode): MatterSyncPhase {

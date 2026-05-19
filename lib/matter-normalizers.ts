@@ -93,7 +93,7 @@ export function normalizeReadingSession(
   );
   const startedAt = normalizeIsoTimestamp(session.started_at ?? session.startedAt ?? session.date);
 
-  if (!sessionId || !itemId || !startedAt || durationSeconds === null) {
+  if (!sessionId || !startedAt || durationSeconds === null) {
     return null;
   }
   const endedAt = normalizeSessionEndTimestamp(session.ended_at ?? session.endedAt, startedAt, durationSeconds);
@@ -121,7 +121,7 @@ export function extractMatterReadingSessionItemId(session: unknown): string | nu
   return firstPresentText(
     textFromUnknown(session.item_id),
     textFromUnknown(session.itemId),
-    textFromMatterSessionObject(session.object),
+    matterObjectItemIdFromUnknown(session.object),
     textFromUnknown(session.library_item_id),
     textFromUnknown(session.libraryItemId),
     textFromUnknown(session.target_id),
@@ -233,10 +233,10 @@ function textFromUnknown(value: unknown): string | null {
   return isNonEmptyText(value) ? value : null;
 }
 
-function textFromMatterSessionObject(value: unknown): string | null {
+function matterObjectItemIdFromUnknown(value: unknown): string | null {
   const objectValue = textFromUnknown(value);
 
-  if (!objectValue || objectValue === "reading_session") {
+  if (!objectValue || !objectValue.startsWith("itm_")) {
     return null;
   }
 

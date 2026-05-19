@@ -107,6 +107,26 @@ test("normalizes production reading sessions that link the item through object",
 });
 
 
+
+
+test("normalizes Matter session shape without linked item id", () => {
+  const row = normalizeReadingSession({
+    id: "reading_sess_1",
+    date: "2026-05-18T14:00:00Z",
+    object: "reading_session",
+    seconds_read: 120,
+  });
+
+  assert.deepEqual(row, {
+    id: "reading_sess_1",
+    item_id: null,
+    started_at: "2026-05-18T14:00:00.000Z",
+    ended_at: "2026-05-18T14:02:00.000Z",
+    duration_seconds: 120,
+    source_device: null,
+    words_estimated: Math.round((120 / 60) * DEFAULT_READING_SPEED_WORDS_PER_MINUTE),
+  });
+});
 test("keeps support for prior reading session item link shapes", () => {
   assert.equal(extractMatterReadingSessionItemId({ item_id: "item_1" }), "item_1");
   assert.equal(extractMatterReadingSessionItemId({ itemId: "item_2" }), "item_2");

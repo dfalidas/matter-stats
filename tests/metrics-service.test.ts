@@ -12,7 +12,7 @@ import {
 
 type TestSession = {
   id: string;
-  item_id: string;
+  item_id: string | null;
   started_at: string | null;
   ended_at: string | null;
   duration_seconds: number | null;
@@ -29,7 +29,7 @@ type TestSession = {
 };
 
 type TestTagRow = {
-  item_id: string;
+  item_id: string | null;
   matter_tags: { id: string; name: string | null } | Array<{ id: string; name: string | null }> | null;
 };
 
@@ -92,7 +92,7 @@ class TestQuery<Row extends TestSession | TestTagRow> {
     }
 
     if (this.itemIds) {
-      result = result.filter((row) => "item_id" in row && this.itemIds!.includes(row.item_id));
+      result = result.filter((row) => "item_id" in row && row.item_id !== null && this.itemIds!.includes(row.item_id));
     }
 
     if (this.startedAtAscending !== null) {
@@ -236,6 +236,30 @@ test("returns typed zero metrics for an empty data set", async () => {
   assert.deepEqual(metrics.comparison.totals, metrics.totals);
 });
 
+
+
+test("counts reading time from sessions even when item_id is null", async () => {
+  const client = createClient({
+    sessions: [
+      {
+        id: "null_item_1",
+        item_id: null,
+        started_at: "2026-05-18T14:00:00.000Z",
+        ended_at: "2026-05-18T14:02:00.000Z",
+        duration_seconds: 120,
+        words_estimated: 450,
+        matter_items: null,
+      },
+    ],
+  });
+
+  const metrics = await getReadingMetrics(client, { preset: "week", now: "2026-05-18T18:00:00Z", timezone: "UTC" });
+
+  assert.equal(metrics.totals.totalReadingTimeSeconds, 120);
+  assert.equal(metrics.totals.sessionsCount, 1);
+  assert.equal(metrics.totals.articlesRead, 0);
+  assert.equal(metrics.recentReads[0]?.title, "Unknown item");
+});
 test("aggregates reading metrics, rankings, heatmap, recency, comparison, and streaks", async () => {
   const client = createClient({
     sessions: [
@@ -366,7 +390,7 @@ test("ignores empty and non-positive session fields when building critical metri
   assert.deepEqual(metrics.recentReads, [
     {
       itemId: "",
-      title: null,
+      title: "Unknown item",
       url: null,
       source: null,
       author: null,
@@ -388,7 +412,7 @@ test("dashboard metrics work with partial item metadata", async () => {
           ended_at: "2026-05-14T10:05:00.000Z",
           duration_seconds: 300,
           words_estimated: 1_125,
-          matter_items: { id: "linked_item_without_metadata", title: null, url: null, source: null, author: null },
+          matter_items: { id: "linked_item_without_metadata", title: "Unknown item", url: null, source: null, author: null },
         },
       ],
     }),
@@ -408,7 +432,7 @@ test("dashboard metrics work with partial item metadata", async () => {
   assert.deepEqual(metrics.recentReads, [
     {
       itemId: "linked_item_without_metadata",
-      title: null,
+      title: "Unknown item",
       url: null,
       source: null,
       author: null,

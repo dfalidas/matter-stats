@@ -38,7 +38,7 @@ test("builds clear messaging when a bounded batch has more data remaining", () =
   const message = buildMatterSyncMessage({ items: 25, sessions: 0, annotations: 4, tags: 12 }, true);
 
   assert.match(message, /Recent activity sync started/);
-  assert.match(message, /Imported 0 sessions, 25 linked items, 4 annotations, and 12 tags/);
+  assert.match(message, /Imported 0 reading sessions, 25 linked items, 4 annotations, and 12 tags/);
   assert.match(message, /More recent activity remains — click Sync again/);
 });
 
@@ -46,7 +46,7 @@ test("builds clear messaging when sync completes", () => {
   const message = buildMatterSyncMessage({ items: 0, sessions: 25, annotations: 0, tags: 0 }, false);
 
   assert.match(message, /Recent activity sync complete/);
-  assert.match(message, /Imported 25 sessions, 0 linked items, 0 annotations, and 0 tags/);
+  assert.match(message, /Imported 25 reading sessions, 0 linked items, 0 annotations, and 0 tags/);
   assert.doesNotMatch(message, /More data remains/);
 });
 
@@ -174,24 +174,23 @@ test("supports selectable recent activity windows", () => {
 });
 
 test("documents sessions-first flow before linked item import", () => {
-  const sessions = [{ item_id: "item_a" }, { object: "item_b" }];
+  const sessions = [{ item_id: "item_a" }, { object: "itm_item_b" }];
 
   assert.equal(getMatterSyncInitialPhase("recent_activity"), "sessions");
-  assert.deepEqual(collectLinkedMatterItemIds(sessions), ["item_a", "item_b"]);
+  assert.deepEqual(collectLinkedMatterItemIds(sessions), ["item_a", "itm_item_b"]);
 });
 
 
-test("warns when Matter returns sessions but none are imported", () => {
+test("includes unavailable item metadata note when sessions import without item links", () => {
   const message = buildMatterSyncMessage(
     { items: 0, sessions: 0, annotations: 0, tags: 0 },
     true,
     "recent_activity",
-    { sessionsReturned: 25, sessionsSkipped: 25 }
+    { sessionsReturned: 25, sessionsSkipped: 0, sessionsWithoutLinkedItem: 25 }
   );
 
-  assert.match(message, /needs attention/);
-  assert.match(message, /Matter returned 25 sessions, but 0 were imported/);
-  assert.doesNotMatch(message, /Recent activity sync started/);
+  assert.match(message, /Imported 0 reading sessions/);
+  assert.match(message, /Item metadata unavailable for these sessions/);
 });
 
 test("reports partial session skips without hiding successful imports", () => {
@@ -202,7 +201,7 @@ test("reports partial session skips without hiding successful imports", () => {
     { sessionsReturned: 25, sessionsSkipped: 1 }
   );
 
-  assert.match(message, /Imported 24 sessions, 2 linked items/);
+  assert.match(message, /Imported 24 reading sessions, 2 linked items/);
   assert.match(message, /Skipped 1 sessions/);
   assert.match(message, /More recent activity remains/);
 });
@@ -229,8 +228,7 @@ test("live sync path handles Matter session object mapping and explicit skip rea
 
   assert.match(source, /extractMatterReadingSessionItemId\(session\)/);
   assert.match(source, /normalizeReadingSession\(session/);
-  assert.match(source, /missing_item_object/);
-  assert.match(source, /invalid_date/);
+    assert.match(source, /invalid_date/);
   assert.match(source, /invalid_seconds_read/);
   assert.match(source, /database_upsert_error/);
   assert.match(source, /objectSamplePrefix/);

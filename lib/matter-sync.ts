@@ -100,6 +100,7 @@ type MatterSyncDiagnostics = {
   lastHasMore: boolean;
   lastNextCursorPresent: boolean;
   sessionsSkipped: number;
+  sessionsWithoutLinkedItem: number;
   firstSkipReason: string | null;
   firstSessionShape: Json | null;
 };
@@ -112,6 +113,7 @@ function createEmptyMatterSyncDiagnostics(): MatterSyncDiagnostics {
     lastHasMore: false,
     lastNextCursorPresent: false,
     sessionsSkipped: 0,
+    sessionsWithoutLinkedItem: 0,
     firstSkipReason: null,
     firstSessionShape: null,
   };
@@ -182,12 +184,11 @@ export async function syncMatterData(
       matter_sessions_returned: diagnostics.sessionsReturned,
       matter_items_returned: diagnostics.itemsReturned,
       matter_sessions_skipped: diagnostics.sessionsSkipped,
+      matter_sessions_without_linked_item: diagnostics.sessionsWithoutLinkedItem,
       matter_first_session_shape: diagnostics.firstSessionShape,
       matter_has_more: diagnostics.lastHasMore,
       matter_next_cursor_present: diagnostics.lastNextCursorPresent,
-      error_message: diagnostics.sessionsReturned > 0 && counts.sessions === 0
-        ? `Matter returned ${diagnostics.sessionsReturned} reading sessions, but none were imported. Inspect first-session shape diagnostics and item-link extraction.`
-        : null,
+      error_message: null,
       checkpoint_timestamp: (mode === "recent_activity" ? persistedState.recent_activity_checkpoint : persistedState.completed_checkpoint_timestamp) ?? null,
     });
 
@@ -195,7 +196,11 @@ export async function syncMatterData(
 
     return {
       ok: true,
-      message: buildMatterSyncMessage(counts, hasMore, mode, { sessionsReturned: diagnostics.sessionsReturned, sessionsSkipped: diagnostics.sessionsSkipped }),
+      message: buildMatterSyncMessage(counts, hasMore, mode, {
+        sessionsReturned: diagnostics.sessionsReturned,
+        sessionsSkipped: diagnostics.sessionsSkipped,
+        sessionsWithoutLinkedItem: diagnostics.sessionsWithoutLinkedItem,
+      }),
       syncRunId: finishedRun.id,
       itemsSynced: finishedRun.items_synced,
       sessionsSynced: finishedRun.sessions_synced,
@@ -432,7 +437,7 @@ async function importMatterSessionPage(
 
   for (const session of sessionPage.results) {
     const itemId = extractMatterReadingSessionItemId(session);
-    const skipReason = classifySessionSkipReason(session, itemId);
+    const skipReason = classifySessionSkipReason(session);
     if (skipReason) {
       diagnostics.sessionsSkipped += 1;
       if (diagnostics.firstSkipReason === null) {
@@ -440,6 +445,9 @@ async function importMatterSessionPage(
         firstSkippedSession = session;
       }
       continue;
+    }
+    if (!itemId) {
+      diagnostics.sessionsWithoutLinkedItem += 1;
     }
     const sessionRow = normalizeReadingSession(session, {
       item: itemId ? await getMatterItemById(itemId, matterItemLookup) : extractEmbeddedMatterItem(session),
@@ -481,13 +489,10 @@ async function importMatterSessionPage(
   return { sessions: sessionRows.length, items: linkedItemCounts.itemCount, tags: linkedItemCounts.tagCount, annotations: linkedItemCounts.annotationCount };
 }
 
-function classifySessionSkipReason(session: unknown, itemId: string | null): string | null {
+function classifySessionSkipReason(session: unknown): string | null {
   const sessionId = typeof (session as { id?: unknown })?.id === "string" ? (session as { id?: string }).id : null;
   if (!isNonEmptyString(sessionId)) {
     return "missing_session_id";
-  }
-  if (!itemId) {
-    return "missing_item_object";
   }
   const startedAt = normalizeReadingSession(session as Parameters<typeof normalizeReadingSession>[0])?.started_at;
   if (!startedAt) {
@@ -518,7 +523,7 @@ function summarizeReadingSessionShapeWithSkip(session: unknown, skipReason: stri
     objectSamplePrefix: typeof objectText === "string" ? objectText.trim().slice(0, 12) : null,
     dateType: typeof first.date,
     secondsReadType: typeof first.seconds_read,
-    skipReason: skipReason ?? classifySessionSkipReason(skipTarget, skipTarget ? extractMatterReadingSessionItemId(skipTarget) : null),
+    skipReason: skipReason ?? classifySessionSkipReason(skipTarget),
   };
 }
 
