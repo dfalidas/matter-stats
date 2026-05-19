@@ -60,7 +60,7 @@ export type Database = {
       reading_sessions: {
         Row: {
           id: string;
-          item_id: string;
+          item_id: string | null;
           started_at: string | null;
           ended_at: string | null;
           duration_seconds: number | null;
@@ -71,7 +71,7 @@ export type Database = {
         };
         Insert: {
           id: string;
-          item_id: string;
+          item_id?: string | null;
           started_at?: string | null;
           ended_at?: string | null;
           duration_seconds?: number | null;
@@ -82,7 +82,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          item_id?: string;
+          item_id?: string | null;
           started_at?: string | null;
           ended_at?: string | null;
           duration_seconds?: number | null;
@@ -304,6 +304,7 @@ export type Database = {
           matter_sessions_returned: number;
           matter_items_returned: number;
           matter_sessions_skipped: number;
+          matter_sessions_without_linked_item: number;
           matter_first_session_shape: Json | null;
           matter_has_more: boolean | null;
           matter_next_cursor_present: boolean | null;
@@ -326,6 +327,7 @@ export type Database = {
           matter_sessions_returned?: number;
           matter_items_returned?: number;
           matter_sessions_skipped?: number;
+          matter_sessions_without_linked_item?: number;
           matter_first_session_shape?: Json | null;
           matter_has_more?: boolean | null;
           matter_next_cursor_present?: boolean | null;
@@ -348,6 +350,7 @@ export type Database = {
           matter_sessions_returned?: number;
           matter_items_returned?: number;
           matter_sessions_skipped?: number;
+          matter_sessions_without_linked_item?: number;
           matter_first_session_shape?: Json | null;
           matter_has_more?: boolean | null;
           matter_next_cursor_present?: boolean | null;
