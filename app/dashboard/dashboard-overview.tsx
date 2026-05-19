@@ -325,8 +325,8 @@ export function DashboardOverview({
               />
             ) : (
               <EmptyState
-                title="No sources yet"
-                description={SESSION_METADATA_EMPTY_STATE}
+                title="Source analytics unavailable"
+                description="Source analytics are unavailable because Matter reading sessions do not currently include article metadata."
               />
             )}
           </ChartCard>

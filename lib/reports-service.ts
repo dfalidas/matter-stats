@@ -1,5 +1,5 @@
-import { getReadingMetrics, type MetricsPeriodPreset, type ReadingMetrics } from "@/lib/metrics-service";
-import type { MatterStatsSupabaseClient } from "@/lib/supabase-queries";
+import { getReadingMetrics, type MetricsPeriodPreset, type ReadingMetrics } from "./metrics-service";
+import type { MatterStatsSupabaseClient } from "./supabase-queries";
 
 type ReportSessionItem = {
   id: string;
@@ -13,7 +13,7 @@ type ReportSessionItem = {
 
 type ReportSessionRow = {
   id: string;
-  item_id: string;
+  item_id: string | null;
   started_at: string | null;
   ended_at: string | null;
   duration_seconds: number | null;
@@ -34,7 +34,7 @@ export const REPORT_PERIOD_TO_METRICS_PRESET: Record<ReportPeriod, MetricsPeriod
 
 export type ReadingSessionTimelineItem = {
   id: string;
-  itemId: string;
+  itemId: string | null;
   title: string | null;
   url: string | null;
   source: string | null;
@@ -46,7 +46,7 @@ export type ReadingSessionTimelineItem = {
 };
 
 export type LongformRead = {
-  itemId: string;
+  itemId: string | null;
   title: string | null;
   url: string | null;
   source: string | null;
@@ -62,14 +62,24 @@ export type ReadingReport = {
   metrics: ReadingMetrics;
   timeline: ReadingSessionTimelineItem[];
   longformReads: LongformRead[];
+  latestWeekWithDataStartDate: string | null;
 };
 
 export async function getReadingReport(
   client: MatterStatsSupabaseClient,
   period: ReportPeriod,
+  options?: { weekStartDate?: string | null }
 ): Promise<ReadingReport> {
+  const weeklyRange = period === "weekly" ? await resolveWeeklyRange(client, options?.weekStartDate) : null;
   const metrics = await getReadingMetrics(client, {
-    preset: REPORT_PERIOD_TO_METRICS_PRESET[period],
+    ...(weeklyRange
+      ? {
+          range: {
+            start: weeklyRange.start,
+            end: weeklyRange.end,
+          },
+        }
+      : { preset: REPORT_PERIOD_TO_METRICS_PRESET[period] }),
     topLimit: 6,
     recentLimit: 8,
   });
@@ -80,7 +90,58 @@ export async function getReadingReport(
     metrics,
     timeline: sessions.map(mapTimelineSession),
     longformReads: buildLongformReads(sessions, 6),
+    latestWeekWithDataStartDate: weeklyRange?.latestWeekWithDataStartDate ?? null,
   };
+}
+
+async function resolveWeeklyRange(client: MatterStatsSupabaseClient, requestedWeekStartDate?: string | null) {
+  const reference = requestedWeekStartDate ? new Date(`${requestedWeekStartDate}T00:00:00.000Z`) : new Date();
+  const start = getWeekStart(reference);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 7);
+  return {
+    start,
+    end,
+    latestWeekWithDataStartDate: await getLatestWeekWithDataStartDate(client),
+  };
+}
+
+async function getLatestWeekWithDataStartDate(client: MatterStatsSupabaseClient): Promise<string | null> {
+  const { data, error } = await client
+    .from("daily_stats")
+    .select("date")
+    .gt("reading_time_seconds", 0)
+    .order("date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (data?.date) {
+    return formatWeekStart(getWeekStart(new Date(`${data.date}T00:00:00.000Z`)));
+  }
+
+  const { data: session, error: sessionError } = await client
+    .from("reading_sessions")
+    .select("started_at")
+    .gt("duration_seconds", 0)
+    .not("started_at", "is", null)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (sessionError) throw sessionError;
+  if (!session?.started_at) return null;
+  return formatWeekStart(getWeekStart(new Date(session.started_at)));
+}
+
+function getWeekStart(date: Date): Date {
+  const result = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const weekday = result.getUTCDay();
+  const daysSinceMonday = (weekday + 6) % 7;
+  result.setUTCDate(result.getUTCDate() - daysSinceMonday);
+  return result;
+}
+
+function formatWeekStart(date: Date): string {
+  return date.toISOString().slice(0, 10);
 }
 
 async function fetchReportSessions(
@@ -112,8 +173,9 @@ function buildLongformReads(sessions: ReportSessionRow[], limit: number): Longfo
   const reads = new Map<string, LongformRead>();
 
   for (const session of sessions) {
+    const readKey = session.item_id ?? `session:${session.id}`;
     const item = getReportSessionItem(session);
-    const existing = reads.get(session.item_id);
+    const existing = reads.get(readKey);
 
     if (existing) {
       existing.readingTimeSeconds += positiveInteger(session.duration_seconds);
@@ -122,7 +184,7 @@ function buildLongformReads(sessions: ReportSessionRow[], limit: number): Longfo
       continue;
     }
 
-    reads.set(session.item_id, {
+    reads.set(readKey, {
       itemId: session.item_id,
       title: item?.title ?? null,
       url: item?.url ?? null,

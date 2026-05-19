@@ -14,8 +14,9 @@ type ReportsPageProps = {
 export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const params = await searchParams;
   const period = normalizeReportPeriod(params?.period);
+  const weekStartDate = normalizeWeekStartDate(params?.weekStart);
   const client = getSupabaseAdminClient();
-  const reportsResult = await getReportsResult(client, period);
+  const reportsResult = await getReportsResult(client, period, weekStartDate);
 
   return (
     <PageShell
@@ -33,9 +34,14 @@ function normalizeReportPeriod(value: string | string[] | undefined): ReportPeri
   return REPORT_PERIODS.includes(candidate as ReportPeriod) ? (candidate as ReportPeriod) : DEFAULT_REPORT_PERIOD;
 }
 
-async function getReportsResult(client: ReturnType<typeof getSupabaseAdminClient>, period: ReportPeriod) {
+function normalizeWeekStartDate(value: string | string[] | undefined): string | null {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return candidate && /^\d{4}-\d{2}-\d{2}$/.test(candidate) ? candidate : null;
+}
+
+async function getReportsResult(client: ReturnType<typeof getSupabaseAdminClient>, period: ReportPeriod, weekStartDate: string | null) {
   try {
-    const report = await getReadingReport(client, period);
+    const report = await getReadingReport(client, period, { weekStartDate });
     return { ok: true as const, report };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load reading report.";
