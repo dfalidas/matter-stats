@@ -39,6 +39,7 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
 MATTER_SYNC_ITEMS_LIMIT=25
 MATTER_SYNC_SESSIONS_LIMIT=25
+CRON_SECRET=generate-a-long-random-secret
 ```
 
 The two `MATTER_SYNC_*_LIMIT` values are optional and default to `25`; keep them at `25` unless you intentionally want smaller sync pages.
@@ -73,9 +74,18 @@ Short version:
 
 1. Create a Supabase project.
 2. Run the SQL files in `supabase/migrations` in timestamp order.
-3. Add the four server-side environment variables in Vercel.
+3. Add the server-side environment variables in Vercel, including `CRON_SECRET` for scheduled sync authorization.
 4. Deploy with the default Next.js build command, `npm run build`.
-5. Open the Vercel URL from any PC, sign in at `/login` with `APP_ACCESS_PASSWORD`, and run **Sync Matter** from `/dashboard`.
+5. In Vercel, configure a daily cron job (`0 6 * * *`) that calls `/api/cron/sync-recent-activity` and sends `Authorization: Bearer ${CRON_SECRET}`.
+6. Open the Vercel URL from any PC, sign in at `/login` with `APP_ACCESS_PASSWORD`, and run **Sync Matter** from `/dashboard`.
+
+
+## Scheduled sync on Vercel
+
+- The server-only endpoint `/api/cron/sync-recent-activity` runs **recent-activity sync only** (no full-library backfill).
+- The endpoint requires `CRON_SECRET` via either `Authorization: Bearer <secret>` or `?secret=<secret>`; unauthorized requests return HTTP 401.
+- Keep `CRON_SECRET` in Vercel Environment Variables (Production) and never expose it client-side.
+- Manual sync from `/dashboard` still works and remains available for on-demand imports.
 
 ## Checks
 
