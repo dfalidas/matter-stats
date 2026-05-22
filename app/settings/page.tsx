@@ -37,6 +37,8 @@ type DataCoverageCounts = {
 
 type SettingsSyncData = {
   latestRun: SyncRun | null;
+  latestScheduledRun: Pick<SyncRun, "finished_at" | "started_at" | "status"> | null;
+  latestManualRun: Pick<SyncRun, "finished_at" | "started_at" | "status"> | null;
   latestSuccessfulRun: Pick<SyncRun, "finished_at" | "started_at"> | null;
   latestErrorRun: Pick<SyncRun, "finished_at" | "started_at" | "error_message"> | null;
   recentRuns: SyncRunLogEntry[];
@@ -88,6 +90,18 @@ export default async function SettingsPage() {
                 label="Last successful sync"
                 value={formatTimestamp(syncData.latestSuccessfulRun?.finished_at ?? syncData.latestSuccessfulRun?.started_at)}
                 helper="Recorded from the most recent successful sync run."
+                icon={<CheckCircle2 className="h-4 w-4 text-emerald-400" aria-hidden />}
+              />
+              <DiagnosticPanel
+                label="Scheduled sync"
+                value={syncData.latestScheduledRun ? "Configured" : "Configured (no runs yet)"}
+                helper={syncData.latestScheduledRun ? `Last scheduled sync ${formatTimestamp(syncData.latestScheduledRun.finished_at ?? syncData.latestScheduledRun.started_at)}` : "Vercel cron endpoint is available when CRON_SECRET is configured."}
+                icon={<Clock3 className="h-4 w-4 text-sky-400" aria-hidden />}
+              />
+              <DiagnosticPanel
+                label="Last manual sync"
+                value={formatTimestamp(syncData.latestManualRun?.finished_at ?? syncData.latestManualRun?.started_at)}
+                helper="Most recent dashboard-triggered recent-activity sync."
                 icon={<CheckCircle2 className="h-4 w-4 text-emerald-400" aria-hidden />}
               />
               <DiagnosticPanel
@@ -355,6 +369,8 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
   if (!hasServerDatabaseCredentials()) {
     return {
       latestRun: null,
+      latestScheduledRun: null,
+      latestManualRun: null,
       latestSuccessfulRun: null,
       latestErrorRun: null,
       recentRuns: [],
@@ -371,8 +387,24 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
   try {
     const { getSupabaseAdminClient } = await import("@/lib/supabase-admin");
     const client = getSupabaseAdminClient();
-    const [latestRunResult, latestSuccessfulRunResult, latestErrorRunResult, recentRunsResult, syncStateResult, totalSessionsCountResult, sessionsWithoutLinkedItemCountResult, totalSyncedItemsCountResult, totalDailyStatsRowsCountResult] = await Promise.all([
+    const [latestRunResult, latestScheduledRunResult, latestManualRunResult, latestSuccessfulRunResult, latestErrorRunResult, recentRunsResult, syncStateResult, totalSessionsCountResult, sessionsWithoutLinkedItemCountResult, totalSyncedItemsCountResult, totalDailyStatsRowsCountResult] = await Promise.all([
       client.from("sync_runs").select("*").order("started_at", { ascending: false }).limit(1).maybeSingle(),
+      client
+        .from("sync_runs")
+        .select("finished_at, started_at, status")
+        .eq("sync_mode", "recent_activity_scheduled")
+        .order("finished_at", { ascending: false, nullsFirst: false })
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      client
+        .from("sync_runs")
+        .select("finished_at, started_at, status")
+        .eq("sync_mode", "recent_activity")
+        .order("finished_at", { ascending: false, nullsFirst: false })
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
       client
         .from("sync_runs")
         .select("finished_at, started_at")
@@ -402,13 +434,15 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
       client.from("daily_stats").select("date", { count: "exact", head: true }),
     ]);
 
-    const firstError = latestRunResult.error ?? latestSuccessfulRunResult.error ?? latestErrorRunResult.error ?? recentRunsResult.error ?? syncStateResult.error ?? totalSessionsCountResult.error ?? sessionsWithoutLinkedItemCountResult.error ?? totalSyncedItemsCountResult.error ?? totalDailyStatsRowsCountResult.error;
+    const firstError = latestRunResult.error ?? latestScheduledRunResult.error ?? latestManualRunResult.error ?? latestSuccessfulRunResult.error ?? latestErrorRunResult.error ?? recentRunsResult.error ?? syncStateResult.error ?? totalSessionsCountResult.error ?? sessionsWithoutLinkedItemCountResult.error ?? totalSyncedItemsCountResult.error ?? totalDailyStatsRowsCountResult.error;
     if (firstError) {
       throw firstError;
     }
 
     return {
       latestRun: latestRunResult.data,
+      latestScheduledRun: latestScheduledRunResult.data,
+      latestManualRun: latestManualRunResult.data,
       latestSuccessfulRun: latestSuccessfulRunResult.data,
       latestErrorRun: latestErrorRunResult.data,
       recentRuns: recentRunsResult.data ?? [],
@@ -428,6 +462,8 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
   } catch {
     return {
       latestRun: null,
+      latestScheduledRun: null,
+      latestManualRun: null,
       latestSuccessfulRun: null,
       latestErrorRun: null,
       recentRuns: [],
