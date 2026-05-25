@@ -15,8 +15,16 @@ function createDeps(overrides: Partial<CronSyncDeps> = {}): CronSyncDeps {
   };
 }
 
-test("returns 401 when cron secret is missing or invalid", async () => {
+test("GET without authorization returns 401", async () => {
   const response = await handleRecentActivityCron(new Request("https://example.com/api/cron/sync-recent-activity"), createDeps());
+  assert.equal(response.status, 401);
+});
+
+test("GET with wrong bearer token returns 401", async () => {
+  const response = await handleRecentActivityCron(
+    new Request("https://example.com/api/cron/sync-recent-activity", { headers: { authorization: "Bearer wrong" } }),
+    createDeps()
+  );
   assert.equal(response.status, 401);
 });
 
@@ -34,7 +42,7 @@ test("rate-limited state causes safe skip", async () => {
   let syncCalled = false;
   let created = false;
   const response = await handleRecentActivityCron(
-    new Request("https://example.com/api/cron/sync-recent-activity?secret=expected"),
+    new Request("https://example.com/api/cron/sync-recent-activity", { headers: { authorization: "Bearer expected" } }),
     createDeps({
       getAvailability: async () => ({ rateLimitedUntil: "2026-05-23T00:00:00.000Z", message: "limited" }),
       syncRecentActivity: async () => ((syncCalled = true), { ok: true, message: "should not run" }),
@@ -49,7 +57,7 @@ test("rate-limited state causes safe skip", async () => {
 test("cron does not call full-library backfill", async () => {
   let called = 0;
   await handleRecentActivityCron(
-    new Request("https://example.com/api/cron/sync-recent-activity?secret=expected"),
+    new Request("https://example.com/api/cron/sync-recent-activity", { headers: { authorization: "Bearer expected" } }),
     createDeps({ syncRecentActivity: async () => ((called += 1), { ok: true, message: "recent" }) })
   );
   assert.equal(called, 1);
