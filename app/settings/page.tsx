@@ -400,7 +400,7 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
       client
         .from("sync_runs")
         .select("finished_at, started_at, status")
-        .eq("sync_mode", "recent_activity")
+        .in("sync_mode", ["recent_activity", "recent_activity_manual"])
         .order("finished_at", { ascending: false, nullsFirst: false })
         .order("started_at", { ascending: false })
         .limit(1)

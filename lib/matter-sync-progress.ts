@@ -6,7 +6,7 @@ const DEFAULT_MATTER_SYNC_SESSIONS_LIMIT = 25;
 export const MATTER_SYNC_BATCH_LIMIT = DEFAULT_MATTER_SYNC_ITEMS_LIMIT;
 
 export type MatterSyncPhase = "items" | "tags" | "sessions" | "complete";
-export type MatterSyncMode = "recent_activity" | "backfill_library";
+export type MatterSyncMode = "recent_activity" | "recent_activity_manual" | "recent_activity_scheduled" | "backfill_library";
 export type MatterRecentActivityWindow = "7_days" | "30_days" | "90_days" | "current_year" | "all";
 
 export const DEFAULT_MATTER_SYNC_MODE: MatterSyncMode = "recent_activity";
@@ -86,7 +86,7 @@ export function buildMatterSyncMessage(
     return `${modeLabel} started. ${imported}${unlinkedSuffix}${skippedSuffix} More ${mode === "backfill_library" ? "library data" : "recent activity"} remains — click Sync again.`;
   }
 
-  if (mode === "recent_activity" && counts.sessions === 0) {
+  if (mode !== "backfill_library" && counts.sessions === 0) {
     return "No recent reading sessions found. Try expanding the sync window or confirm Matter has reading-session data.";
   }
 

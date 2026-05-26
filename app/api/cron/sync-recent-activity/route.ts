@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request): Promise<Response> {
   return handleRecentActivityCron(request, {
     cronSecret: process.env.CRON_SECRET,
-    syncRecentActivity: () => syncMatterData("recent_activity"),
+    syncRecentActivity: () => syncMatterData("recent_activity_scheduled"),
     getAvailability: getMatterSyncAvailability,
     createRun: createSyncRun,
     updateRun: updateSyncRun,

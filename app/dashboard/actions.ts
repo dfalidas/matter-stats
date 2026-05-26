@@ -50,5 +50,5 @@ export async function syncMatterAction(previousState: SyncMatterActionState, for
 }
 
 function parseSyncMode(value: FormDataEntryValue | null | undefined): MatterSyncMode {
-  return value === "backfill_library" ? "backfill_library" : "recent_activity";
+  return value === "backfill_library" ? "backfill_library" : "recent_activity_manual";
 }
