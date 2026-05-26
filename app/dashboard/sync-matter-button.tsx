@@ -88,7 +88,7 @@ export function SyncMatterButton({ showBackfill = false }: { showBackfill?: bool
         <SyncButton
           type="submit"
           name="mode"
-          value="recent_activity"
+          value="recent_activity_manual"
           isSyncing={isPending}
           disabled={isDisabled}
           idleLabel="Sync Recent Activity"

@@ -135,7 +135,7 @@ export async function getMatterSyncAvailability(): Promise<{ rateLimitedUntil: s
 }
 
 export async function syncMatterData(
-  mode: MatterSyncMode = "recent_activity",
+  mode: MatterSyncMode = "recent_activity_manual",
   options: { recentActivityWindow?: MatterRecentActivityWindow } = {}
 ): Promise<MatterSyncResult> {
   let syncRunId: string | null = null;
@@ -160,7 +160,7 @@ export async function syncMatterData(
     // Validate the configured Matter token before mutating local Matter-derived rows.
     await getMatterAccount();
 
-    const recentActivitySince = mode === "recent_activity" ? getRecentActivityWindowStart(new Date(startedAt), options.recentActivityWindow) : null;
+    const recentActivitySince = isRecentActivityMode(mode) ? getRecentActivityWindowStart(new Date(startedAt), options.recentActivityWindow) : null;
     const batchState = startBatchState(storedState, legacyCheckpoint, mode, recentActivitySince);
     const counts = createEmptyMatterBatchCounts();
     const diagnostics = createEmptyMatterSyncDiagnostics();
@@ -189,7 +189,7 @@ export async function syncMatterData(
       matter_has_more: diagnostics.lastHasMore,
       matter_next_cursor_present: diagnostics.lastNextCursorPresent,
       error_message: null,
-      checkpoint_timestamp: (mode === "recent_activity" ? persistedState.recent_activity_checkpoint : persistedState.completed_checkpoint_timestamp) ?? null,
+      checkpoint_timestamp: (isRecentActivityMode(mode) ? persistedState.recent_activity_checkpoint : persistedState.completed_checkpoint_timestamp) ?? null,
     });
 
     await upsertMatterSyncState(persistedState);
@@ -602,7 +602,7 @@ function startBatchState(
   const completedCheckpoint = storedState?.completed_checkpoint_timestamp ?? legacyCheckpoint;
   const storedPhase = storedState ? normalizePhase(storedState.active_phase, mode) : "complete";
   const modeChanged = storedState?.sync_mode && storedState.sync_mode !== mode;
-  const canResumeMode = mode === "recent_activity" ? storedPhase === "sessions" : storedPhase === "items";
+  const canResumeMode = isRecentActivityMode(mode) ? storedPhase === "sessions" : storedPhase === "items";
 
   if (storedState && storedPhase !== "complete" && !modeChanged && canResumeMode) {
     return {
@@ -643,7 +643,7 @@ function getModeCheckpoint(
   mode: MatterSyncMode,
   recentActivitySince: string | null
 ): string | null {
-  if (mode === "recent_activity") {
+  if (isRecentActivityMode(mode)) {
     return recentActivitySince;
   }
 
@@ -681,7 +681,7 @@ function buildPersistedSyncState(
       tag_cursor: null,
       session_cursor: null,
       next_checkpoint_timestamp: null,
-      recent_activity_checkpoint: mode === "recent_activity" ? nextCheckpoint : state.recent_activity_checkpoint,
+      recent_activity_checkpoint: isRecentActivityMode(mode) ? nextCheckpoint : state.recent_activity_checkpoint,
       backfill_items_cursor: mode === "backfill_library" ? null : state.backfill_items_cursor,
     };
   }
@@ -919,6 +919,10 @@ function maxIsoTimestamp(current: string | null, candidate: string | null | unde
   }
 
   return current;
+}
+
+function isRecentActivityMode(mode: MatterSyncMode): boolean {
+  return mode === "recent_activity" || mode === "recent_activity_manual" || mode === "recent_activity_scheduled";
 }
 
 function isNonEmptyString(value: string | null | undefined): value is string {
