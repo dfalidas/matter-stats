@@ -1,7 +1,9 @@
+import { isMatterRateLimitActive } from "./matter-sync-progress";
+
 export type CronSyncDeps = {
   cronSecret: string | undefined;
   syncRecentActivity: () => Promise<{ ok: boolean; message: string; syncRunId?: string; sessionsSynced?: number }>;
-  
+
   getAvailability: () => Promise<{ rateLimitedUntil: string | null; message: string | null }>;
   createRun: (values: { status: "running"; started_at: string; sync_mode: string }) => Promise<{ id: string }>;
   updateRun: (id: string, values: Record<string, unknown>) => Promise<{ id: string }>;
@@ -25,7 +27,7 @@ export async function handleRecentActivityCron(request: Request, deps: CronSyncD
   const syncMode = "recent_activity_scheduled";
 
   const availability = await deps.getAvailability();
-  if (availability.rateLimitedUntil) {
+  if (isMatterRateLimitActive(availability.rateLimitedUntil, deps.now())) {
     const startedAt = deps.now().toISOString();
     const run = await deps.createRun({ status: "running", started_at: startedAt, sync_mode: syncMode });
     await deps.updateRun(run.id, {
