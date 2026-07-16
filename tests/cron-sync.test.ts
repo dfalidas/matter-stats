@@ -54,14 +54,14 @@ test("rate-limited state causes safe skip", async () => {
   assert.equal(created, true);
 });
 
-test("expired rate-limited state does not skip scheduled sync", async () => {
+test("expired rate limit does not block scheduled sync", async () => {
   let syncCalled = false;
   let created = false;
   const response = await handleRecentActivityCron(
     new Request("https://example.com/api/cron/sync-recent-activity", { headers: { authorization: "Bearer expected" } }),
     createDeps({
       getAvailability: async () => ({ rateLimitedUntil: "2026-05-21T00:00:00.000Z", message: null }),
-      syncRecentActivity: async () => ((syncCalled = true), { ok: true, message: "done" }),
+      syncRecentActivity: async () => ((syncCalled = true), { ok: true, message: "synced", sessionsSynced: 2 }),
       createRun: async () => ((created = true), { id: "skip-run" }),
     })
   );
@@ -69,6 +69,15 @@ test("expired rate-limited state does not skip scheduled sync", async () => {
   assert.equal(response.status, 200);
   assert.equal(syncCalled, true);
   assert.equal(created, false);
+  assert.deepEqual(await response.json(), {
+    ok: true,
+    status: "success",
+    sync_mode: "recent_activity_scheduled",
+    sessions_synced: 2,
+    matter_sessions_returned: 2,
+    skipped_reason: null,
+    message: "synced",
+  });
 });
 
 test("cron does not call full-library backfill", async () => {
