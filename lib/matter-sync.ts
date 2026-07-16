@@ -127,11 +127,10 @@ function recordMatterPageDiagnostics(diagnostics: MatterSyncDiagnostics, page: M
 export async function getMatterSyncAvailability(): Promise<{ rateLimitedUntil: string | null; message: string | null }> {
   const state = await getMatterSyncState();
   const rateLimitedUntil = state?.rate_limited_until ?? null;
-  const isRateLimited = isMatterRateLimitActive(rateLimitedUntil);
 
   return {
-    rateLimitedUntil: isRateLimited ? rateLimitedUntil : null,
-    message: isRateLimited ? buildMatterRateLimitMessage(rateLimitedUntil) : null,
+    rateLimitedUntil,
+    message: isMatterRateLimitActive(rateLimitedUntil) ? buildMatterRateLimitMessage(rateLimitedUntil) : null,
   };
 }
 

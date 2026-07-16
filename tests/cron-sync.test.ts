@@ -59,7 +59,7 @@ test("expired rate-limited state still calls sync", async () => {
   const response = await handleRecentActivityCron(
     new Request("https://example.com/api/cron/sync-recent-activity", { headers: { authorization: "Bearer expected" } }),
     createDeps({
-      getAvailability: async () => ({ rateLimitedUntil: null, message: null }),
+      getAvailability: async () => ({ rateLimitedUntil: "2026-05-21T00:00:00.000Z", message: null }),
       syncRecentActivity: async () => ((called = true), { ok: true, message: "done", syncRunId: "run-1" }),
     })
   );
