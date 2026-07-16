@@ -128,9 +128,13 @@ export async function getMatterSyncAvailability(): Promise<{ rateLimitedUntil: s
   const state = await getMatterSyncState();
   const rateLimitedUntil = state?.rate_limited_until ?? null;
 
+  if (!isMatterRateLimitActive(rateLimitedUntil)) {
+    return { rateLimitedUntil: null, message: null };
+  }
+
   return {
     rateLimitedUntil,
-    message: isMatterRateLimitActive(rateLimitedUntil) ? buildMatterRateLimitMessage(rateLimitedUntil) : null,
+    message: buildMatterRateLimitMessage(rateLimitedUntil),
   };
 }
 
