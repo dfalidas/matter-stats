@@ -60,7 +60,7 @@ export type Database = {
       reading_sessions: {
         Row: {
           id: string;
-          item_id: string;
+          item_id: string | null;
           started_at: string | null;
           ended_at: string | null;
           duration_seconds: number | null;
@@ -71,7 +71,7 @@ export type Database = {
         };
         Insert: {
           id: string;
-          item_id: string;
+          item_id?: string | null;
           started_at?: string | null;
           ended_at?: string | null;
           duration_seconds?: number | null;
@@ -82,7 +82,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          item_id?: string;
+          item_id?: string | null;
           started_at?: string | null;
           ended_at?: string | null;
           duration_seconds?: number | null;
@@ -238,6 +238,57 @@ export type Database = {
         };
         Relationships: [];
       };
+      sync_state: {
+        Row: {
+          id: string;
+          completed_checkpoint_timestamp: string | null;
+          active_since_timestamp: string | null;
+          active_phase: string;
+          item_cursor: string | null;
+          tag_cursor: string | null;
+          session_cursor: string | null;
+          next_checkpoint_timestamp: string | null;
+          rate_limited_until: string | null;
+          sync_mode: string;
+          recent_activity_checkpoint: string | null;
+          backfill_items_cursor: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          completed_checkpoint_timestamp?: string | null;
+          active_since_timestamp?: string | null;
+          active_phase?: string;
+          item_cursor?: string | null;
+          tag_cursor?: string | null;
+          session_cursor?: string | null;
+          next_checkpoint_timestamp?: string | null;
+          rate_limited_until?: string | null;
+          sync_mode?: string;
+          recent_activity_checkpoint?: string | null;
+          backfill_items_cursor?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          completed_checkpoint_timestamp?: string | null;
+          active_since_timestamp?: string | null;
+          active_phase?: string;
+          item_cursor?: string | null;
+          tag_cursor?: string | null;
+          session_cursor?: string | null;
+          next_checkpoint_timestamp?: string | null;
+          rate_limited_until?: string | null;
+          sync_mode?: string;
+          recent_activity_checkpoint?: string | null;
+          backfill_items_cursor?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       sync_runs: {
         Row: {
           id: string;
@@ -246,6 +297,17 @@ export type Database = {
           status: string;
           items_synced: number;
           sessions_synced: number;
+          annotations_synced: number;
+          tags_synced: number;
+          sync_mode: string;
+          matter_requests_count: number;
+          matter_sessions_returned: number;
+          matter_items_returned: number;
+          matter_sessions_skipped: number;
+          matter_sessions_without_linked_item: number;
+          matter_first_session_shape: Json | null;
+          matter_has_more: boolean | null;
+          matter_next_cursor_present: boolean | null;
           error_message: string | null;
           checkpoint_timestamp: string | null;
           created_at: string;
@@ -258,6 +320,17 @@ export type Database = {
           status: string;
           items_synced?: number;
           sessions_synced?: number;
+          annotations_synced?: number;
+          tags_synced?: number;
+          sync_mode?: string;
+          matter_requests_count?: number;
+          matter_sessions_returned?: number;
+          matter_items_returned?: number;
+          matter_sessions_skipped?: number;
+          matter_sessions_without_linked_item?: number;
+          matter_first_session_shape?: Json | null;
+          matter_has_more?: boolean | null;
+          matter_next_cursor_present?: boolean | null;
           error_message?: string | null;
           checkpoint_timestamp?: string | null;
           created_at?: string;
@@ -270,6 +343,17 @@ export type Database = {
           status?: string;
           items_synced?: number;
           sessions_synced?: number;
+          annotations_synced?: number;
+          tags_synced?: number;
+          sync_mode?: string;
+          matter_requests_count?: number;
+          matter_sessions_returned?: number;
+          matter_items_returned?: number;
+          matter_sessions_skipped?: number;
+          matter_sessions_without_linked_item?: number;
+          matter_first_session_shape?: Json | null;
+          matter_has_more?: boolean | null;
+          matter_next_cursor_present?: boolean | null;
           error_message?: string | null;
           checkpoint_timestamp?: string | null;
           created_at?: string;
@@ -295,4 +379,5 @@ export type MatterTag = Tables<"matter_tags">;
 export type ItemTag = Tables<"item_tags">;
 export type Annotation = Tables<"annotations">;
 export type DailyStat = Tables<"daily_stats">;
+export type SyncState = Tables<"sync_state">;
 export type SyncRun = Tables<"sync_runs">;

@@ -21,7 +21,7 @@ function readRequiredServerEnv(key: RequiredServerEnvKey): string {
   return value;
 }
 
-function validateServerEnv() {
+export function validateServerEnv() {
   const missingKeys = REQUIRED_SERVER_ENV_KEYS.filter((key) => {
     const value = process.env[key];
     return !value || value.trim().length === 0;
@@ -38,14 +38,20 @@ function validateServerEnv() {
   }
 }
 
-validateServerEnv();
-
 export const serverEnv = Object.freeze({
-  appAccessPassword: readRequiredServerEnv("APP_ACCESS_PASSWORD"),
-  matterApiToken: readRequiredServerEnv("MATTER_API_TOKEN"),
+  get appAccessPassword() {
+    return readRequiredServerEnv("APP_ACCESS_PASSWORD");
+  },
+  get matterApiToken() {
+    return readRequiredServerEnv("MATTER_API_TOKEN");
+  },
   supabase: Object.freeze({
-    url: readRequiredServerEnv("SUPABASE_URL"),
-    serviceRoleKey: readRequiredServerEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    get url() {
+      return readRequiredServerEnv("SUPABASE_URL");
+    },
+    get serviceRoleKey() {
+      return readRequiredServerEnv("SUPABASE_SERVICE_ROLE_KEY");
+    },
   }),
 });
 

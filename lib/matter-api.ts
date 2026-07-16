@@ -1,11 +1,15 @@
 import "server-only";
 
 import { serverEnv } from "@/lib/env";
+import { parseRetryAfterHeader } from "@/lib/matter-sync-progress";
 
 const MATTER_API_BASE_URL = "https://api.getmatter.com/public/v1";
 const DEFAULT_PAGE_LIMIT = 100;
-const DEFAULT_MAX_RATE_LIMIT_RETRIES = 1;
+const DEFAULT_MAX_RATE_LIMIT_RETRIES = 0;
 const MAX_RATE_LIMIT_DELAY_MS = 60_000;
+const MIN_MATTER_REQUEST_INTERVAL_MS = 250;
+
+let lastMatterRequestStartedAt = 0;
 
 type QueryValue = string | number | boolean | Date | null | undefined | readonly (string | number | boolean)[];
 
@@ -122,11 +126,30 @@ export type ListMatterItemsParams = MatterPageParams & {
 };
 
 export type MatterReadingSession = {
-  object: "reading_session";
+  object?: "reading_session" | string | null;
   id: string;
-  date: string;
-  seconds_read: number;
+  date?: string | null;
+  started_at?: string | null;
+  startedAt?: string | null;
+  ended_at?: string | null;
+  endedAt?: string | null;
+  seconds_read?: number | null;
+  secondsRead?: number | null;
+  duration_seconds?: number | null;
+  durationSeconds?: number | null;
   item_id?: string | null;
+  itemId?: string | null;
+  library_item_id?: string | null;
+  libraryItemId?: string | null;
+  target_id?: string | null;
+  targetId?: string | null;
+  item?: string | Partial<MatterItem> | null;
+  library_item?: string | Partial<MatterItem> | null;
+  libraryItem?: string | Partial<MatterItem> | null;
+  target?: string | Partial<MatterItem> | null;
+  source_device?: string | null;
+  sourceDevice?: string | null;
+  device?: string | null;
 };
 
 export type ListMatterReadingSessionsParams = MatterPageParams & {
@@ -190,6 +213,8 @@ export async function matterFetch<T>(path: string, options: MatterFetchOptions =
   const { maxRateLimitRetries = DEFAULT_MAX_RATE_LIMIT_RETRIES, ...fetchOptions } = options;
 
   for (let attempt = 0; attempt <= maxRateLimitRetries; attempt += 1) {
+    await paceMatterRequest();
+
     const response = await fetch(buildMatterUrl(path, fetchOptions.query), {
       ...fetchOptions,
       headers: buildHeaders(fetchOptions.headers, fetchOptions.body),
@@ -266,6 +291,10 @@ export async function getMatterAccount(): Promise<MatterAccount> {
 
 export async function listMatterItems(params: ListMatterItemsParams = {}): Promise<MatterListResponse<MatterItem>> {
   return matterFetch<MatterListResponse<MatterItem>>("/items", { query: toMatterItemsQuery(params) });
+}
+
+export async function getMatterItem(itemId: string): Promise<MatterItem> {
+  return matterFetch<MatterItem>(`/items/${encodeURIComponent(itemId)}`);
 }
 
 export async function listMatterReadingSessions(
@@ -452,7 +481,7 @@ function formatErrorMessage(status: number, body: MatterErrorBody, rateLimit: Ma
   return apiMessage ?? `Matter API request failed with HTTP ${status}.`;
 }
 
-function parseRateLimitHeaders(headers: Headers): MatterRateLimitHeaders {
+export function parseRateLimitHeaders(headers: Headers): MatterRateLimitHeaders {
   return {
     limit: parseIntegerHeader(headers.get("X-RateLimit-Limit")),
     remaining: parseIntegerHeader(headers.get("X-RateLimit-Remaining")),
@@ -470,22 +499,15 @@ function parseIntegerHeader(value: string | null): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function parseRetryAfterHeader(value: string | null): number | null {
-  if (!value) {
-    return null;
+async function paceMatterRequest(): Promise<void> {
+  const now = Date.now();
+  const waitMs = Math.max(lastMatterRequestStartedAt + MIN_MATTER_REQUEST_INTERVAL_MS - now, 0);
+
+  if (waitMs > 0) {
+    await sleep(waitMs);
   }
 
-  const seconds = Number.parseInt(value, 10);
-  if (Number.isFinite(seconds)) {
-    return Math.max(seconds, 0);
-  }
-
-  const retryAt = Date.parse(value);
-  if (Number.isFinite(retryAt)) {
-    return Math.max(Math.ceil((retryAt - Date.now()) / 1_000), 0);
-  }
-
-  return null;
+  lastMatterRequestStartedAt = Date.now();
 }
 
 function sleep(ms: number): Promise<void> {

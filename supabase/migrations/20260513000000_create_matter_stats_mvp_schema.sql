@@ -107,6 +107,8 @@ create table public.sync_runs (
   status text not null,
   items_synced integer not null default 0 check (items_synced >= 0),
   sessions_synced integer not null default 0 check (sessions_synced >= 0),
+  annotations_synced integer not null default 0 check (annotations_synced >= 0),
+  tags_synced integer not null default 0 check (tags_synced >= 0),
   error_message text,
   checkpoint_timestamp timestamptz,
   created_at timestamptz not null default now(),

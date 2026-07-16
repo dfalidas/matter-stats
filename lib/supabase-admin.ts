@@ -144,6 +144,34 @@ export async function getLatestSuccessfulSyncCheckpoint(): Promise<string | null
   return data?.checkpoint_timestamp ?? null;
 }
 
+export async function getMatterSyncState() {
+  const { data, error } = await getSupabaseAdminClient()
+    .from("sync_state")
+    .select("*")
+    .eq("id", "matter")
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function upsertMatterSyncState(syncState: TablesInsert<"sync_state">) {
+  const { data, error } = await getSupabaseAdminClient()
+    .from("sync_state")
+    .upsert({ ...syncState, id: "matter" }, { onConflict: "id" })
+    .select()
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
 export async function createSyncRun(syncRun: TablesInsert<"sync_runs">) {
   const { data, error } = await getSupabaseAdminClient().from("sync_runs").insert(syncRun).select().single();
 

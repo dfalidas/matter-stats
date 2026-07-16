@@ -32,7 +32,7 @@ export type RankedMetric = {
 };
 
 export type RecentRead = {
-  itemId: string;
+  itemId: string | null;
   title: string | null;
   url: string | null;
   source: string | null;
@@ -99,7 +99,7 @@ type SessionItem = {
 
 type MetricsSession = {
   id: string;
-  item_id: string;
+  item_id: string | null;
   started_at: string | null;
   ended_at: string | null;
   duration_seconds: number | null;
@@ -108,7 +108,7 @@ type MetricsSession = {
 };
 
 type TagJoinRow = {
-  item_id: string;
+  item_id: string | null;
   matter_tags: { id: string; name: string } | { id: string; name: string }[] | null;
 };
 
@@ -196,6 +196,34 @@ export function getPreviousEquivalentRange(range: MetricsDateRange): MetricsDate
     return null;
   }
 
+  if (range.preset === "month") {
+    const { year, month } = getLocalDateParts(range.start, range.timezone);
+    const previousStart = localDateToUtc(year, month - 1, 1, range.timezone);
+
+    return {
+      start: previousStart,
+      end: range.start,
+      startDate: formatDateInTimezone(previousStart, range.timezone),
+      endDate: formatDateInTimezone(range.start, range.timezone),
+      timezone: range.timezone,
+      preset: "custom",
+    };
+  }
+
+  if (range.preset === "year") {
+    const { year } = getLocalDateParts(range.start, range.timezone);
+    const previousStart = localDateToUtc(year - 1, 1, 1, range.timezone);
+
+    return {
+      start: previousStart,
+      end: range.start,
+      startDate: formatDateInTimezone(previousStart, range.timezone),
+      endDate: formatDateInTimezone(range.start, range.timezone),
+      timezone: range.timezone,
+      preset: "custom",
+    };
+  }
+
   const days = Math.max(1, differenceInLocalDays(range.start, range.end, range.timezone));
   const previousStart = addLocalDays(range.start, -days, range.timezone);
 
@@ -224,7 +252,7 @@ export async function getReadingMetrics(
     fetchSessionsForStreaks(client, range.end),
   ]);
 
-  const rangeItemIds = uniqueStrings(rangeSessions.map((session) => session.item_id));
+  const rangeItemIds = uniqueStrings(rangeSessions.map((session) => session.item_id).filter(isNonEmptyString));
   const rangeTagsByItemId = await fetchTagsByItemId(client, rangeItemIds);
 
   const totals = summarizeSessions(rangeSessions);
@@ -390,6 +418,9 @@ async function fetchTagsByItemId(client: MatterStatsSupabaseClient, itemIds: str
   for (const row of (data ?? []) as unknown as TagJoinRow[]) {
     const tagRows = Array.isArray(row.matter_tags) ? row.matter_tags : row.matter_tags ? [row.matter_tags] : [];
     const names = tagRows.map((tag) => tag.name?.trim()).filter(isNonEmptyString);
+    if (!isNonEmptyString(row.item_id)) {
+      continue;
+    }
     tagsByItemId.set(row.item_id, [...(tagsByItemId.get(row.item_id) ?? []), ...names]);
   }
 
@@ -436,6 +467,9 @@ function rankTags(sessions: MetricsSession[], tagsByItemId: Map<string, string[]
   const buckets = new Map<string, MetricsAccumulator>();
 
   for (const session of sessions) {
+    if (!isNonEmptyString(session.item_id)) {
+      continue;
+    }
     const tags = tagsByItemId.get(session.item_id) ?? [];
 
     for (const tag of tags) {
@@ -456,7 +490,9 @@ function addToBucket(buckets: Map<string, MetricsAccumulator>, name: string, ses
 
   existing.readingTimeSeconds += positiveInteger(session.duration_seconds);
   existing.wordsRead += positiveInteger(session.words_estimated);
-  existing.itemIds.add(session.item_id);
+  if (isNonEmptyString(session.item_id)) {
+    existing.itemIds.add(session.item_id);
+  }
   existing.sessionIds.add(session.id);
   buckets.set(name, existing);
 }
@@ -481,7 +517,8 @@ function buildRecentReads(sessions: MetricsSession[], limit: number): RecentRead
   const readsByItemId = new Map<string, RecentRead>();
 
   for (const session of sessions) {
-    const existing = readsByItemId.get(session.item_id);
+    const bucketId = session.item_id ?? `unknown:${session.id}`;
+    const existing = readsByItemId.get(bucketId);
     const item = getSessionItem(session);
     const readAt = session.started_at;
 
@@ -494,9 +531,9 @@ function buildRecentReads(sessions: MetricsSession[], limit: number): RecentRead
       continue;
     }
 
-    readsByItemId.set(session.item_id, {
+    readsByItemId.set(bucketId, {
       itemId: session.item_id,
-      title: item?.title ?? null,
+      title: item?.title ?? "Unknown item",
       url: item?.url ?? null,
       source: item?.source ?? null,
       author: item?.author ?? null,
