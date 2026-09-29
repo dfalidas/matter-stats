@@ -375,7 +375,12 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      record_app_login_attempt: {
+        Args: { p_client_key_hash: string; p_succeeded: boolean; p_limit?: number; p_window_seconds?: number };
+        Returns: boolean;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

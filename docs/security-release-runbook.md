@@ -2,7 +2,7 @@
 
 ## Dependency note (2026-09-29)
 
-The lock contains Next.js/eslint-config-next 15.5.18, React/React DOM 19.2.6 and Supabase JS 2.105.4. Attempts to query official web documentation and the npm registry/audit API were rejected by the environment (401/403). Consequently W2 is **unverified**, not declared vulnerability-free, and no guessed downgrade/upgrade was made. Re-run `npm view next@15 version`, review official Next.js and React advisories, and run `npm audit` from an authorized network before release; select the smallest supported patched 15.x target or request approval for a major.
+The lock contains Next.js/eslint-config-next 15.5.18, React/React DOM 19.2.6 and Supabase JS 2.105.4. On 2026-09-29 the web documentation tool returned HTTP 401; direct `curl https://registry.npmjs.org/next`, `npm view next@15 version`, and the npm audit endpoint were rejected by the environment's CONNECT proxy with HTTP 403. Consequently W2 is **open**, not declared vulnerability-free, and no guessed downgrade/upgrade was made. Re-run those commands and review official Next.js/React advisories from an authorized network; select the smallest supported patched 15.x target or request approval for a major.
 
 ## Required configuration
 
@@ -13,9 +13,24 @@ The lock contains Next.js/eslint-config-next 15.5.18, React/React DOM 19.2.6 and
 ## Pre-deploy on an isolated Supabase project
 
 1. Restore/synthesize the previous schema, then apply `20260929000000_harden_rls_and_auth.sql`; also test a fresh migration chain.
-2. Through the real Data API, attempt SELECT/INSERT/UPDATE/DELETE on every inventoried table with `anon` and a normal `authenticated` JWT. Verify no rows are returned/changed (do not rely on HTTP status alone). Verify the trigger function cannot be invoked.
+2. Set only `STABILIZATION_TEST_SUPABASE_URL`, `STABILIZATION_TEST_SUPABASE_ANON_KEY`, `STABILIZATION_TEST_SUPABASE_SERVICE_ROLE_KEY`, and `DISPOSABLE_DB_ACK=yes`, then run `npm run test:security-db`. It attempts SELECT/INSERT/UPDATE/DELETE on every inventoried table with real `anon` and `authenticated` clients, verifies service-role reads, rejects the limiter RPC for browser roles, and sends 20 concurrent RPCs that must admit/store exactly five.
 3. With the service-role key, create/read/revoke a disposable app session and exercise ordinary application queries. Delete the disposable project/data afterward.
-4. Run `supabase/audit/stabilization-read-only.sql`; retain sanitized results. Run all application checks and inspect client chunks for secret values/names.
+4. Run `supabase/audit/stabilization-read-only.sql`; retain sanitized table, policy, function-grant and view results. Run all application checks and inspect client chunks for secret values/names. Until both fresh and upgrade runs succeed, W1 is not release-ready.
+
+For a local Supabase CLI stack, the fresh check is `supabase db reset --local`. For
+the upgrade check, create a second disposable project/branch at migration
+`20260519090000`, then run `supabase migration up --local` with the two 20260929
+migrations present. Run `npm run test:security-db` against each result. Do not
+point these commands at a linked production project.
+
+### Merge prerequisites
+
+W1 may merge only after sanitized evidence exists for both migration paths and
+the real Data API suite. W2 may merge only after official advisory review,
+successful `npm audit`, and the smallest supported patched lockfile update (or
+documented proof that the locked versions already satisfy every applicable
+advisory). W3 additionally requires the real 20-request concurrency assertion.
+Passing unit tests alone does not satisfy any of these external gates.
 
 ## Controlled deployment (requires separate approval)
 

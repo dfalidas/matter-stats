@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { headers } from "next/headers";
-import { ACCESS_COOKIE_MAX_AGE_SECONDS, ACCESS_COOKIE_NAME, createAccessSession, getLoginRateLimit, isCorrectAccessPassword, recordLoginAttempt, revokeAccessSession } from "@/lib/auth-cookie";
+import { ACCESS_COOKIE_MAX_AGE_SECONDS, ACCESS_COOKIE_NAME, createAccessSession, isCorrectAccessPassword, recordLoginAttempt, revokeAccessSession } from "@/lib/auth-cookie";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export type LoginState = {
@@ -16,16 +16,13 @@ export async function login(_previousState: LoginState, formData: FormData): Pro
   const headerStore = await headers();
   const clientKey = headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   const client = getSupabaseAdminClient();
-  const rateLimit = await getLoginRateLimit(client, clientKey);
+  const passwordIsCorrect = typeof submittedPassword === "string" && isCorrectAccessPassword(submittedPassword);
+  const allowed = await recordLoginAttempt(client, clientKey, passwordIsCorrect);
+  if (!allowed) return { error: "Too many attempts. Please wait 15 minutes and try again." };
 
-  if (!rateLimit.allowed) return { error: "Too many attempts. Please wait 15 minutes and try again." };
-
-  if (typeof submittedPassword !== "string" || !isCorrectAccessPassword(submittedPassword)) {
-    await recordLoginAttempt(client, rateLimit.clientKeyHash, false);
+  if (!passwordIsCorrect) {
     return { error: "Invalid password. Please try again." };
   }
-
-  await recordLoginAttempt(client, rateLimit.clientKeyHash, true);
 
   const cookieStore = await cookies();
   cookieStore.set({

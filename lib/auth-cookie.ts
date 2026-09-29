@@ -80,18 +80,14 @@ export async function revokeAccessSession(client: AuthClient, token: string | un
   if (error) throw error;
 }
 
-export async function getLoginRateLimit(client: AuthClient, clientKey: string, now = new Date()) {
+export async function recordLoginAttempt(client: AuthClient, clientKey: string, succeeded: boolean): Promise<boolean> {
   const clientKeyHash = await hashAuthValue(`${readAccessPassword()}\0${clientKey}`);
-  const windowStart = new Date(now.getTime() - LOGIN_ATTEMPT_WINDOW_SECONDS * 1000).toISOString();
-  const { count, error } = await client.from("app_login_attempts").select("*", { count: "exact", head: true })
-    .eq("client_key_hash", clientKeyHash).eq("succeeded", false).gte("attempted_at", windowStart);
-  if (error) throw error;
-  return { allowed: (count ?? 0) < LOGIN_ATTEMPT_LIMIT, clientKeyHash };
-}
-
-export async function recordLoginAttempt(client: AuthClient, clientKeyHash: string, succeeded: boolean, now = new Date()) {
-  const { error } = await client.from("app_login_attempts").insert({
-    client_key_hash: clientKeyHash, attempted_at: now.toISOString(), succeeded,
+  const { data, error } = await client.rpc("record_app_login_attempt", {
+    p_client_key_hash: clientKeyHash,
+    p_succeeded: succeeded,
+    p_limit: LOGIN_ATTEMPT_LIMIT,
+    p_window_seconds: LOGIN_ATTEMPT_WINDOW_SECONDS,
   });
   if (error) throw error;
+  return data === true;
 }

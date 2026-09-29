@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars -- compact Supabase fluent-query test double */
+/* eslint-disable @typescript-eslint/no-explicit-any -- compact Supabase test double */
 
 import {
   createAccessSession,
-  getLoginRateLimit,
   hashAuthValue,
   isValidAccessToken,
   LOGIN_ATTEMPT_LIMIT,
@@ -17,28 +16,39 @@ process.env.APP_ACCESS_PASSWORD = "synthetic-test-password";
 process.env.APP_CREDENTIAL_VERSION = "1";
 
 type Session = { token_hash: string; credential_version: number; created_at: string; expires_at: string; revoked_at: string | null };
-type Attempt = { client_key_hash: string; attempted_at: string; succeeded: boolean };
 
 function fakeClient() {
   const sessions: Session[] = [];
-  const attempts: Attempt[] = [];
-  const from = (table: string) => ({
-    insert: async (row: any) => { (table === "app_sessions" ? sessions : attempts).push(row); return { error: null }; },
+  const attempts = new Map<string, number>();
+  let transactionTail = Promise.resolve();
+  const from = () => ({
+    insert: async (row: any) => { sessions.push(row); return { error: null }; },
     update: (patch: any) => ({ eq: async (_field: string, value: string) => {
       const row = sessions.find((entry) => entry.token_hash === value); if (row) Object.assign(row, patch); return { error: null };
     } }),
-    select: (_columns: string, options?: { head?: boolean }) => {
-      let tokenHash = ""; let clientHash = ""; let since = ""; let failedOnly = false;
+    select: () => {
+      let tokenHash = "";
       const builder: any = {
-        eq(field: string, value: any) { if (field === "token_hash") tokenHash = value; if (field === "client_key_hash") clientHash = value; if (field === "succeeded") failedOnly = value === false; return builder; },
-        gte(_field: string, value: string) { since = value; return builder; },
+        eq(_field: string, value: string) { tokenHash = value; return builder; },
         async maybeSingle() { return { data: sessions.find((entry) => entry.token_hash === tokenHash) ?? null, error: null }; },
-        then(resolve: (result: any) => void) { const count = attempts.filter((a) => a.client_key_hash === clientHash && (!failedOnly || !a.succeeded) && a.attempted_at >= since).length; resolve({ count, error: null }); },
       };
       return builder;
     },
   });
-  return { client: { from } as any, sessions, attempts };
+  const rpc = (_name: string, args: any) => {
+    const operation = transactionTail.then(async () => {
+      // Yield inside the critical section so the test exercises genuinely
+      // overlapping callers while this double models the database lock.
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      const count = attempts.get(args.p_client_key_hash) ?? 0;
+      if (count >= args.p_limit) return { data: false, error: null };
+      if (!args.p_succeeded) attempts.set(args.p_client_key_hash, count + 1);
+      return { data: true, error: null };
+    });
+    transactionTail = operation.then(() => undefined);
+    return operation;
+  };
+  return { client: { from, rpc } as any, sessions, attempts };
 }
 
 test("opaque sessions expire, revoke, and respect credential rotation", async () => {
@@ -63,12 +73,14 @@ test("malformed and storage-error tokens fail closed", async () => {
   assert.equal(await isValidAccessToken(broken, "x".repeat(43)), false);
 });
 
-test("login limiter is shared through persisted attempts and scoped per client", async () => {
+test("twenty concurrent attempts atomically allow only the configured limit", async () => {
   const db = fakeClient();
-  const now = new Date("2026-09-29T12:00:00Z");
-  const first = await getLoginRateLimit(db.client, "203.0.113.7", now);
-  for (let index = 0; index < LOGIN_ATTEMPT_LIMIT; index += 1) await recordLoginAttempt(db.client, first.clientKeyHash, false, now);
-  assert.equal((await getLoginRateLimit(db.client, "203.0.113.7", now)).allowed, false);
-  assert.equal((await getLoginRateLimit(db.client, "198.51.100.4", now)).allowed, true);
-  assert.equal((await getLoginRateLimit(db.client, "203.0.113.7", new Date("2026-09-29T12:16:00Z"))).allowed, true);
+  const results = await Promise.all(Array.from(
+    { length: 20 },
+    () => recordLoginAttempt(db.client, "203.0.113.7", false),
+  ));
+  assert.equal(results.filter(Boolean).length, LOGIN_ATTEMPT_LIMIT);
+  assert.equal(results.filter((allowed) => !allowed).length, 20 - LOGIN_ATTEMPT_LIMIT);
+  assert.equal([...db.attempts.values()][0], LOGIN_ATTEMPT_LIMIT);
+  assert.equal(await recordLoginAttempt(db.client, "198.51.100.4", false), true);
 });

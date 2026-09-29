@@ -13,7 +13,7 @@
 
 | ID | HEAD evidence | Delivery status |
 |---|---|---|
-| R1 | No RLS/grant statements in prior migrations | Code ready, production pending: new object-scoped migration/audit SQL; disposable Data API test still needs a Supabase test project |
+| R1 | No RLS/grant statements in prior migrations | Fix implemented but **W1 unverified/not release-ready**: executable Data API suite exists; fresh/upgrade disposable DB evidence is still required |
 | R2 | Lock has Next 15.5.18 and React 19.2.6 | Verification blocked: official web/registry/audit endpoints returned 401/403 in this environment; no unsupported speculative dependency change made |
 | R3 | Recent activity processes one bounded API page and defaults to current-year window | Verified open; deferred to W4 by instruction |
 | R4 | Singleton state combines modes/cursors and has no lease/fencing | Verified open; deferred to W4 |
@@ -26,7 +26,7 @@
 
 ## Synthetic regression inventory
 
-Existing fixtures already expose nullable links, API alias shapes, pagination flags, current-year resets, word-count/progress behavior and London timezone behavior. W0 keeps those passing as characterization tests. New W3 tests cover hashed opaque tokens, expiry, revocation, credential-version invalidation, malformed tokens, fail-closed storage and shared limiter state. R3–R8 behavior changes are intentionally not implemented or started before W4/W5; their target fixtures are specified in `docs/stabilization-plan.md`.
+`tests/stabilization-regressions.test.ts` contains green characterization fixtures for the current R3/R4/R7/R8 behavior and an independent 1,200-session R5 reference dataset. Its explicitly `todo` target cases are future W4/W5 gates and do not claim those fixes. New W3 tests cover hashes, expiry, revocation, credential-version invalidation, malformed tokens, fail-closed storage and concurrent limiter calls.
 
 ## Read-only / access classification
 

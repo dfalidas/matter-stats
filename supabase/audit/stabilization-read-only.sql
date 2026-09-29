@@ -17,6 +17,16 @@ where table_schema = 'public' and table_name in (
 select schemaname, tablename, policyname, roles, cmd, qual, with_check
 from pg_policies where schemaname = 'public' order by tablename, policyname;
 
+select routine_name, grantee, privilege_type
+from information_schema.role_routine_grants
+where routine_schema = 'public'
+order by routine_name, grantee;
+
+select table_name, view_definition
+from information_schema.views
+where table_schema = 'public'
+order by table_name;
+
 select count(*) as session_count, min(started_at) as min_occurred_at,
   max(started_at) as max_occurred_at,
   coalesce(sum(duration_seconds), 0) as total_duration_seconds,
