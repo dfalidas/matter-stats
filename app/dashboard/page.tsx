@@ -1,6 +1,7 @@
 import { PageShell } from "../_components/page-shell";
 import { DashboardOverview } from "./dashboard-overview";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { requireAccessSession } from "@/lib/require-auth";
 import { getReadingMetrics, METRICS_PERIOD_PRESETS, type MetricsPeriodPreset } from "@/lib/metrics-service";
 
 const DEFAULT_PERIOD: MetricsPeriodPreset = "today";
@@ -12,6 +13,7 @@ type DashboardPageProps = {
 };
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  await requireAccessSession();
   const params = await searchParams;
   const period = normalizePeriod(params?.period);
   const metricsResult = await getDashboardMetrics(period);

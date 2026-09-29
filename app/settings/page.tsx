@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { requireAccessSession } from "@/lib/require-auth";
 import { AlertTriangle, CheckCircle2, Clock3, Database, Globe2, LogOut, ShieldCheck, Tags } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +49,7 @@ type SettingsSyncData = {
 };
 
 export default async function SettingsPage() {
+  await requireAccessSession();
   const [matterStatus, syncData] = await Promise.all([getMatterConnectionStatus(), getSettingsSyncData()]);
   const timezone = getDefaultMetricsTimezone();
   const latestRun = syncData.latestRun;

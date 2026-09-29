@@ -1,6 +1,7 @@
 import { PageShell } from "../_components/page-shell";
 import { ArticlesLibrary } from "./articles-library";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { requireAccessSession } from "@/lib/require-auth";
 import { getArticleList, normalizeArticlePage, normalizeArticlePeriod, normalizeArticleTextFilter } from "@/lib/articles-service";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ type ArticlesPageProps = {
 };
 
 export default async function ArticlesPage({ searchParams }: ArticlesPageProps) {
+  await requireAccessSession();
   const params = await searchParams;
   const client = getSupabaseAdminClient();
   const result = await getArticlesPageData(client, {

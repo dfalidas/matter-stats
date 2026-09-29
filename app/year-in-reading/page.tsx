@@ -1,5 +1,6 @@
 import { PageShell } from "../_components/page-shell";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { requireAccessSession } from "@/lib/require-auth";
 import { getReadingReport } from "@/lib/reports-service";
 
 import { YearInReadingOverview } from "./year-in-reading-overview";
@@ -19,6 +20,7 @@ type YearInReadingResult =
     };
 
 export default async function YearInReadingPage() {
+  await requireAccessSession();
   const client = getSupabaseAdminClient();
   const recapResult = await getYearInReadingResult(client);
   const year = recapResult.ok ? getReportYear(recapResult.report) : FALLBACK_YEAR;

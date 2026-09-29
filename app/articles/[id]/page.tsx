@@ -22,6 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getArticleDetail } from "@/lib/articles-service";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { requireAccessSession } from "@/lib/require-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ type ArticleDetailPageProps = {
 };
 
 export default async function ArticleDetailPage({ params }: ArticleDetailPageProps) {
+  await requireAccessSession();
   const { id } = await params;
   const client = getSupabaseAdminClient();
   const article = await getArticleDetail(client, decodeURIComponent(id));

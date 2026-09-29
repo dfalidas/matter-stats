@@ -1,5 +1,6 @@
 import { PageShell } from "../_components/page-shell";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { requireAccessSession } from "@/lib/require-auth";
 import { getAuthorRanking, normalizeAuthorPeriod } from "@/lib/authors-service";
 import { AuthorsRanking } from "./authors-ranking";
 
@@ -10,6 +11,7 @@ type AuthorsPageProps = {
 };
 
 export default async function AuthorsPage({ searchParams }: AuthorsPageProps) {
+  await requireAccessSession();
   const params = await searchParams;
   const period = normalizeAuthorPeriod(params?.period);
   const client = getSupabaseAdminClient();

@@ -1,5 +1,6 @@
 import { PageShell } from "../_components/page-shell";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { requireAccessSession } from "@/lib/require-auth";
 import { getSourceRanking, normalizeSourcePeriod } from "@/lib/sources-service";
 import { SourcesRanking } from "./sources-ranking";
 
@@ -10,6 +11,7 @@ type SourcesPageProps = {
 };
 
 export default async function SourcesPage({ searchParams }: SourcesPageProps) {
+  await requireAccessSession();
   const params = await searchParams;
   const period = normalizeSourcePeriod(params?.period);
   const client = getSupabaseAdminClient();

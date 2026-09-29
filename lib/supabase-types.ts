@@ -3,6 +3,18 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      app_sessions: {
+        Row: { token_hash: string; credential_version: number; created_at: string; expires_at: string; revoked_at: string | null; last_seen_at: string | null };
+        Insert: { token_hash: string; credential_version: number; created_at?: string; expires_at: string; revoked_at?: string | null; last_seen_at?: string | null };
+        Update: { token_hash?: string; credential_version?: number; created_at?: string; expires_at?: string; revoked_at?: string | null; last_seen_at?: string | null };
+        Relationships: [];
+      };
+      app_login_attempts: {
+        Row: { client_key_hash: string; attempted_at: string; succeeded: boolean };
+        Insert: { client_key_hash: string; attempted_at?: string; succeeded?: boolean };
+        Update: { client_key_hash?: string; attempted_at?: string; succeeded?: boolean };
+        Relationships: [];
+      };
       matter_items: {
         Row: {
           id: string;
