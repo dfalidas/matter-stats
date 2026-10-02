@@ -77,18 +77,13 @@ export type ReadingReport = {
 export async function getReadingReport(
   client: MatterStatsSupabaseClient,
   period: ReportPeriod,
-  options?: { weekStartDate?: string | null }
+  options?: { reference?: string | null; weekStartDate?: string | null; now?: Date }
 ): Promise<ReadingReport> {
-  const weeklyRange = period === "weekly" ? await resolveWeeklyRange(client, options?.weekStartDate) : null;
+  const requestedReference = options?.reference ?? options?.weekStartDate;
+  const selectedRange = resolveReportRange(period, requestedReference, options?.now);
+  const latestWeekWithDataStartDate = period === "weekly" ? await getLatestWeekWithDataStartDate(client) : null;
   const metrics = await getReadingMetrics(client, {
-    ...(weeklyRange
-      ? {
-          range: {
-            start: weeklyRange.start,
-            end: weeklyRange.end,
-          },
-        }
-      : { preset: REPORT_PERIOD_TO_METRICS_PRESET[period] }),
+    range: selectedRange,
     topLimit: 6,
     recentLimit: 8,
   });
@@ -99,24 +94,45 @@ export async function getReadingReport(
     metrics,
     timeline: sessions.map(mapTimelineSession),
     longformReads: buildLongformReads(sessions, 6),
-    latestWeekWithDataStartDate: weeklyRange?.latestWeekWithDataStartDate ?? null,
+    latestWeekWithDataStartDate,
   };
 }
 
-async function resolveWeeklyRange(client: MatterStatsSupabaseClient, requestedWeekStartDate?: string | null) {
+export function resolveReportRange(period: ReportPeriod, requested?: string | null, now = new Date()) {
   const timezone = getDefaultMetricsTimezone();
-  const reference = requestedWeekStartDate && isRealDate(requestedWeekStartDate)
-    ? requestedWeekStartDate
-    : formatDateInTimezone(new Date(), timezone);
-  const [year, month, day] = reference.split("-").map(Number);
-  const localWeekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-  const start = localDateToUtc(year, month, day - ((localWeekday + 6) % 7), timezone);
-  const end = addLocalDays(start, 7, timezone);
-  return {
-    start,
-    end,
-    latestWeekWithDataStartDate: await getLatestWeekWithDataStartDate(client),
-  };
+  const today = formatDateInTimezone(now, timezone);
+  const fallback = period === "yearly" ? today.slice(0, 4) : period === "monthly" ? today.slice(0, 7) : today;
+  const reference = isValidReportReference(period, requested) ? requested : fallback;
+  const [year, month = 1, day = 1] = reference.split("-").map(Number);
+  let start: Date;
+  let end: Date;
+
+  if (period === "yearly") {
+    start = localDateToUtc(year, 1, 1, timezone);
+    end = localDateToUtc(year + 1, 1, 1, timezone);
+  } else if (period === "monthly") {
+    start = localDateToUtc(year, month, 1, timezone);
+    end = localDateToUtc(year, month + 1, 1, timezone);
+  } else if (period === "weekly") {
+    const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    start = localDateToUtc(year, month, day - ((weekday + 6) % 7), timezone);
+    end = addLocalDays(start, 7, timezone);
+  } else {
+    start = localDateToUtc(year, month, day, timezone);
+    end = addLocalDays(start, 1, timezone);
+  }
+  return { start, end };
+}
+
+export function isValidReportReference(period: ReportPeriod, value: string | null | undefined): value is string {
+  if (!value) return false;
+  if (period === "yearly") return /^\d{4}$/.test(value) && Number(value) >= 1;
+  if (period === "monthly") {
+    if (!/^\d{4}-\d{2}$/.test(value)) return false;
+    const month = Number(value.slice(5));
+    return month >= 1 && month <= 12;
+  }
+  return isRealDate(value);
 }
 
 function isRealDate(value: string): boolean {

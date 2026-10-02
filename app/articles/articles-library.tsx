@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, CalendarDays, Clock, FileText, Highlighter, Search, Tags } from "lucide-react";
@@ -23,6 +23,14 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [query, setQuery] = useState(result.filters.query);
+  const [author, setAuthor] = useState(result.filters.author);
+  const [contentType, setContentType] = useState(result.filters.contentType);
+
+  useEffect(() => {
+    setQuery(result.filters.query);
+    setAuthor(result.filters.author);
+    setContentType(result.filters.contentType);
+  }, [result.filters.query, result.filters.author, result.filters.contentType]);
   const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize));
   const activeSource = result.sources.find((source) => source.value === result.filters.source)?.label;
   const activeTag = result.tags.find((tag) => tag.value === result.filters.tag)?.label;
@@ -127,13 +135,13 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
               />
               <label className="grid gap-1.5 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 Author
-                <Input defaultValue={result.filters.author} placeholder="All authors" onBlur={(event) => updateParam("author", event.target.value.trim())} />
+                <Input value={author} placeholder="All authors" onChange={(event) => setAuthor(event.target.value)} onBlur={() => updateParam("author", author.trim())} />
               </label>
               <label className="grid gap-1.5 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 Content type
-                <Input defaultValue={result.filters.contentType} placeholder="All types" onBlur={(event) => updateParam("type", event.target.value.trim())} />
+                <Input value={contentType} placeholder="All types" onChange={(event) => setContentType(event.target.value)} onBlur={() => updateParam("type", contentType.trim())} />
               </label>
-              <Button type="button" variant="outline" onClick={() => { setQuery(""); startTransition(() => router.push(pathname as Route)); }}>
+              <Button type="button" variant="outline" onClick={() => { setQuery(""); setAuthor(""); setContentType(""); startTransition(() => router.push(pathname as Route)); }}>
                 Clear all filters
               </Button>
             </div>

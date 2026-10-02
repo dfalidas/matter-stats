@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getReadingReport } from '../lib/reports-service';
+import { getReadingReport, isValidReportReference, resolveReportRange } from '../lib/reports-service';
 
 type Session={id:string;item_id:string|null;started_at:string|null;ended_at:string|null;duration_seconds:number|null;words_estimated:number|null;matter_items:null};
 class Q {
@@ -57,4 +57,30 @@ test('weekly report renders populated historical week with null item_id sessions
   assert.equal(report.metrics.range.startDate,'2026-05-04');
   assert.ok(report.metrics.totals.sessionsCount >= 0);
   assert.ok(report.timeline.length >= 0);
+});
+
+test('validates URL-persisted report references by period',()=>{
+  assert.equal(isValidReportReference('weekly','2026-02-29'),false);
+  assert.equal(isValidReportReference('weekly','2028-02-29'),true);
+  assert.equal(isValidReportReference('monthly','2026-13'),false);
+  assert.equal(isValidReportReference('monthly','2026-09'),true);
+  assert.equal(isValidReportReference('yearly','2026'),true);
+});
+
+test('resolves historical week, month, and year at Athens local boundaries',()=>{
+  const oldTimezone=process.env.APP_TIMEZONE;
+  process.env.APP_TIMEZONE='Europe/Athens';
+  try {
+    const week=resolveReportRange('weekly','2026-09-03');
+    assert.equal(week.start.toISOString(),'2026-08-30T21:00:00.000Z');
+    assert.equal(week.end.toISOString(),'2026-09-06T21:00:00.000Z');
+    const month=resolveReportRange('monthly','2026-09');
+    assert.equal(month.start.toISOString(),'2026-08-31T21:00:00.000Z');
+    assert.equal(month.end.toISOString(),'2026-09-30T21:00:00.000Z');
+    const year=resolveReportRange('yearly','2026');
+    assert.equal(year.start.toISOString(),'2025-12-31T22:00:00.000Z');
+    assert.equal(year.end.toISOString(),'2026-12-31T22:00:00.000Z');
+  } finally {
+    if(oldTimezone===undefined) delete process.env.APP_TIMEZONE; else process.env.APP_TIMEZONE=oldTimezone;
+  }
 });

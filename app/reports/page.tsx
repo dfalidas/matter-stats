@@ -2,7 +2,7 @@ import { PageShell } from "../_components/page-shell";
 import { ReportsOverview } from "./reports-overview";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { requireAccessSession } from "@/lib/require-auth";
-import { getReadingReport, REPORT_PERIODS, type ReportPeriod } from "@/lib/reports-service";
+import { getReadingReport, isValidReportReference, REPORT_PERIODS, type ReportPeriod } from "@/lib/reports-service";
 
 const DEFAULT_REPORT_PERIOD: ReportPeriod = "weekly";
 
@@ -16,9 +16,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   await requireAccessSession();
   const params = await searchParams;
   const period = normalizeReportPeriod(params?.period);
-  const weekStartDate = normalizeWeekStartDate(params?.weekStart);
+  const reference = normalizeReference(period, params?.date ?? params?.weekStart);
   const client = getSupabaseAdminClient();
-  const reportsResult = await getReportsResult(client, period, weekStartDate);
+  const reportsResult = await getReportsResult(client, period, reference);
 
   return (
     <PageShell
@@ -36,14 +36,14 @@ function normalizeReportPeriod(value: string | string[] | undefined): ReportPeri
   return REPORT_PERIODS.includes(candidate as ReportPeriod) ? (candidate as ReportPeriod) : DEFAULT_REPORT_PERIOD;
 }
 
-function normalizeWeekStartDate(value: string | string[] | undefined): string | null {
+function normalizeReference(period: ReportPeriod, value: string | string[] | undefined): string | null {
   const candidate = Array.isArray(value) ? value[0] : value;
-  return candidate && /^\d{4}-\d{2}-\d{2}$/.test(candidate) ? candidate : null;
+  return isValidReportReference(period, candidate) ? candidate : null;
 }
 
-async function getReportsResult(client: ReturnType<typeof getSupabaseAdminClient>, period: ReportPeriod, weekStartDate: string | null) {
+async function getReportsResult(client: ReturnType<typeof getSupabaseAdminClient>, period: ReportPeriod, reference: string | null) {
   try {
-    const report = await getReadingReport(client, period, { weekStartDate });
+    const report = await getReadingReport(client, period, { reference });
     return { ok: true as const, report };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load reading report.";
