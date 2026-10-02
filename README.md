@@ -9,7 +9,7 @@ The current primary navigation is:
 - **Overview** (`/dashboard`) — summary metrics, periods, library preview, and manual sync.
 - **Activity** (`/activity`) — day-level reading activity.
 - **Library** (`/articles`) — searchable library; item details are at `/articles/[id]`.
-- **Reports** (`/reports`) — weekly, monthly, yearly, and custom-period reporting.
+- **Reports** (`/reports`) — weekly, monthly, and yearly reporting with period selection. Custom start/end date ranges are available in **Overview** (`/dashboard`).
 
 Desktop navigation includes **Settings** (`/settings`) and Log out. On mobile they are under the **Account** menu. Existing `/sources`, `/authors`, `/tags`, and `/year-in-reading` routes remain available as legacy analytics views but are not primary navigation. `/` redirects to `/dashboard`, and `/login` is the public password form.
 
