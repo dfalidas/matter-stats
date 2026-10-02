@@ -12,8 +12,8 @@ The lock contains Next.js/eslint-config-next 15.5.18, React/React DOM 19.2.6 and
 
 ## Pre-deploy on an isolated Supabase project
 
-1. Restore/synthesize the previous schema, then apply `20260929000000_harden_rls_and_auth.sql`; also test a fresh migration chain.
-2. Set only `STABILIZATION_TEST_SUPABASE_URL`, `STABILIZATION_TEST_SUPABASE_ANON_KEY`, `STABILIZATION_TEST_SUPABASE_SERVICE_ROLE_KEY`, and `DISPOSABLE_DB_ACK=yes`, then run `npm run test:security-db`. It attempts SELECT/INSERT/UPDATE/DELETE on every inventoried table with real `anon` and `authenticated` clients, verifies service-role reads, rejects the limiter RPC for browser roles, and sends 20 concurrent RPCs that must admit/store exactly five.
+1. Prepare both migration paths. For a fresh environment, apply the full migration chain in timestamp order. For an upgrade environment, restore/synthesize the previous schema and apply every outstanding migration in timestamp order. In both cases the required release sequence is `20260929000000_harden_rls_and_auth.sql`, then `20260929010000_atomic_login_limiter.sql`, then application deployment.
+2. Confirm both 20260929 migrations are present before running an integration test that calls `public.record_app_login_attempt`. Set only `STABILIZATION_TEST_SUPABASE_URL`, `STABILIZATION_TEST_SUPABASE_ANON_KEY`, `STABILIZATION_TEST_SUPABASE_SERVICE_ROLE_KEY`, and `DISPOSABLE_DB_ACK=yes`, then run `npm run test:security-db`. It attempts SELECT/INSERT/UPDATE/DELETE on every inventoried table with real `anon` and `authenticated` clients, verifies service-role reads, rejects the limiter RPC for browser roles, and sends 20 concurrent RPCs that must admit/store exactly five.
 3. With the service-role key, create/read/revoke a disposable app session and exercise ordinary application queries. Delete the disposable project/data afterward.
 4. Run `supabase/audit/stabilization-read-only.sql`; retain sanitized table, policy, function-grant and view results. Run all application checks and inspect client chunks for secret values/names. Until both fresh and upgrade runs succeed, W1 is not release-ready.
 
@@ -34,7 +34,7 @@ Passing unit tests alone does not satisfy any of these external gates.
 
 ## Controlled deployment (requires separate approval)
 
-Backup/export affected schema/data; apply the additive migration; add `APP_CREDENTIAL_VERSION`; deploy the reviewed commit; log migration and commit identifiers; sign in, access a dynamic/dotted article path, log out, confirm replay rejection, and test cron with missing/wrong/correct Bearer secret. Run the read-only audit and Supabase Security Advisor. Do not mutate personal production data merely to test RLS.
+With separate production authorization, backup/export affected schema/data and apply all outstanding migrations in timestamp order. Specifically, apply `20260929000000_harden_rls_and_auth.sql`, then `20260929010000_atomic_login_limiter.sql`; only after both succeed, add `APP_CREDENTIAL_VERSION` and deploy the reviewed application commit. Log migration and commit identifiers; sign in, access a dynamic/dotted article path, log out, confirm replay rejection, and test cron with missing/wrong/correct Bearer secret. Run the read-only audit and Supabase Security Advisor. Do not mutate personal production data merely to test RLS.
 
 Existing deterministic cookies become invalid, so one fresh login is expected. Raw reading/library data is unchanged. The new tables contain only hashes and timestamps.
 

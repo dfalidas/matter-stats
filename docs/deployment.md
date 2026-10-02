@@ -1,133 +1,115 @@
 # Deployment guide: Vercel + Supabase
 
-This guide walks through deploying Matter Stats with a hosted Supabase database and Vercel. It assumes you have:
+This guide describes the repository's deployment contract. It does not authorize a production deployment, secret rotation, real Matter sync, paid service change, or production database mutation.
 
-- A GitHub account with this repository pushed to GitHub.
-- A Vercel account connected to GitHub.
-- A Supabase account.
-- A Matter API token for the Matter account you want to sync.
+## Prerequisites
 
-## 1. Create a Supabase project
+- a Vercel project connected to the repository;
+- an isolated or production Supabase project, as appropriate for the approved operation;
+- a Matter API token; and
+- the exact application commit and migration evidence recorded for the release.
 
-1. Sign in to the [Supabase dashboard](https://supabase.com/dashboard).
-2. Select **New project**.
-3. Choose an organization, enter a project name such as `matter-stats`, and create a strong database password.
-4. Pick the region closest to where you usually use the app.
-5. Select **Create new project** and wait for Supabase to finish provisioning the project.
-6. Open **Project Settings** > **Data API** or **API Keys** and copy these values for the Vercel setup later:
-   - **Project URL**: used for `SUPABASE_URL`.
-   - **service_role** or **secret** server key: used for `SUPABASE_SERVICE_ROLE_KEY`.
+Use `npm ci` for local/CI installation. Do not substitute guessed configuration or commit real secrets, account identifiers, or project identifiers.
 
-> Keep the service-role or secret key private. It can bypass normal database access controls and must never be committed to GitHub or exposed with a `NEXT_PUBLIC_` prefix.
+## 1. Apply the database migrations
 
-## 2. Run the SQL migrations
+Apply every SQL file in `supabase/migrations` in filename/timestamp order:
 
-The app needs the tables, indexes, functions, and schema changes in `supabase/migrations` before the first Vercel deployment can work.
+1. `20260513000000_create_matter_stats_mvp_schema.sql`
+2. `20260514000000_add_sync_run_annotation_tag_counts.sql`
+3. `20260515000000_add_matter_sync_state.sql`
+4. `20260515010000_add_sync_state_rate_limit.sql`
+5. `20260515020000_add_recent_activity_sync_state.sql`
+6. `20260515030000_add_sync_run_recent_activity_diagnostics.sql`
+7. `20260518000000_add_reading_session_import_diagnostics.sql`
+8. `20260519090000_allow_nullable_reading_session_item_id.sql`
+9. `20260929000000_harden_rls_and_auth.sql`
+10. `20260929010000_atomic_login_limiter.sql`
 
-### Option A: Supabase SQL Editor (easiest)
+The final two migrations must both succeed **before** deploying code that performs login. The first creates `public.app_sessions` and `public.app_login_attempts` and declares the table RLS/grant policy. The second defines:
 
-1. In the Supabase dashboard, open your project.
-2. Go to **SQL Editor**.
-3. Select **New query**.
-4. Open `supabase/migrations/20260513000000_create_matter_stats_mvp_schema.sql` from this repository, copy the full file contents, paste them into the SQL editor, and select **Run**.
-5. Create another new query.
-6. Open `supabase/migrations/20260514000000_add_sync_run_annotation_tag_counts.sql`, copy the full file contents, paste them into the SQL editor, and select **Run**.
-7. Go to **Table Editor** and confirm tables such as `matter_items`, `reading_sessions`, `annotations`, `daily_stats`, and `sync_runs` exist.
-
-Run migration files in timestamp order, oldest first. If a migration fails, read the error message, fix the failed statement, and rerun only after you know whether any earlier statements already succeeded.
-
-### Option B: Supabase CLI
-
-Use this option if you already use the Supabase CLI locally.
-
-```bash
-supabase login
-supabase link --project-ref your-project-ref
-supabase db push
+```sql
+public.record_app_login_attempt(
+  p_client_key_hash text,
+  p_succeeded boolean,
+  p_limit integer default 5,
+  p_window_seconds integer default 900
+) returns boolean
 ```
 
-Replace `your-project-ref` with the reference from your Supabase project URL or dashboard. After the command succeeds, confirm the tables exist in the Supabase **Table Editor**.
+The application invokes that RPC through `service_role`. Applying only the first migration leaves login without its required function.
 
-## 3. Set Vercel environment variables
+For an existing project, follow [the security release runbook](security-release-runbook.md) and verify both an upgrade path and a fresh migration chain in disposable environments before production. SQL text demonstrates intended controls, not deployed controls: retain separate evidence for applied migrations, browser-role Data API denial, service-role allowance, and 20-request RPC concurrency.
 
-1. Sign in to [Vercel](https://vercel.com/dashboard).
-2. Open the Vercel project after importing it, or import it first using the steps in the next section and then return here.
-3. Go to **Settings** > **Environment Variables**.
-4. Add each variable below for **Production**. If you want preview deployments to work too, also select **Preview**.
+If using the Supabase CLI, link only to the deliberately selected project and review the target before running `supabase db push`. `supabase db reset --local` is appropriate for the fresh local check. Do not point destructive verification at production.
 
-| Variable | Where to get it | Visibility |
-| --- | --- | --- |
-| `APP_ACCESS_PASSWORD` | Create a strong private password that you will type on `/login`. | Server-only secret |
-| `MATTER_API_TOKEN` | Your Matter API token. | Server-only secret |
-| `SUPABASE_URL` | Supabase Project URL. | Server-only secret |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role or secret server key. | Server-only secret |
-| `MATTER_SYNC_ITEMS_LIMIT` | Optional; defaults to `25` items per sync request. | Server-only config |
-| `MATTER_SYNC_SESSIONS_LIMIT` | Optional; defaults to `25` reading sessions per sync request. | Server-only config |
+## 2. Configure server-side environment values
 
-5. Select **Save** after adding each variable.
-6. If you edited variables after a deployment already ran, trigger a new deployment so Vercel rebuilds with the new values.
+Copy `.env.example` only as a template. Replace its obvious placeholders in Vercel **Settings > Environment Variables** and in an uncommitted `.env.local` for local development.
 
-Do not add `NEXT_PUBLIC_` to `MATTER_API_TOKEN`, `APP_ACCESS_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `MATTER_SYNC_ITEMS_LIMIT`, or `MATTER_SYNC_SESSIONS_LIMIT`. The current private app does not require any browser-exposed Supabase keys.
+| Variable | Requirement |
+| --- | --- |
+| `APP_ACCESS_PASSWORD` | Required secret used at `/login`. |
+| `APP_CREDENTIAL_VERSION` | Positive integer; start at `1`. Incrementing invalidates older app sessions. |
+| `APP_TIMEZONE` | Optional valid IANA timezone; code falls back to `Europe/Athens`. |
+| `MATTER_API_TOKEN` | Required server-only Matter secret. |
+| `SUPABASE_URL` | Required server-side Supabase URL. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Required server-only administrative key. |
+| `CRON_SECRET` | Required for authorized scheduled sync; use a long random secret. |
+| `MATTER_SYNC_ITEMS_LIMIT` | Optional positive integer; defaults to `25`. |
+| `MATTER_SYNC_SESSIONS_LIMIT` | Optional positive integer; defaults to `25`. |
 
-## 4. Deploy from GitHub to Vercel
+None of these variables should be prefixed with `NEXT_PUBLIC_`. In particular, the service-role key bypasses normal RLS enforcement and must never reach browser code. Redeploy after changing Vercel environment values.
 
-1. Push this repository to GitHub.
-2. In Vercel, select **Add New** > **Project**.
-3. Choose the GitHub repository.
-4. Keep the detected framework as **Next.js**.
-5. Use the default build settings unless you intentionally changed the project:
-   - Install command: `npm install`
-   - Build command: `npm run build`
-   - Output directory: Vercel default for Next.js
-6. Add the environment variables from the previous section if you have not already added them.
-7. Select **Deploy**.
-8. Wait for the build to finish, then open the generated Vercel URL.
+## 3. Check and deploy the application
 
-After the GitHub integration is connected, Vercel automatically creates a new deployment when you push commits to the connected branch. Pull requests normally receive preview deployments, while the production branch receives production deployments.
+From a clean checkout:
 
-## 5. Test the deployed app
+```bash
+npm ci
+npm run typecheck
+npm run lint
+npm run test
+npm run build
+```
 
-Use this checklist after every first deployment, environment-variable change, token rotation, or migration change.
+Keep Vercel's detected framework as Next.js and use `npm run build`. Deploy only after the required migrations and configuration are present. The application renders data pages dynamically; build success does not verify Supabase, Matter, environment values, or deployed data.
 
-1. Open your Vercel production URL.
-2. Visit `/login`.
-3. Enter the value you set for `APP_ACCESS_PASSWORD`.
-4. Confirm you are redirected into the app and can open `/dashboard`.
-5. On `/dashboard`, select **Sync Matter**.
-6. Wait for the sync to finish.
-   - Success looks like a message with counts for imported items, reading sessions, annotations, and tags.
-   - If you see an error, open the Vercel deployment logs and confirm all required environment variables are present.
-7. In Supabase **Table Editor**, confirm rows were written to tables such as `matter_items`, `sync_runs`, and `daily_stats`.
-8. Refresh `/dashboard`, `/articles`, `/sources`, `/authors`, `/tags`, and `/reports` to confirm pages load with the synced data.
+## 4. Configure scheduled sync
 
-If the app builds but pages fail at runtime, the most common causes are a missing environment variable, a Supabase key pasted into the wrong variable, or migrations that were not run against the same Supabase project used by Vercel.
+`vercel.json` already defines this daily schedule:
 
-## 6. Rotate the Matter API token and app password
+```text
+0 6 * * * UTC
+```
 
-Rotate secrets if you think they were exposed, when someone who had access should no longer use the app, or on a regular security schedule.
+It calls `GET /api/cron/sync-recent-activity`. Authorization is exclusively:
 
-### Rotate the Matter API token
+```http
+Authorization: Bearer <CRON_SECRET>
+```
 
-1. Generate a new Matter API token in Matter.
-2. In Vercel, open the project and go to **Settings** > **Environment Variables**.
-3. Edit `MATTER_API_TOKEN` and replace the old token with the new token for Production and any Preview environments you use.
-4. Save the variable.
-5. Redeploy the latest production deployment, or push a small commit to trigger a fresh deployment.
-6. Open the deployed app, sign in, and run **Sync Matter** from `/dashboard`.
-7. Confirm the sync succeeds, then revoke or delete the old Matter API token in Matter if Matter does not automatically invalidate it.
+A missing or incorrect Bearer value receives HTTP 401. There is no supported query-string secret. This endpoint performs bounded recent-activity sync and may skip work while the stored Matter rate limit is active. It does not guarantee full backfill, exhaustive continuation, or concurrent-invocation safety; those remain stabilization work.
 
-### Rotate the app password
+## 5. Verify the deployed release
 
-1. Create a new strong password. A password manager-generated value is best.
-2. In Vercel, open **Settings** > **Environment Variables**.
-3. Edit `APP_ACCESS_PASSWORD` and replace the old password with the new password for Production and any Preview environments you use.
-4. Save the variable.
-5. Redeploy the latest production deployment, or push a small commit to trigger a fresh deployment.
-6. Open `/login` in a private browser window and confirm the old password no longer works and the new password does work.
-7. Share the new password only with people who should have access.
+After deployment, record sanitized evidence rather than assuming implementation equals production behavior:
 
-Existing browser sessions may continue until their auth cookie expires or is cleared. To force a local re-test, sign out if a sign-out control exists, clear the site cookies, or use a private browser window.
+1. Record the deployed Git SHA and migration identifiers.
+2. Open `/login`, verify a failed login is rejected, then verify a valid login reaches `/dashboard`.
+3. Confirm **Overview**, **Activity**, **Library**, and **Reports** load. On mobile, confirm **Account** exposes Settings and Log out. Check `/settings` and any retained legacy route required by the release (`/sources`, `/authors`, `/tags`, `/year-in-reading`).
+4. Log out and confirm the old session cannot be replayed.
+5. Test cron with missing, wrong, and correct Bearer values without using a query parameter. Run a real Matter sync only when separately authorized.
+6. Execute the runbook's isolated Data API/RPC checks and retain sanitized results. Run the read-only audit and Supabase Security Advisor as approved.
 
-## Security migration (W1–W3, 2026-09-29)
+Observed Matter sessions may have a null item link. That supports time and session metrics but makes source/author/tag/article attribution incomplete; it is not evidence that a later sync will repair attribution. Estimated word semantics and other open metric consistency work are documented in [architecture.md](architecture.md).
 
-Before deploying this release, follow [`security-release-runbook.md`](./security-release-runbook.md). Apply `20260929000000_harden_rls_and_auth.sql` before the application, configure `APP_CREDENTIAL_VERSION=1`, and expect existing access cookies to require a fresh login. App sessions are server-validated and revocable; cron remains separately authorized by `CRON_SECRET`. Do not use `NEXT_PUBLIC_` Supabase credentials—the browser does not access this private database.
+## 6. Secret rotation and rollback
+
+Changing `APP_ACCESS_PASSWORD` should be paired with incrementing `APP_CREDENTIAL_VERSION` so previously issued database-backed sessions fail validation. Rotate Matter, cron, and Supabase credentials according to their providers' procedures and only with operational approval. A configuration change requires redeployment.
+
+For a documentation-only release, rollback is simply reverting the documentation commit. For runtime/database releases, follow the security runbook: do not disable RLS as a routine rollback, and do not drop authentication tables or history without an approved backup/destructive-change plan.
+
+## Open work and external verification
+
+Security dependency patching, reliable sync continuation/concurrency, complete database queries, streak/word/timezone consistency, repair tooling, and CI are not completed by the interface redesign. Production compatibility, actual migration state, Data API permissions, RPC concurrency, cron delivery, live Matter payloads, stored-data correctness, and the deployed SHA remain externally verified facts, not repository guarantees.
