@@ -1,6 +1,8 @@
 import type { MatterStatsSupabaseClient } from "@/lib/supabase-queries";
 
-export const DEFAULT_APP_TIMEZONE = "Europe/London";
+import { estimateWordsFromSeconds } from "./reading-estimates";
+
+export const DEFAULT_APP_TIMEZONE = "Europe/Athens";
 
 export const METRICS_PERIOD_PRESETS = ["today", "week", "month", "year", "all-time"] as const;
 
@@ -429,7 +431,7 @@ async function fetchTagsByItemId(client: MatterStatsSupabaseClient, itemIds: str
 
 function summarizeSessions(sessions: MetricsSession[]): MetricTotals {
   const totalReadingTimeSeconds = sessions.reduce((total, session) => total + positiveInteger(session.duration_seconds), 0);
-  const wordsRead = sessions.reduce((total, session) => total + positiveInteger(session.words_estimated), 0);
+  const wordsRead = estimateWordsFromSeconds(totalReadingTimeSeconds);
   const articlesRead = new Set(sessions.map((session) => session.item_id).filter(isNonEmptyString)).size;
   const sessionsCount = sessions.length;
 
@@ -489,7 +491,7 @@ function addToBucket(buckets: Map<string, MetricsAccumulator>, name: string, ses
   };
 
   existing.readingTimeSeconds += positiveInteger(session.duration_seconds);
-  existing.wordsRead += positiveInteger(session.words_estimated);
+  existing.wordsRead = estimateWordsFromSeconds(existing.readingTimeSeconds);
   if (isNonEmptyString(session.item_id)) {
     existing.itemIds.add(session.item_id);
   }
@@ -524,7 +526,7 @@ function buildRecentReads(sessions: MetricsSession[], limit: number): RecentRead
 
     if (existing) {
       existing.readingTimeSeconds += positiveInteger(session.duration_seconds);
-      existing.wordsRead += positiveInteger(session.words_estimated);
+      existing.wordsRead = estimateWordsFromSeconds(existing.readingTimeSeconds);
       if (readAt && (!existing.readAt || readAt > existing.readAt)) {
         existing.readAt = readAt;
       }
@@ -539,7 +541,7 @@ function buildRecentReads(sessions: MetricsSession[], limit: number): RecentRead
       author: item?.author ?? null,
       readAt,
       readingTimeSeconds: positiveInteger(session.duration_seconds),
-      wordsRead: positiveInteger(session.words_estimated),
+      wordsRead: estimateWordsFromSeconds(positiveInteger(session.duration_seconds)),
     });
   }
 

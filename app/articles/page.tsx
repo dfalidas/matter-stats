@@ -2,7 +2,7 @@ import { PageShell } from "../_components/page-shell";
 import { ArticlesLibrary } from "./articles-library";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { requireAccessSession } from "@/lib/require-auth";
-import { getArticleList, normalizeArticlePage, normalizeArticlePeriod, normalizeArticleTextFilter } from "@/lib/articles-service";
+import { getArticleList, normalizeArticlePage, normalizeArticleTextFilter } from "@/lib/articles-service";
 
 export const dynamic = "force-dynamic";
 
@@ -15,18 +15,22 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
   const params = await searchParams;
   const client = getSupabaseAdminClient();
   const result = await getArticlesPageData(client, {
-    period: normalizeArticlePeriod(params?.period),
+    period: "all-time",
     query: normalizeArticleTextFilter(params?.q),
     source: normalizeArticleTextFilter(params?.source),
     tag: normalizeArticleTextFilter(params?.tag),
+    status: normalizeArticleTextFilter(params?.status) || "all",
+    author: normalizeArticleTextFilter(params?.author),
+    contentType: normalizeArticleTextFilter(params?.type),
+    size: normalizeArticleTextFilter(params?.size),
     page: normalizeArticlePage(params?.page),
   });
 
   return (
     <PageShell
-      eyebrow="Articles"
-      title="Article library"
-      description="Browse your Matter history with fast server-side search, focused filters, highlight counts, and reading metadata."
+      eyebrow="Library"
+      title="Your library"
+      description="Browse current Matter items. Library metadata and progress are independent of the analytics period."
     >
       {result.ok ? (
         <ArticlesLibrary result={result.result} />

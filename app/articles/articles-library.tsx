@@ -11,19 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { ArticleListResult } from "@/lib/articles-service";
-import { METRICS_PERIOD_PRESETS, type MetricsPeriodPreset } from "@/lib/metrics-service";
 import { cn } from "@/lib/utils";
 
 type ArticlesLibraryProps = {
   result: ArticleListResult;
-};
-
-const periodLabels: Record<MetricsPeriodPreset, string> = {
-  today: "Today",
-  week: "This week",
-  month: "This month",
-  year: "This year",
-  "all-time": "All time",
 };
 
 export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
@@ -88,10 +79,7 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-2xl font-semibold tracking-tight">Articles</CardTitle>
-                <Badge variant="secondary" className="rounded-full">
-                  {periodLabels[result.filters.period]}
-                </Badge>
+                <CardTitle className="text-2xl font-semibold tracking-tight">Library items</CardTitle>
                 {activeSource ? <Badge className="rounded-full">{activeSource}</Badge> : null}
                 {activeTag ? <Badge className="rounded-full">#{activeTag}</Badge> : null}
               </div>
@@ -100,20 +88,6 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2" aria-label="Filter articles by period">
-              {METRICS_PERIOD_PRESETS.map((period) => (
-                <Button
-                  key={period}
-                  type="button"
-                  variant={period === result.filters.period ? "default" : "outline"}
-                  size="sm"
-                  disabled={isPending}
-                  onClick={() => updateParam("period", period)}
-                >
-                  {periodLabels[period]}
-                </Button>
-              ))}
-            </div>
           </div>
 
           <div className="grid gap-3 xl:grid-cols-[minmax(260px,0.8fr)_minmax(0,1fr)]">
@@ -132,6 +106,8 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
             </form>
 
             <div className="grid gap-2 md:grid-cols-2">
+              <FilterSelect label="Status" value={result.filters.status} disabled={isPending} onChange={(v)=>updateParam("status",v)} options={[{value:"inbox",label:"Inbox"},{value:"queue",label:"Queue"},{value:"archive",label:"Archive"}]} />
+              <FilterSelect label="Article size" value={result.filters.size} disabled={isPending} onChange={(v)=>updateParam("size",v)} options={[{value:"short",label:"Short · <1,500 words"},{value:"medium",label:"Medium · 1,500–3,999"},{value:"long",label:"Long · 4,000+ words"}]} />
               <FilterSelect
                 label="Source"
                 value={result.filters.source}

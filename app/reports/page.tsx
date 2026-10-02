@@ -24,7 +24,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     <PageShell
       eyebrow="Reports"
       title="Reading reports"
-      description="Daily, weekly, monthly, and yearly summaries powered by synced Matter reading sessions from Supabase."
+      description="Weekly, monthly, and yearly reviews built from synced session duration—not inferred article activity."
     >
       <ReportsOverview period={period} reportsResult={reportsResult} />
     </PageShell>

@@ -12,6 +12,10 @@ export type ArticleListFilters = {
   query?: string;
   source?: string;
   tag?: string;
+  status?: string;
+  author?: string;
+  contentType?: string;
+  size?: string;
   page?: number;
 };
 
@@ -43,7 +47,7 @@ export type ArticleListResult = {
   total: number;
   page: number;
   pageSize: number;
-  filters: Required<Pick<ArticleListFilters, "period" | "query" | "source" | "tag" | "page">>;
+  filters: Required<Pick<ArticleListFilters, "period" | "query" | "source" | "tag" | "status" | "author" | "contentType" | "size" | "page">>;
   sources: ArticleFacet[];
   tags: ArticleFacet[];
 };
@@ -98,6 +102,10 @@ export async function getArticleList(
   const query = filters.query?.trim() ?? "";
   const source = filters.source?.trim() ?? "";
   const tag = filters.tag?.trim() ?? "";
+  const status = filters.status?.trim() ?? "all";
+  const author = filters.author?.trim() ?? "";
+  const contentType = filters.contentType?.trim() ?? "";
+  const size = filters.size?.trim() ?? "";
   const page = Math.max(filters.page ?? 1, 1);
   const range = resolveMetricsDateRange({ preset: period });
   const [sources, tags, tagItemIds] = await Promise.all([
@@ -112,7 +120,7 @@ export async function getArticleList(
       total: 0,
       page,
       pageSize: ARTICLE_PAGE_SIZE,
-      filters: { period, query, source, tag, page },
+      filters: { period, query, source, tag, status, author, contentType, size, page },
       sources,
       tags,
     };
@@ -139,6 +147,12 @@ export async function getArticleList(
   if (source) {
     request = request.eq("source", source);
   }
+  if (status && status !== "all") request = request.eq("status", status);
+  if (author) request = request.eq("author", author);
+  if (contentType) request = request.eq("content_type", contentType);
+  if (size === "short") request = request.lt("word_count", 1500);
+  if (size === "medium") request = request.gte("word_count", 1500).lt("word_count", 4000);
+  if (size === "long") request = request.gte("word_count", 4000);
 
   if (tagItemIds) {
     request = request.in("id", tagItemIds);
@@ -168,7 +182,7 @@ export async function getArticleList(
     total: count ?? rows.length,
     page,
     pageSize: ARTICLE_PAGE_SIZE,
-    filters: { period, query, source, tag, page },
+    filters: { period, query, source, tag, status, author, contentType, size, page },
     sources,
     tags,
   };

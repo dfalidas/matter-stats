@@ -4,7 +4,7 @@ import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { requireAccessSession } from "@/lib/require-auth";
 import { getReadingMetrics, METRICS_PERIOD_PRESETS, type MetricsPeriodPreset } from "@/lib/metrics-service";
 
-const DEFAULT_PERIOD: MetricsPeriodPreset = "today";
+const DEFAULT_PERIOD: MetricsPeriodPreset = "week";
 
 export const dynamic = "force-dynamic";
 
@@ -20,9 +20,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   return (
     <PageShell
-      eyebrow="Dashboard"
-      title="Matter Stats"
-      description="Your private command center for reading momentum, source mix, topics, and recent Matter activity."
+      eyebrow="Overview"
+      title="A quieter view of your reading"
+      description="Reliable time-based insights from your synced Matter reading sessions."
     >
       <DashboardOverview period={period} metricsResult={metricsResult} />
     </PageShell>
