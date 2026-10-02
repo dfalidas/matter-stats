@@ -14,6 +14,19 @@ export function AppShell({ children }: { children: ReactNode }) {
         <form action={logout}><button className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"><LogOut className="h-5 w-5" />Log out</button></form>
       </div>
     </aside>
+    <header className="flex min-h-16 items-center justify-between border-b bg-card px-5 lg:hidden">
+      <Link href="/dashboard" className="flex min-h-11 items-center gap-3 rounded-xl font-semibold focus-visible:ring-2 focus-visible:ring-ring">
+        <span className="grid h-9 w-9 place-items-center rounded-full bg-foreground text-background"><BookOpen className="h-4 w-4" /></span>
+        Matter Stats
+      </Link>
+      <details className="relative">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center rounded-lg border px-3 text-sm font-medium">Account</summary>
+        <div className="absolute right-0 z-40 mt-2 w-48 rounded-xl border bg-card p-2 shadow-sm">
+          <Link href="/settings" className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm hover:bg-muted"><Settings className="h-5 w-5" />Settings</Link>
+          <form action={logout}><button className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm hover:bg-muted"><LogOut className="h-5 w-5" />Log out</button></form>
+        </div>
+      </details>
+    </header>
     <main className="mx-auto min-w-0 max-w-[88rem] px-5 pb-28 pt-8 sm:px-8 lg:ml-60 lg:px-12 lg:pb-14 lg:pt-12">{children}</main>
     <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-card/95 pb-[env(safe-area-inset-bottom)] lg:hidden"><Suspense><AppNavigation variant="mobile" /></Suspense></div>
   </div>;

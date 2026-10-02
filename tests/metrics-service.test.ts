@@ -38,6 +38,7 @@ class TestQuery<Row extends TestSession | TestTagRow> {
   private startedAtOrAfter: string | null = null;
   private itemIds: string[] | null = null;
   private startedAtAscending: boolean | null = null;
+  private window: [number, number] | null = null;
 
   constructor(private readonly rows: Row[]) {}
 
@@ -63,6 +64,11 @@ class TestQuery<Row extends TestSession | TestTagRow> {
     if (column === "started_at") {
       this.startedAtAscending = options.ascending ?? true;
     }
+    return this;
+  }
+
+  range(from: number, to: number) {
+    this.window = [from, to];
     return this;
   }
 
@@ -103,7 +109,7 @@ class TestQuery<Row extends TestSession | TestTagRow> {
       });
     }
 
-    return result;
+    return this.window ? result.slice(this.window[0], this.window[1] + 1) : result;
   }
 }
 

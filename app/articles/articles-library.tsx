@@ -125,6 +125,17 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
                 onChange={(value) => updateParam("tag", value)}
                 options={result.tags.map((tag) => ({ value: tag.value, label: tag.label }))}
               />
+              <label className="grid gap-1.5 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Author
+                <Input defaultValue={result.filters.author} placeholder="All authors" onBlur={(event) => updateParam("author", event.target.value.trim())} />
+              </label>
+              <label className="grid gap-1.5 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Content type
+                <Input defaultValue={result.filters.contentType} placeholder="All types" onBlur={(event) => updateParam("type", event.target.value.trim())} />
+              </label>
+              <Button type="button" variant="outline" onClick={() => { setQuery(""); startTransition(() => router.push(pathname as Route)); }}>
+                Clear all filters
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -140,7 +151,24 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
             />
           ) : (
             <>
-              <Table>
+              <div className="space-y-3 md:hidden">
+                {result.articles.map((article) => (
+                  <button key={article.id} onClick={() => openArticle(article.id)} className="min-h-11 w-full rounded-xl border bg-card p-4 text-left">
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="font-medium leading-6">{article.title ?? "Untitled article"}</h3>
+                      <Badge variant="secondary" className="shrink-0 capitalize">{article.status ?? "Unknown"}</Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">{article.source ?? "Source unknown"}{article.author ? ` · ${article.author}` : ""}</p>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      {article.word_count == null ? "Article size unknown" : `≈${formatInteger(article.word_count)} words`}
+                      {article.estimated_reading_time_minutes == null ? "" : ` · ≈${formatMinutes(article.estimated_reading_time_minutes)}`}
+                    </p>
+                    {article.progress != null && <div className="mt-3"><div className="h-1.5 rounded-full bg-muted"><span className="block h-full rounded-full bg-primary" style={{ width: `${Math.min(100, Math.max(0, article.progress * 100))}%` }} /></div><p className="mt-1 text-xs text-muted-foreground">{Math.round(article.progress * 100)}% current progress</p></div>}
+                    {article.tags.length > 0 && <div className="mt-3 flex flex-wrap gap-1">{article.tags.slice(0, 3).map((tag) => <Badge key={tag.id} variant="outline">{tag.name}</Badge>)}</div>}
+                  </button>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto md:block"><Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="min-w-[280px]">Title</TableHead>
@@ -195,8 +223,8 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
                           {formatDate(article.created_at_matter ?? article.updated_at_matter)}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{formatMinutes(article.estimated_reading_time_minutes ?? 0)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatInteger(article.word_count ?? 0)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{article.estimated_reading_time_minutes == null ? "—" : formatMinutes(article.estimated_reading_time_minutes)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{article.word_count == null ? "—" : formatInteger(article.word_count)}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatInteger(article.highlights)}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" className="rounded-full capitalize">{article.status ?? "Unknown"}</Badge>
@@ -204,7 +232,7 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              </Table></div>
 
               <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
                 <span>

@@ -29,6 +29,7 @@ export type ArticleListRow = Pick<
   | "status"
   | "word_count"
   | "estimated_reading_time_minutes"
+  | "progress"
   | "created_at_matter"
   | "updated_at_matter"
 > & {
@@ -129,7 +130,7 @@ export async function getArticleList(
   let request = client
     .from("matter_items")
     .select(
-      "id,title,url,source,author,status,word_count,estimated_reading_time_minutes,created_at_matter,updated_at_matter",
+      "id,title,url,source,author,status,word_count,estimated_reading_time_minutes,progress,created_at_matter,updated_at_matter",
       { count: "exact" },
     )
     .order("created_at_matter", { ascending: false, nullsFirst: false })

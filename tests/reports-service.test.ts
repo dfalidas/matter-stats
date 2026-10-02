@@ -7,10 +7,12 @@ class Q {
   private filters: Record<string, string | number | boolean> = {};
   private sort: {col:string;asc:boolean}|null=null;
   private lim:number|null=null;
+  private window:[number,number]|null=null;
   constructor(private table:string, private rows:Record<string, unknown>[]){}
   select(){return this;} lt(c:string,v:string){this.filters[`lt_${c}`]=v;return this;} gte(c:string,v:string){this.filters[`gte_${c}`]=v;return this;}
   gt(c:string,v:number){this.filters[`gt_${c}`]=v;return this;} not(c:string){this.filters[`not_${c}`]=true;return this;}
   order(col:string,opt:{ascending?:boolean}){this.sort={col,asc:opt.ascending??true};return this;} limit(n:number){this.lim=n;return this;}
+  range(from:number,to:number){this.window=[from,to];return this;}
   maybeSingle(){const data=this.result()[0]??null; return Promise.resolve({data,error:null});}
   in(){return this;}
   then<TResult1 = { data: unknown[]; error: null }, TResult2 = never>(
@@ -28,6 +30,7 @@ class Q {
     }
     if(this.sort){out.sort((a,b)=> this.sort!.asc?String(a[this.sort!.col]??'').localeCompare(String(b[this.sort!.col]??'')):String(b[this.sort!.col]??'').localeCompare(String(a[this.sort!.col]??'')));}
     if(this.lim!==null) out=out.slice(0,this.lim);
+    if(this.window) out=out.slice(this.window[0],this.window[1]+1);
     return out;
   }
 }

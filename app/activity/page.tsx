@@ -1,3 +1,52 @@
-import { requireAccessSession } from "@/lib/require-auth"; import { getSupabaseAdminClient } from "@/lib/supabase-admin"; import { getActivityMonth } from "@/lib/activity-service"; import { PageShell } from "../_components/page-shell"; import { ActivityView } from "./view";
-export const dynamic="force-dynamic";
-export default async function ActivityPage({searchParams}:{searchParams?:Promise<Record<string,string|string[]|undefined>>}){await requireAccessSession();const p=await searchParams;const one=(v:string|string[]|undefined)=>Array.isArray(v)?v[0]:v;const month=one(p?.month)??new Date().toISOString().slice(0,7);try{const data=await getActivityMonth(getSupabaseAdminClient(),month,one(p?.day)??null,Math.max(1,Number(one(p?.page)??1)));return <PageShell eyebrow="Activity" title="Reading activity" description="A calendar of session timestamps and time read, in Europe/Athens."><ActivityView data={data}/></PageShell>}catch(e){return <PageShell eyebrow="Activity" title="Reading activity" description="Activity data is currently unavailable."><p className="rounded-xl border p-5 text-sm text-muted-foreground">{e instanceof Error?e.message:"Unable to load activity."}</p></PageShell>}}
+import { PageShell } from "../_components/page-shell";
+import { ActivityView } from "./view";
+import {
+  getActivityMonth,
+  isCalendarDate,
+  isCalendarMonth,
+  normalizeActivityPage,
+} from "@/lib/activity-service";
+import { formatDateInTimezone, getDefaultMetricsTimezone } from "@/lib/metrics-service";
+import { requireAccessSession } from "@/lib/require-auth";
+import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+
+export const dynamic = "force-dynamic";
+
+export default async function ActivityPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  await requireAccessSession();
+  const params = await searchParams;
+  const value = (input: string | string[] | undefined) => Array.isArray(input) ? input[0] : input;
+  const now = new Date();
+  const currentMonth = formatDateInTimezone(now, getDefaultMetricsTimezone()).slice(0, 7);
+  const candidateMonth = value(params?.month);
+  const month = isCalendarMonth(candidateMonth) ? candidateMonth : currentMonth;
+  const candidateDay = value(params?.day);
+  const day = isCalendarDate(candidateDay) && candidateDay.startsWith(`${month}-`) ? candidateDay : null;
+
+  try {
+    const data = await getActivityMonth(
+      getSupabaseAdminClient(),
+      month,
+      day,
+      normalizeActivityPage(value(params?.page)),
+      now,
+    );
+    return (
+      <PageShell eyebrow="Activity" title="Reading activity" description={`Session activity in ${data.timezone}.`}>
+        <ActivityView data={data} />
+      </PageShell>
+    );
+  } catch (error) {
+    return (
+      <PageShell eyebrow="Activity" title="Reading activity" description="Activity data is currently unavailable.">
+        <p className="rounded-xl border p-5 text-sm text-muted-foreground">
+          {error instanceof Error ? error.message : "Unable to load activity."}
+        </p>
+      </PageShell>
+    );
+  }
+}
