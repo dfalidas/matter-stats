@@ -40,9 +40,10 @@ SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
 MATTER_SYNC_ITEMS_LIMIT=25
 MATTER_SYNC_SESSIONS_LIMIT=25
 CRON_SECRET=generate-a-long-random-secret
+APP_TIMEZONE=Europe/London
 ```
 
-The two `MATTER_SYNC_*_LIMIT` values are optional and default to `25`; keep them at `25` unless you intentionally want smaller sync pages.
+The two `MATTER_SYNC_*_LIMIT` values are optional and default to `25`; keep them at `25` unless you intentionally want different sync pages. `APP_TIMEZONE` is optional and defaults to `Europe/London`.
 
 Security rules:
 
@@ -70,6 +71,8 @@ Open [http://localhost:3000/login](http://localhost:3000/login), enter `APP_ACCE
 
 For complete production setup instructions, see [Deployment guide: Vercel + Supabase](docs/deployment.md).
 
+For the component map, synchronization lifecycle, persistence model, and metric definitions, see [Architecture](docs/architecture.md).
+
 Short version:
 
 1. Create a Supabase project.
@@ -83,7 +86,7 @@ Short version:
 ## Scheduled sync on Vercel
 
 - The server-only endpoint `/api/cron/sync-recent-activity` runs **recent-activity sync only** (no full-library backfill).
-- The endpoint requires `CRON_SECRET` via either `Authorization: Bearer <secret>` or `?secret=<secret>`; unauthorized requests return HTTP 401.
+- The endpoint requires `CRON_SECRET` via `Authorization: Bearer <secret>`; unauthorized requests return HTTP 401.
 - Keep `CRON_SECRET` in Vercel Environment Variables (Production) and never expose it client-side.
 - Manual sync from `/dashboard` still works and remains available for on-demand imports.
 
