@@ -6,12 +6,13 @@ import { cookies } from "next/headers";
 import { ACCESS_COOKIE_NAME, isValidAccessToken } from "@/lib/auth-cookie";
 import { getMatterSyncAvailability, syncMatterData, type MatterSyncResult } from "@/lib/matter-sync";
 import { normalizeRecentActivityWindow, type MatterSyncMode } from "@/lib/matter-sync-progress";
+import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export type SyncMatterActionState = MatterSyncResult | null;
 
 export async function getMatterSyncAvailabilityAction() {
   const cookieStore = await cookies();
-  const hasAccess = await isValidAccessToken(cookieStore.get(ACCESS_COOKIE_NAME)?.value);
+  const hasAccess = await isValidAccessToken(getSupabaseAdminClient(), cookieStore.get(ACCESS_COOKIE_NAME)?.value);
 
   if (!hasAccess) {
     return { rateLimitedUntil: null, message: null };
@@ -26,7 +27,7 @@ export async function syncMatterAction(previousState: SyncMatterActionState, for
   const recentActivityWindow = normalizeRecentActivityWindow(formData?.get("recentActivityWindow"));
 
   const cookieStore = await cookies();
-  const hasAccess = await isValidAccessToken(cookieStore.get(ACCESS_COOKIE_NAME)?.value);
+  const hasAccess = await isValidAccessToken(getSupabaseAdminClient(), cookieStore.get(ACCESS_COOKIE_NAME)?.value);
 
   if (!hasAccess) {
     return {

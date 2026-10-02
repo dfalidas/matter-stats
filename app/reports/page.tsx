@@ -1,6 +1,7 @@
 import { PageShell } from "../_components/page-shell";
 import { ReportsOverview } from "./reports-overview";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { requireAccessSession } from "@/lib/require-auth";
 import { getReadingReport, REPORT_PERIODS, type ReportPeriod } from "@/lib/reports-service";
 
 const DEFAULT_REPORT_PERIOD: ReportPeriod = "weekly";
@@ -12,6 +13,7 @@ type ReportsPageProps = {
 };
 
 export default async function ReportsPage({ searchParams }: ReportsPageProps) {
+  await requireAccessSession();
   const params = await searchParams;
   const period = normalizeReportPeriod(params?.period);
   const weekStartDate = normalizeWeekStartDate(params?.weekStart);

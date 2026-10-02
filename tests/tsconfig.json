@@ -14,6 +14,7 @@
     "tsBuildInfoFile": "../.test-build/tsconfig.tsbuildinfo"
   },
   "include": [
+    "../lib/auth-cookie.ts",
     "../lib/matter-normalizers.ts",
     "../lib/matter-sync-progress.ts",
     "../lib/metrics-service.ts",

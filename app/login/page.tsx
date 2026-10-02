@@ -3,12 +3,13 @@ import { redirect } from "next/navigation";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ACCESS_COOKIE_NAME, isValidAccessToken } from "@/lib/auth-cookie";
+import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 
 import { LoginForm } from "./login-form";
 
 export default async function LoginPage() {
   const cookieStore = await cookies();
-  const hasAccess = await isValidAccessToken(cookieStore.get(ACCESS_COOKIE_NAME)?.value);
+  const hasAccess = await isValidAccessToken(getSupabaseAdminClient(), cookieStore.get(ACCESS_COOKIE_NAME)?.value);
 
   if (hasAccess) {
     redirect("/dashboard");

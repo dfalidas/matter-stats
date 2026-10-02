@@ -127,3 +127,7 @@ Rotate secrets if you think they were exposed, when someone who had access shoul
 7. Share the new password only with people who should have access.
 
 Existing browser sessions may continue until their auth cookie expires or is cleared. To force a local re-test, sign out if a sign-out control exists, clear the site cookies, or use a private browser window.
+
+## Security migration (W1–W3, 2026-09-29)
+
+Before deploying this release, follow [`security-release-runbook.md`](./security-release-runbook.md). Apply `20260929000000_harden_rls_and_auth.sql` before the application, configure `APP_CREDENTIAL_VERSION=1`, and expect existing access cookies to require a fresh login. App sessions are server-validated and revocable; cron remains separately authorized by `CRON_SECRET`. Do not use `NEXT_PUBLIC_` Supabase credentials—the browser does not access this private database.

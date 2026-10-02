@@ -1,5 +1,6 @@
 import { PageShell } from "../_components/page-shell";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { requireAccessSession } from "@/lib/require-auth";
 import { getTagRanking, normalizeTagPeriod } from "@/lib/tags-service";
 import { TagsRanking } from "./tags-ranking";
 
@@ -10,6 +11,7 @@ type TagsPageProps = {
 };
 
 export default async function TagsPage({ searchParams }: TagsPageProps) {
+  await requireAccessSession();
   const params = await searchParams;
   const period = normalizeTagPeriod(params?.period);
   const client = getSupabaseAdminClient();
