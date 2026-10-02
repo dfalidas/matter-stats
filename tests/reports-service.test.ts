@@ -1,16 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getReadingReport } from '../lib/reports-service';
+import { getReadingReport, isValidReportReference, resolveReportRange } from '../lib/reports-service';
 
 type Session={id:string;item_id:string|null;started_at:string|null;ended_at:string|null;duration_seconds:number|null;words_estimated:number|null;matter_items:null};
 class Q {
   private filters: Record<string, string | number | boolean> = {};
   private sort: {col:string;asc:boolean}|null=null;
   private lim:number|null=null;
+  private window:[number,number]|null=null;
   constructor(private table:string, private rows:Record<string, unknown>[]){}
   select(){return this;} lt(c:string,v:string){this.filters[`lt_${c}`]=v;return this;} gte(c:string,v:string){this.filters[`gte_${c}`]=v;return this;}
   gt(c:string,v:number){this.filters[`gt_${c}`]=v;return this;} not(c:string){this.filters[`not_${c}`]=true;return this;}
   order(col:string,opt:{ascending?:boolean}){this.sort={col,asc:opt.ascending??true};return this;} limit(n:number){this.lim=n;return this;}
+  range(from:number,to:number){this.window=[from,to];return this;}
   maybeSingle(){const data=this.result()[0]??null; return Promise.resolve({data,error:null});}
   in(){return this;}
   then<TResult1 = { data: unknown[]; error: null }, TResult2 = never>(
@@ -28,6 +30,7 @@ class Q {
     }
     if(this.sort){out.sort((a,b)=> this.sort!.asc?String(a[this.sort!.col]??'').localeCompare(String(b[this.sort!.col]??'')):String(b[this.sort!.col]??'').localeCompare(String(a[this.sort!.col]??'')));}
     if(this.lim!==null) out=out.slice(0,this.lim);
+    if(this.window) out=out.slice(this.window[0],this.window[1]+1);
     return out;
   }
 }
@@ -54,4 +57,30 @@ test('weekly report renders populated historical week with null item_id sessions
   assert.equal(report.metrics.range.startDate,'2026-05-04');
   assert.ok(report.metrics.totals.sessionsCount >= 0);
   assert.ok(report.timeline.length >= 0);
+});
+
+test('validates URL-persisted report references by period',()=>{
+  assert.equal(isValidReportReference('weekly','2026-02-29'),false);
+  assert.equal(isValidReportReference('weekly','2028-02-29'),true);
+  assert.equal(isValidReportReference('monthly','2026-13'),false);
+  assert.equal(isValidReportReference('monthly','2026-09'),true);
+  assert.equal(isValidReportReference('yearly','2026'),true);
+});
+
+test('resolves historical week, month, and year at Athens local boundaries',()=>{
+  const oldTimezone=process.env.APP_TIMEZONE;
+  process.env.APP_TIMEZONE='Europe/Athens';
+  try {
+    const week=resolveReportRange('weekly','2026-09-03');
+    assert.equal(week.start.toISOString(),'2026-08-30T21:00:00.000Z');
+    assert.equal(week.end.toISOString(),'2026-09-06T21:00:00.000Z');
+    const month=resolveReportRange('monthly','2026-09');
+    assert.equal(month.start.toISOString(),'2026-08-31T21:00:00.000Z');
+    assert.equal(month.end.toISOString(),'2026-09-30T21:00:00.000Z');
+    const year=resolveReportRange('yearly','2026');
+    assert.equal(year.start.toISOString(),'2025-12-31T22:00:00.000Z');
+    assert.equal(year.end.toISOString(),'2026-12-31T22:00:00.000Z');
+  } finally {
+    if(oldTimezone===undefined) delete process.env.APP_TIMEZONE; else process.env.APP_TIMEZONE=oldTimezone;
+  }
 });

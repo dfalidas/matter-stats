@@ -1,5 +1,14 @@
-import { getReadingMetrics, type MetricsPeriodPreset, type ReadingMetrics } from "./metrics-service";
+import {
+  addLocalDays,
+  formatDateInTimezone,
+  getDefaultMetricsTimezone,
+  getReadingMetrics,
+  localDateToUtc,
+  type MetricsPeriodPreset,
+  type ReadingMetrics,
+} from "./metrics-service";
 import type { MatterStatsSupabaseClient } from "./supabase-queries";
+import { estimateWordsFromSeconds } from "./reading-estimates";
 
 type ReportSessionItem = {
   id: string;
@@ -68,18 +77,13 @@ export type ReadingReport = {
 export async function getReadingReport(
   client: MatterStatsSupabaseClient,
   period: ReportPeriod,
-  options?: { weekStartDate?: string | null }
+  options?: { reference?: string | null; weekStartDate?: string | null; now?: Date }
 ): Promise<ReadingReport> {
-  const weeklyRange = period === "weekly" ? await resolveWeeklyRange(client, options?.weekStartDate) : null;
+  const requestedReference = options?.reference ?? options?.weekStartDate;
+  const selectedRange = resolveReportRange(period, requestedReference, options?.now);
+  const latestWeekWithDataStartDate = period === "weekly" ? await getLatestWeekWithDataStartDate(client) : null;
   const metrics = await getReadingMetrics(client, {
-    ...(weeklyRange
-      ? {
-          range: {
-            start: weeklyRange.start,
-            end: weeklyRange.end,
-          },
-        }
-      : { preset: REPORT_PERIOD_TO_METRICS_PRESET[period] }),
+    range: selectedRange,
     topLimit: 6,
     recentLimit: 8,
   });
@@ -90,20 +94,52 @@ export async function getReadingReport(
     metrics,
     timeline: sessions.map(mapTimelineSession),
     longformReads: buildLongformReads(sessions, 6),
-    latestWeekWithDataStartDate: weeklyRange?.latestWeekWithDataStartDate ?? null,
+    latestWeekWithDataStartDate,
   };
 }
 
-async function resolveWeeklyRange(client: MatterStatsSupabaseClient, requestedWeekStartDate?: string | null) {
-  const reference = requestedWeekStartDate ? new Date(`${requestedWeekStartDate}T00:00:00.000Z`) : new Date();
-  const start = getWeekStart(reference);
-  const end = new Date(start);
-  end.setUTCDate(end.getUTCDate() + 7);
-  return {
-    start,
-    end,
-    latestWeekWithDataStartDate: await getLatestWeekWithDataStartDate(client),
-  };
+export function resolveReportRange(period: ReportPeriod, requested?: string | null, now = new Date()) {
+  const timezone = getDefaultMetricsTimezone();
+  const today = formatDateInTimezone(now, timezone);
+  const fallback = period === "yearly" ? today.slice(0, 4) : period === "monthly" ? today.slice(0, 7) : today;
+  const reference = isValidReportReference(period, requested) ? requested : fallback;
+  const [year, month = 1, day = 1] = reference.split("-").map(Number);
+  let start: Date;
+  let end: Date;
+
+  if (period === "yearly") {
+    start = localDateToUtc(year, 1, 1, timezone);
+    end = localDateToUtc(year + 1, 1, 1, timezone);
+  } else if (period === "monthly") {
+    start = localDateToUtc(year, month, 1, timezone);
+    end = localDateToUtc(year, month + 1, 1, timezone);
+  } else if (period === "weekly") {
+    const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    start = localDateToUtc(year, month, day - ((weekday + 6) % 7), timezone);
+    end = addLocalDays(start, 7, timezone);
+  } else {
+    start = localDateToUtc(year, month, day, timezone);
+    end = addLocalDays(start, 1, timezone);
+  }
+  return { start, end };
+}
+
+export function isValidReportReference(period: ReportPeriod, value: string | null | undefined): value is string {
+  if (!value) return false;
+  if (period === "yearly") return /^\d{4}$/.test(value) && Number(value) >= 1;
+  if (period === "monthly") {
+    if (!/^\d{4}-\d{2}$/.test(value)) return false;
+    const month = Number(value.slice(5));
+    return month >= 1 && month <= 12;
+  }
+  return isRealDate(value);
+}
+
+function isRealDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
 async function getLatestWeekWithDataStartDate(client: MatterStatsSupabaseClient): Promise<string | null> {
@@ -148,25 +184,23 @@ async function fetchReportSessions(
   client: MatterStatsSupabaseClient,
   metrics: ReadingMetrics,
 ): Promise<ReportSessionRow[]> {
-  let query = client
-    .from("reading_sessions")
-    .select(
-      "id,item_id,started_at,ended_at,duration_seconds,words_estimated,matter_items(id,title,url,source,author,estimated_reading_time_minutes,word_count)",
-    )
-    .lt("started_at", metrics.range.end.toISOString())
-    .order("started_at", { ascending: true, nullsFirst: false });
-
-  if (metrics.range.start) {
-    query = query.gte("started_at", metrics.range.start.toISOString());
+  const rows: ReportSessionRow[] = [];
+  const pageSize = 500;
+  for (let from = 0; ; from += pageSize) {
+    let query = client
+      .from("reading_sessions")
+      .select("id,item_id,started_at,ended_at,duration_seconds,words_estimated,matter_items(id,title,url,source,author,estimated_reading_time_minutes,word_count)")
+      .lt("started_at", metrics.range.end.toISOString())
+      .order("started_at", { ascending: true, nullsFirst: false })
+      .order("id", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (metrics.range.start) query = query.gte("started_at", metrics.range.start.toISOString());
+    const { data, error } = await query;
+    if (error) throw error;
+    const page = (data ?? []) as unknown as ReportSessionRow[];
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
   }
-
-  const { data, error } = await query;
-
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? []) as unknown as ReportSessionRow[];
 }
 
 function buildLongformReads(sessions: ReportSessionRow[], limit: number): LongformRead[] {
@@ -179,7 +213,7 @@ function buildLongformReads(sessions: ReportSessionRow[], limit: number): Longfo
 
     if (existing) {
       existing.readingTimeSeconds += positiveInteger(session.duration_seconds);
-      existing.wordsRead += positiveInteger(session.words_estimated);
+      existing.wordsRead = estimateWordsFromSeconds(existing.readingTimeSeconds);
       existing.sessionsCount += 1;
       continue;
     }
@@ -191,7 +225,7 @@ function buildLongformReads(sessions: ReportSessionRow[], limit: number): Longfo
       source: item?.source ?? null,
       author: item?.author ?? null,
       readingTimeSeconds: positiveInteger(session.duration_seconds),
-      wordsRead: positiveInteger(session.words_estimated),
+      wordsRead: estimateWordsFromSeconds(positiveInteger(session.duration_seconds)),
       sessionsCount: 1,
       estimatedReadingTimeMinutes: item?.estimated_reading_time_minutes ?? null,
     });
@@ -221,7 +255,7 @@ function mapTimelineSession(session: ReportSessionRow): ReadingSessionTimelineIt
     startedAt: session.started_at,
     endedAt: session.ended_at,
     durationSeconds: positiveInteger(session.duration_seconds),
-    wordsRead: positiveInteger(session.words_estimated),
+    wordsRead: estimateWordsFromSeconds(positiveInteger(session.duration_seconds)),
   };
 }
 

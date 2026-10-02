@@ -38,6 +38,7 @@ class TestQuery<Row extends TestSession | TestTagRow> {
   private startedAtOrAfter: string | null = null;
   private itemIds: string[] | null = null;
   private startedAtAscending: boolean | null = null;
+  private window: [number, number] | null = null;
 
   constructor(private readonly rows: Row[]) {}
 
@@ -63,6 +64,11 @@ class TestQuery<Row extends TestSession | TestTagRow> {
     if (column === "started_at") {
       this.startedAtAscending = options.ascending ?? true;
     }
+    return this;
+  }
+
+  range(from: number, to: number) {
+    this.window = [from, to];
     return this;
   }
 
@@ -103,7 +109,7 @@ class TestQuery<Row extends TestSession | TestTagRow> {
       });
     }
 
-    return result;
+    return this.window ? result.slice(this.window[0], this.window[1] + 1) : result;
   }
 }
 
@@ -125,7 +131,7 @@ function createClient({ sessions = [], tags = [] }: { sessions?: TestSession[]; 
 
 const emptyClient = createClient({});
 
-test("defaults metrics timezone to Europe/London when APP_TIMEZONE is unset", () => {
+test("defaults metrics timezone to Europe/Athens when APP_TIMEZONE is unset", () => {
   const originalTimezone = process.env.APP_TIMEZONE;
   delete process.env.APP_TIMEZONE;
 
@@ -317,7 +323,7 @@ test("aggregates reading metrics, rankings, heatmap, recency, comparison, and st
 
   assert.deepEqual(metrics.totals, {
     totalReadingTimeSeconds: 480,
-    wordsRead: 1_500,
+    wordsRead: 1_800,
     articlesRead: 2,
     sessionsCount: 3,
     averageSessionLengthSeconds: 160,
@@ -325,39 +331,39 @@ test("aggregates reading metrics, rankings, heatmap, recency, comparison, and st
   assert.equal(metrics.currentStreakDays, 3);
   assert.equal(metrics.bestStreakDays, 3);
   assert.deepEqual(metrics.topSources, [
-    { name: "Beta", readingTimeSeconds: 300, wordsRead: 1_000, articlesRead: 1, sessionsCount: 1 },
-    { name: "Zeta", readingTimeSeconds: 180, wordsRead: 500, articlesRead: 1, sessionsCount: 2 },
+    { name: "Beta", readingTimeSeconds: 300, wordsRead: 1_125, articlesRead: 1, sessionsCount: 1 },
+    { name: "Zeta", readingTimeSeconds: 180, wordsRead: 675, articlesRead: 1, sessionsCount: 2 },
   ]);
   assert.deepEqual(metrics.topAuthors, [
-    { name: "Bob", readingTimeSeconds: 300, wordsRead: 1_000, articlesRead: 1, sessionsCount: 1 },
-    { name: "Alice", readingTimeSeconds: 180, wordsRead: 500, articlesRead: 1, sessionsCount: 2 },
+    { name: "Bob", readingTimeSeconds: 300, wordsRead: 1_125, articlesRead: 1, sessionsCount: 1 },
+    { name: "Alice", readingTimeSeconds: 180, wordsRead: 675, articlesRead: 1, sessionsCount: 2 },
   ]);
   assert.deepEqual(metrics.topTags, [
-    { name: "Tech", readingTimeSeconds: 480, wordsRead: 1_500, articlesRead: 2, sessionsCount: 3 },
-    { name: "Longform", readingTimeSeconds: 180, wordsRead: 500, articlesRead: 1, sessionsCount: 2 },
+    { name: "Tech", readingTimeSeconds: 480, wordsRead: 1_800, articlesRead: 2, sessionsCount: 3 },
+    { name: "Longform", readingTimeSeconds: 180, wordsRead: 675, articlesRead: 1, sessionsCount: 2 },
   ]);
   assert.deepEqual(metrics.recentReads.map(({ itemId, readAt, readingTimeSeconds, wordsRead }) => ({ itemId, readAt, readingTimeSeconds, wordsRead })), [
-    { itemId: "item_a", readAt: "2026-05-17T10:00:00.000Z", readingTimeSeconds: 180, wordsRead: 500 },
-    { itemId: "item_b", readAt: "2026-05-15T10:00:00.000Z", readingTimeSeconds: 300, wordsRead: 1_000 },
+    { itemId: "item_a", readAt: "2026-05-17T10:00:00.000Z", readingTimeSeconds: 180, wordsRead: 675 },
+    { itemId: "item_b", readAt: "2026-05-15T10:00:00.000Z", readingTimeSeconds: 300, wordsRead: 1_125 },
   ]);
   assert.deepEqual(
     metrics.heatmap.filter((day) => day.readingTimeSeconds > 0),
     [
-      { date: "2026-05-15", readingTimeSeconds: 300, wordsRead: 1_000, articlesRead: 1, sessionsCount: 1 },
-      { date: "2026-05-16", readingTimeSeconds: 60, wordsRead: 0, articlesRead: 1, sessionsCount: 1 },
-      { date: "2026-05-17", readingTimeSeconds: 120, wordsRead: 500, articlesRead: 1, sessionsCount: 1 },
+      { date: "2026-05-15", readingTimeSeconds: 300, wordsRead: 1_125, articlesRead: 1, sessionsCount: 1 },
+      { date: "2026-05-16", readingTimeSeconds: 60, wordsRead: 225, articlesRead: 1, sessionsCount: 1 },
+      { date: "2026-05-17", readingTimeSeconds: 120, wordsRead: 450, articlesRead: 1, sessionsCount: 1 },
     ]
   );
   assert.deepEqual(metrics.comparison.totals, {
     totalReadingTimeSeconds: 240,
-    wordsRead: 600,
+    wordsRead: 900,
     articlesRead: 1,
     sessionsCount: 1,
     averageSessionLengthSeconds: 240,
   });
   assert.equal(metrics.comparison.delta.totalReadingTimeSeconds, 240);
   assert.equal(metrics.comparison.delta.totalReadingTimePercentChange, 1);
-  assert.equal(metrics.comparison.delta.wordsReadPercentChange, 1.5);
+  assert.equal(metrics.comparison.delta.wordsReadPercentChange, 1);
 });
 
 test("ignores empty and non-positive session fields when building critical metrics", async () => {

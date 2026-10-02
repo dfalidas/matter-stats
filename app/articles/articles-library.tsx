@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, CalendarDays, Clock, FileText, Highlighter, Search, Tags } from "lucide-react";
@@ -11,19 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { ArticleListResult } from "@/lib/articles-service";
-import { METRICS_PERIOD_PRESETS, type MetricsPeriodPreset } from "@/lib/metrics-service";
 import { cn } from "@/lib/utils";
 
 type ArticlesLibraryProps = {
   result: ArticleListResult;
-};
-
-const periodLabels: Record<MetricsPeriodPreset, string> = {
-  today: "Today",
-  week: "This week",
-  month: "This month",
-  year: "This year",
-  "all-time": "All time",
 };
 
 export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
@@ -32,6 +23,14 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [query, setQuery] = useState(result.filters.query);
+  const [author, setAuthor] = useState(result.filters.author);
+  const [contentType, setContentType] = useState(result.filters.contentType);
+
+  useEffect(() => {
+    setQuery(result.filters.query);
+    setAuthor(result.filters.author);
+    setContentType(result.filters.contentType);
+  }, [result.filters.query, result.filters.author, result.filters.contentType]);
   const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize));
   const activeSource = result.sources.find((source) => source.value === result.filters.source)?.label;
   const activeTag = result.tags.find((tag) => tag.value === result.filters.tag)?.label;
@@ -88,10 +87,7 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
           <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-2xl font-semibold tracking-tight">Articles</CardTitle>
-                <Badge variant="secondary" className="rounded-full">
-                  {periodLabels[result.filters.period]}
-                </Badge>
+                <CardTitle className="text-2xl font-semibold tracking-tight">Library items</CardTitle>
                 {activeSource ? <Badge className="rounded-full">{activeSource}</Badge> : null}
                 {activeTag ? <Badge className="rounded-full">#{activeTag}</Badge> : null}
               </div>
@@ -100,20 +96,6 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2" aria-label="Filter articles by period">
-              {METRICS_PERIOD_PRESETS.map((period) => (
-                <Button
-                  key={period}
-                  type="button"
-                  variant={period === result.filters.period ? "default" : "outline"}
-                  size="sm"
-                  disabled={isPending}
-                  onClick={() => updateParam("period", period)}
-                >
-                  {periodLabels[period]}
-                </Button>
-              ))}
-            </div>
           </div>
 
           <div className="grid gap-3 xl:grid-cols-[minmax(260px,0.8fr)_minmax(0,1fr)]">
@@ -132,6 +114,8 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
             </form>
 
             <div className="grid gap-2 md:grid-cols-2">
+              <FilterSelect label="Status" value={result.filters.status} disabled={isPending} onChange={(v)=>updateParam("status",v)} options={[{value:"inbox",label:"Inbox"},{value:"queue",label:"Queue"},{value:"archive",label:"Archive"}]} />
+              <FilterSelect label="Article size" value={result.filters.size} disabled={isPending} onChange={(v)=>updateParam("size",v)} options={[{value:"short",label:"Short · <1,500 words"},{value:"medium",label:"Medium · 1,500–3,999"},{value:"long",label:"Long · 4,000+ words"}]} />
               <FilterSelect
                 label="Source"
                 value={result.filters.source}
@@ -149,6 +133,17 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
                 onChange={(value) => updateParam("tag", value)}
                 options={result.tags.map((tag) => ({ value: tag.value, label: tag.label }))}
               />
+              <label className="grid gap-1.5 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Author
+                <Input value={author} placeholder="All authors" onChange={(event) => setAuthor(event.target.value)} onBlur={() => updateParam("author", author.trim())} />
+              </label>
+              <label className="grid gap-1.5 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Content type
+                <Input value={contentType} placeholder="All types" onChange={(event) => setContentType(event.target.value)} onBlur={() => updateParam("type", contentType.trim())} />
+              </label>
+              <Button type="button" variant="outline" onClick={() => { setQuery(""); setAuthor(""); setContentType(""); startTransition(() => router.push(pathname as Route)); }}>
+                Clear all filters
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -164,7 +159,24 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
             />
           ) : (
             <>
-              <Table>
+              <div className="space-y-3 md:hidden">
+                {result.articles.map((article) => (
+                  <button key={article.id} onClick={() => openArticle(article.id)} className="min-h-11 w-full rounded-xl border bg-card p-4 text-left">
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="font-medium leading-6">{article.title ?? "Untitled article"}</h3>
+                      <Badge variant="secondary" className="shrink-0 capitalize">{article.status ?? "Unknown"}</Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">{article.source ?? "Source unknown"}{article.author ? ` · ${article.author}` : ""}</p>
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      {article.word_count == null ? "Article size unknown" : `≈${formatInteger(article.word_count)} words`}
+                      {article.estimated_reading_time_minutes == null ? "" : ` · ≈${formatMinutes(article.estimated_reading_time_minutes)}`}
+                    </p>
+                    {article.progress != null && <div className="mt-3"><div className="h-1.5 rounded-full bg-muted"><span className="block h-full rounded-full bg-primary" style={{ width: `${Math.min(100, Math.max(0, article.progress * 100))}%` }} /></div><p className="mt-1 text-xs text-muted-foreground">{Math.round(article.progress * 100)}% current progress</p></div>}
+                    {article.tags.length > 0 && <div className="mt-3 flex flex-wrap gap-1">{article.tags.slice(0, 3).map((tag) => <Badge key={tag.id} variant="outline">{tag.name}</Badge>)}</div>}
+                  </button>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto md:block"><Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="min-w-[280px]">Title</TableHead>
@@ -219,8 +231,8 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
                           {formatDate(article.created_at_matter ?? article.updated_at_matter)}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{formatMinutes(article.estimated_reading_time_minutes ?? 0)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatInteger(article.word_count ?? 0)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{article.estimated_reading_time_minutes == null ? "—" : formatMinutes(article.estimated_reading_time_minutes)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{article.word_count == null ? "—" : formatInteger(article.word_count)}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatInteger(article.highlights)}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" className="rounded-full capitalize">{article.status ?? "Unknown"}</Badge>
@@ -228,7 +240,7 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              </Table></div>
 
               <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
                 <span>

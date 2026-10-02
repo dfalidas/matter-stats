@@ -1,6 +1,8 @@
 import type { MatterStatsSupabaseClient } from "@/lib/supabase-queries";
 
-export const DEFAULT_APP_TIMEZONE = "Europe/London";
+import { estimateWordsFromSeconds } from "./reading-estimates";
+
+export const DEFAULT_APP_TIMEZONE = "Europe/Athens";
 
 export const METRICS_PERIOD_PRESETS = ["today", "week", "month", "year", "all-time"] as const;
 
@@ -335,18 +337,18 @@ function getTimezoneOffsetMs(date: Date, timezone: string): number {
   return utcFromLocalParts - date.getTime();
 }
 
-function localDateToUtc(year: number, month: number, day: number, timezone: string): Date {
+export function localDateToUtc(year: number, month: number, day: number, timezone: string): Date {
   const utcGuess = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
   const firstPass = new Date(utcGuess.getTime() - getTimezoneOffsetMs(utcGuess, timezone));
   return new Date(utcGuess.getTime() - getTimezoneOffsetMs(firstPass, timezone));
 }
 
-function formatDateInTimezone(date: Date, timezone: string): string {
+export function formatDateInTimezone(date: Date, timezone: string): string {
   const { year, month, day } = getLocalDateParts(date, timezone);
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-function addLocalDays(date: Date, days: number, timezone: string): Date {
+export function addLocalDays(date: Date, days: number, timezone: string): Date {
   const local = getLocalDateParts(date, timezone);
   return localDateToUtc(local.year, local.month, local.day + days, timezone);
 }
@@ -369,37 +371,39 @@ function differenceInLocalDays(start: Date, end: Date, timezone: string): number
 }
 
 async function fetchSessionsForRange(client: MatterStatsSupabaseClient, range: MetricsDateRange): Promise<MetricsSession[]> {
-  let query = client
-    .from("reading_sessions")
-    .select("id,item_id,started_at,ended_at,duration_seconds,words_estimated,matter_items(id,title,url,source,author)")
-    .lt("started_at", range.end.toISOString())
-    .order("started_at", { ascending: false, nullsFirst: false });
-
-  if (range.start) {
-    query = query.gte("started_at", range.start.toISOString());
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? []) as unknown as MetricsSession[];
+  return fetchAllSessions(client, range.start, range.end);
 }
 
 async function fetchSessionsForStreaks(client: MatterStatsSupabaseClient, end: Date): Promise<MetricsSession[]> {
-  const { data, error } = await client
-    .from("reading_sessions")
-    .select("id,item_id,started_at,ended_at,duration_seconds,words_estimated")
-    .lt("started_at", end.toISOString())
-    .order("started_at", { ascending: true, nullsFirst: false });
+  return fetchAllSessions(client, null, end);
+}
 
-  if (error) {
-    throw error;
+const DATABASE_PAGE_SIZE = 500;
+
+/** Fetch every row in a stable order; PostgREST otherwise caps aggregate inputs. */
+async function fetchAllSessions(
+  client: MatterStatsSupabaseClient,
+  start: Date | null,
+  end: Date,
+): Promise<MetricsSession[]> {
+  const rows: MetricsSession[] = [];
+
+  for (let from = 0; ; from += DATABASE_PAGE_SIZE) {
+    let query = client
+      .from("reading_sessions")
+      .select("id,item_id,started_at,ended_at,duration_seconds,words_estimated,matter_items(id,title,url,source,author)")
+      .lt("started_at", end.toISOString())
+      .order("started_at", { ascending: true, nullsFirst: false })
+      .order("id", { ascending: true })
+      .range(from, from + DATABASE_PAGE_SIZE - 1);
+
+    if (start) query = query.gte("started_at", start.toISOString());
+    const { data, error } = await query;
+    if (error) throw error;
+    const page = (data ?? []) as unknown as MetricsSession[];
+    rows.push(...page);
+    if (page.length < DATABASE_PAGE_SIZE) return rows;
   }
-
-  return (data ?? []) as unknown as MetricsSession[];
 }
 
 async function fetchTagsByItemId(client: MatterStatsSupabaseClient, itemIds: string[]): Promise<Map<string, string[]>> {
@@ -429,7 +433,7 @@ async function fetchTagsByItemId(client: MatterStatsSupabaseClient, itemIds: str
 
 function summarizeSessions(sessions: MetricsSession[]): MetricTotals {
   const totalReadingTimeSeconds = sessions.reduce((total, session) => total + positiveInteger(session.duration_seconds), 0);
-  const wordsRead = sessions.reduce((total, session) => total + positiveInteger(session.words_estimated), 0);
+  const wordsRead = estimateWordsFromSeconds(totalReadingTimeSeconds);
   const articlesRead = new Set(sessions.map((session) => session.item_id).filter(isNonEmptyString)).size;
   const sessionsCount = sessions.length;
 
@@ -489,7 +493,7 @@ function addToBucket(buckets: Map<string, MetricsAccumulator>, name: string, ses
   };
 
   existing.readingTimeSeconds += positiveInteger(session.duration_seconds);
-  existing.wordsRead += positiveInteger(session.words_estimated);
+  existing.wordsRead = estimateWordsFromSeconds(existing.readingTimeSeconds);
   if (isNonEmptyString(session.item_id)) {
     existing.itemIds.add(session.item_id);
   }
@@ -524,7 +528,7 @@ function buildRecentReads(sessions: MetricsSession[], limit: number): RecentRead
 
     if (existing) {
       existing.readingTimeSeconds += positiveInteger(session.duration_seconds);
-      existing.wordsRead += positiveInteger(session.words_estimated);
+      existing.wordsRead = estimateWordsFromSeconds(existing.readingTimeSeconds);
       if (readAt && (!existing.readAt || readAt > existing.readAt)) {
         existing.readAt = readAt;
       }
@@ -539,7 +543,7 @@ function buildRecentReads(sessions: MetricsSession[], limit: number): RecentRead
       author: item?.author ?? null,
       readAt,
       readingTimeSeconds: positiveInteger(session.duration_seconds),
-      wordsRead: positiveInteger(session.words_estimated),
+      wordsRead: estimateWordsFromSeconds(positiveInteger(session.duration_seconds)),
     });
   }
 

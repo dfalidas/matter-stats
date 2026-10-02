@@ -36,10 +36,10 @@ test("R7 characterization: item word_count×progress is currently copied to ever
 });
 test.todo("R7 target (W5): three 60-second sessions estimate 675 words at 225 WPM, not 3,000 item words");
 
-test("R8 characterization: the current default timezone remains Europe/London", () => {
+test("R8: the default timezone is Europe/Athens", () => {
   const previous = process.env.APP_TIMEZONE;
   delete process.env.APP_TIMEZONE;
-  assert.equal(getDefaultMetricsTimezone(), "Europe/London");
+  assert.equal(getDefaultMetricsTimezone(), "Europe/Athens");
   if (previous === undefined) delete process.env.APP_TIMEZONE; else process.env.APP_TIMEZONE = previous;
 });
 test.todo("R8 target (W5): Athens midnight, Monday boundary, DST and year boundary bucket identically in every metric/rollup");

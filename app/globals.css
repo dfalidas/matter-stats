@@ -3,72 +3,11 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    color-scheme: dark;
-    --background: 220 16% 6%;
-    --foreground: 210 24% 96%;
-    --card: 220 14% 9%;
-    --card-foreground: 210 24% 96%;
-    --dashboard-background: 220 16% 6%;
-    --dashboard-card: 220 14% 10%;
-    --dashboard-border: 220 10% 18%;
-    --dashboard-text: 210 24% 96%;
-    --dashboard-muted: 215 11% 68%;
-    --accent-red: 5 94% 66%;
-    --accent-violet: 262 83% 70%;
-    --accent-blue: 199 89% 64%;
-    --success: 149 63% 48%;
-    --warning: 38 92% 58%;
-    --popover: 220 14% 8%;
-    --popover-foreground: 210 24% 96%;
-    --primary: 5 94% 66%;
-    --primary-foreground: 220 22% 7%;
-    --secondary: 220 10% 15%;
-    --secondary-foreground: 210 24% 96%;
-    --muted: 220 10% 15%;
-    --muted-foreground: 215 11% 68%;
-    --accent: 220 10% 18%;
-    --accent-foreground: 210 24% 96%;
-    --destructive: 0 72.2% 50.6%;
-    --destructive-foreground: 210 24% 96%;
-    --chart-1: var(--accent-red);
-    --chart-2: var(--accent-violet);
-    --chart-3: var(--accent-blue);
-    --chart-4: var(--success);
-    --chart-5: var(--warning);
-    --border: 220 10% 18%;
-    --input: 220 10% 18%;
-    --ring: 5 94% 66%;
-    --radius: 1rem;
-  }
-
-  .dark {
-    color-scheme: dark;
-  }
-
-  * {
-    @apply border-border;
-    box-sizing: border-box;
-  }
-
-  html {
-    min-height: 100%;
-    background: hsl(var(--background));
-  }
-
-  body {
-    min-height: 100vh;
-    margin: 0;
-    background:
-      radial-gradient(circle at top left, hsl(var(--accent-red) / 0.18), transparent 30rem),
-      radial-gradient(circle at 80% 0%, hsl(var(--accent-violet) / 0.12), transparent 34rem),
-      linear-gradient(135deg, hsl(var(--dashboard-card) / 0.96), hsl(var(--dashboard-background) / 0.98) 48%, rgb(16 17 20 / 0.96)),
-      hsl(var(--dashboard-background));
-    color: hsl(var(--foreground));
-  }
-
-  a {
-    color: inherit;
-    text-decoration: none;
-  }
+  :root { color-scheme: light; --background: 60 18% 97%; --foreground: 150 5% 13%; --card: 0 0% 100%; --card-foreground: 150 5% 13%; --popover: 0 0% 100%; --popover-foreground: 150 5% 13%; --primary: 212 32% 42%; --primary-foreground: 0 0% 100%; --secondary: 60 10% 93%; --secondary-foreground: 150 5% 13%; --muted: 60 10% 93%; --muted-foreground: 150 4% 39%; --accent: 212 24% 91%; --accent-foreground: 212 40% 30%; --destructive: 0 65% 45%; --destructive-foreground: 0 0% 100%; --border: 60 7% 85%; --input: 60 7% 80%; --ring: 212 32% 42%; --radius: .75rem; --dashboard-background: 60 18% 97%; --dashboard-card: 0 0% 100%; --dashboard-border: 60 7% 85%; --dashboard-text: 150 5% 13%; --dashboard-muted: 150 4% 39%; --accent-red: 212 32% 42%; --accent-violet: 212 32% 42%; --accent-blue: 212 32% 42%; --success: 150 35% 35%; --warning: 35 70% 40%; }
+  .dark { color-scheme: dark; --background: 150 7% 9%; --foreground: 60 13% 92%; --card: 150 6% 12%; --card-foreground: 60 13% 92%; --popover: 150 6% 12%; --popover-foreground: 60 13% 92%; --primary: 211 39% 65%; --primary-foreground: 150 8% 10%; --secondary: 150 5% 17%; --secondary-foreground: 60 13% 92%; --muted: 150 5% 17%; --muted-foreground: 60 5% 65%; --accent: 211 20% 22%; --accent-foreground: 211 45% 78%; --border: 150 4% 22%; --input: 150 4% 25%; --ring: 211 39% 65%; --dashboard-background: 150 7% 9%; --dashboard-card: 150 6% 12%; --dashboard-border: 150 4% 22%; --dashboard-text: 60 13% 92%; --dashboard-muted: 60 5% 65%; }
+  * { @apply border-border; box-sizing: border-box; }
+  html, body { min-height: 100%; background: hsl(var(--background)); }
+  body { margin: 0; color: hsl(var(--foreground)); }
+  a { color: inherit; text-decoration: none; }
+  button, a, input, select { @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2; }
 }
