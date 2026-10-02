@@ -2,6 +2,47 @@
 
 ## W2 dependency baseline update (2026-10-02)
 
+### Follow-up correction for PR #55
+
+**Status: blocked; the security patch has not been installed.** The reviewed PR
+head supplied for this follow-up is
+`fa94401b594cf33c547ff81ab16c40364a6dcb90`. This checkout contains only the
+previous dependency commit (`11830209d39190db6e832932856132d6a18e0e78`), and
+fetching `pull/55/head` and `main` from GitHub failed with `CONNECT tunnel
+failed, response 403`. The latest remote PR head therefore could not be
+inspected or reconciled in this environment.
+
+The September 30, 2026 Next.js security release supplied for this review
+recommends Next.js **15.5.27** for the supported 15.x line. The supplied
+[GHSA-m99w-x7hq-7vfj](https://github.com/vercel/next.js/security/advisories/GHSA-m99w-x7hq-7vfj)
+range includes the currently locked 15.5.18 and begins its fix at 15.5.21. This
+is a runtime-applicable denial of service because this repository uses the App
+Router and Server Actions. Raising only a manifest floor or React version does
+not remediate it. The earlier text below records the first attempt as
+historical evidence; it must not be interpreted as a completed security patch.
+
+The required 15.5.27 packages are not in the local npm cache. `npm view
+next@15.5.27` and registry-backed installation both fail with HTTP 403, while
+`npm view next@15.5.27 --offline` fails with `ENOTCACHED`. The same constraint
+applies to `eslint-config-next`. Consequently the lockfile cannot be
+regenerated through npm and its registry-issued integrity values cannot be
+verified. In accordance with the no-fabrication requirement, this attempt does
+not edit the dependency manifest or manually construct lockfile entries. The
+actual resolved graph remains vulnerable Next.js 15.5.18; W2 is not complete.
+
+| Package and dependency path | Before → after locked version | Advisory and official source | Affected range / patched version | Applicability | Resolution or remaining gap |
+| --- | --- | --- | --- | --- | --- |
+| `next` (root runtime dependency) | 15.5.18 → 15.5.18 (required target: 15.5.27) | [September 2026 Next.js security release](https://nextjs.org/blog/september-2026-security-release); [GHSA-m99w-x7hq-7vfj](https://github.com/vercel/next.js/security/advisories/GHSA-m99w-x7hq-7vfj) | Supplied advisory evidence: 15.5.18 affected; fix starts at 15.5.21; maintainer recommendation 15.5.27 | **Applicable runtime high-severity issue:** App Router and Server Actions are used. | **Unresolved.** Registry/package retrieval is blocked, so 15.5.27 could not be installed. |
+| `eslint-config-next` (root development dependency) | 15.5.18 → 15.5.18 (required target: 15.5.27) | [September 2026 Next.js security release](https://nextjs.org/blog/september-2026-security-release) | Align with the selected Next.js 15.5.27 release. | Development/build tooling. | **Unresolved.** Must be updated with `next` after registry access is restored. |
+| `react`, `react-dom` (root runtime dependencies and Next.js peers) | 19.2.6 → 19.2.6 | Next.js 15.5.27 package peer metadata and current React security notices must be checked during install. | No change justified by the evidence available in this blocked attempt. | Runtime/build; React Server Components are mediated by Next.js. | Installed pair remains aligned, but compatibility with the target and subsequent advisories could not be revalidated. |
+| Remaining transitive graph (`sharp`, both `postcss` paths, `nanoid`, `js-yaml`, both `brace-expansion` paths, and `postcss-selector-parser`) | unchanged | npm bulk advisory service | Current affected ranges and patched releases unavailable. | Runtime, build, or development as classified in the historical matrix below. | Both audits returned HTTP 403 transport errors rather than findings; no zero-findings claim is made. |
+
+The follow-up `npm audit --json` and `npm audit --omit=dev --json` each exited
+1 because `POST https://registry.npmjs.org/-/npm/v1/security/advisories/bulk`
+returned HTTP 403. A maintainer must rerun the package update and both audits
+on an authorized network, then run the full application gate suite before this
+draft can be represented as security-complete.
+
 **Status: draft / externally blocked.** The reviewed Git base is
 `b6a605d0c50bff847bf5f864ea1c7e71038d05f6`, which is the supplied PR #54
 merge commit. A fetch of `origin/main` failed with `CONNECT tunnel failed,
