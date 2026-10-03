@@ -2,115 +2,19 @@
 
 ## W2 dependency baseline update (2026-10-02)
 
-### Follow-up correction for PR #55
+### Follow-up completion for PR #55 (2026-10-03)
 
-**Status: blocked; the security patch has not been installed.** The reviewed PR
-head supplied for this follow-up is
-`fa94401b594cf33c547ff81ab16c40364a6dcb90`. This checkout contains only the
-previous dependency commit (`11830209d39190db6e832932856132d6a18e0e78`), and
-fetching `pull/55/head` and `main` from GitHub failed with `CONNECT tunnel
-failed, response 403`. The latest remote PR head therefore could not be
-inspected or reconciled in this environment.
+**Status: the requested Next.js patch is installed.** Registry access and the
+npm audit endpoint both responded without HTTP 403. The manifest now requests
+Next.js and `eslint-config-next` 15.5.27, and npm regenerated the lockfile with
+15.5.27 for Next.js, its platform packages, and the matching ESLint plugin.
 
-The September 30, 2026 Next.js security release supplied for this review
-recommends Next.js **15.5.27** for the supported 15.x line. The supplied
-[GHSA-m99w-x7hq-7vfj](https://github.com/vercel/next.js/security/advisories/GHSA-m99w-x7hq-7vfj)
-range includes the currently locked 15.5.18 and begins its fix at 15.5.21. This
-is a runtime-applicable denial of service because this repository uses the App
-Router and Server Actions. Raising only a manifest floor or React version does
-not remediate it. The earlier text below records the first attempt as
-historical evidence; it must not be interpreted as a completed security patch.
-
-The required 15.5.27 packages are not in the local npm cache. `npm view
-next@15.5.27` and registry-backed installation both fail with HTTP 403, while
-`npm view next@15.5.27 --offline` fails with `ENOTCACHED`. The same constraint
-applies to `eslint-config-next`. Consequently the lockfile cannot be
-regenerated through npm and its registry-issued integrity values cannot be
-verified. In accordance with the no-fabrication requirement, this attempt does
-not edit the dependency manifest or manually construct lockfile entries. The
-actual resolved graph remains vulnerable Next.js 15.5.18; W2 is not complete.
-
-| Package and dependency path | Before → after locked version | Advisory and official source | Affected range / patched version | Applicability | Resolution or remaining gap |
-| --- | --- | --- | --- | --- | --- |
-| `next` (root runtime dependency) | 15.5.18 → 15.5.18 (required target: 15.5.27) | [September 2026 Next.js security release](https://nextjs.org/blog/september-2026-security-release); [GHSA-m99w-x7hq-7vfj](https://github.com/vercel/next.js/security/advisories/GHSA-m99w-x7hq-7vfj) | Supplied advisory evidence: 15.5.18 affected; fix starts at 15.5.21; maintainer recommendation 15.5.27 | **Applicable runtime high-severity issue:** App Router and Server Actions are used. | **Unresolved.** Registry/package retrieval is blocked, so 15.5.27 could not be installed. |
-| `eslint-config-next` (root development dependency) | 15.5.18 → 15.5.18 (required target: 15.5.27) | [September 2026 Next.js security release](https://nextjs.org/blog/september-2026-security-release) | Align with the selected Next.js 15.5.27 release. | Development/build tooling. | **Unresolved.** Must be updated with `next` after registry access is restored. |
-| `react`, `react-dom` (root runtime dependencies and Next.js peers) | 19.2.6 → 19.2.6 | Next.js 15.5.27 package peer metadata and current React security notices must be checked during install. | No change justified by the evidence available in this blocked attempt. | Runtime/build; React Server Components are mediated by Next.js. | Installed pair remains aligned, but compatibility with the target and subsequent advisories could not be revalidated. |
-| Remaining transitive graph (`sharp`, both `postcss` paths, `nanoid`, `js-yaml`, both `brace-expansion` paths, and `postcss-selector-parser`) | unchanged | npm bulk advisory service | Current affected ranges and patched releases unavailable. | Runtime, build, or development as classified in the historical matrix below. | Both audits returned HTTP 403 transport errors rather than findings; no zero-findings claim is made. |
-
-The follow-up `npm audit --json` and `npm audit --omit=dev --json` each exited
-1 because `POST https://registry.npmjs.org/-/npm/v1/security/advisories/bulk`
-returned HTTP 403. A maintainer must rerun the package update and both audits
-on an authorized network, then run the full application gate suite before this
-draft can be represented as security-complete.
-
-**Status: draft / externally blocked.** The reviewed Git base is
-`b6a605d0c50bff847bf5f864ea1c7e71038d05f6`, which is the supplied PR #54
-merge commit. A fetch of `origin/main` failed with `CONNECT tunnel failed,
-response 403`, so the environment could not prove that this commit was still
-the latest remote `main`.
-
-The pre-change lock already resolved Next.js and `eslint-config-next` to
-15.5.18 and React/React DOM to 19.2.6, but the manifest still admitted Next.js
-15.3.2 and React 19.0.0. The dependency patch raises those four semver floors
-to their reviewed locked versions. It intentionally does not introduce
-overrides or refresh unrelated packages; the locked dependency graph is
-unchanged.
-
-Both baseline audit commands were run after a successful `npm ci`. On this
-network, `npm audit --json` and `npm audit --omit=dev --json` each exited 1
-because the npm bulk-advisory endpoint returned HTTP 403. Their JSON bodies
-contained the transport error rather than vulnerability metadata, so these
-are unavailable checks, **not zero-finding audits**. The official-guidance web
-lookup also returned HTTP 401, and direct npm registry metadata requests
-returned HTTP 403. Accordingly, the versions below are locally installed and
-compatible but cannot be represented as a current, externally verified safe
-set from this environment. W2 remains blocked until a reviewer reruns the
-official-source and live-audit gates from an authorized network.
-
-### Advisory matrix
-
-| Package and locked dependency path | Before → after locked version | Advisory and official source | Affected range / patched version | Applicability | Resolution or verification gap |
-| --- | --- | --- | --- | --- | --- |
-| `next` (root runtime dependency) | 15.5.18 → 15.5.18; manifest floor 15.3.2 → 15.5.18 | React Server Components advisory family: [React CVE-2025-55182 notice](https://react.dev/blog/2025/12/03/critical-security-vulnerability-in-react-server-components), [React follow-up](https://react.dev/blog/2025/12/11/denial-of-service-and-source-code-exposure-in-react-server-components), and [Next.js guidance](https://nextjs.org/blog/security-update-2025-12-11) | The installed 15.5.18 is newer than the 15.5.x fixes named by those notices; current affected ranges and any later advisories could not be revalidated because official lookups were blocked. | Runtime and build; this App Router application uses React Server Components. | The manifest can no longer resolve the known-vulnerable 15.3.2 floor. Current completeness remains an external verification gap. |
-| `eslint-config-next` (root development dependency) | 15.5.18 → 15.5.18; manifest floor 15.3.2 → 15.5.18 | [Next.js guidance](https://nextjs.org/blog/security-update-2025-12-11) | Kept on exactly the same 15.5.x release line as `next`; registry metadata was unavailable. | Build/development only. | Aligned with Next.js; current registry/advisory verification remains blocked. |
-| `react`, `react-dom` (root runtime dependencies and Next.js peers) | 19.2.6 → 19.2.6; manifest floor 19.0.0 → 19.2.6 | [CVE-2025-55182](https://react.dev/blog/2025/12/03/critical-security-vulnerability-in-react-server-components) and the [CVE-2025-55183/CVE-2025-55184/CVE-2025-67779 follow-up](https://react.dev/blog/2025/12/11/denial-of-service-and-source-code-exposure-in-react-server-components) | The notices patched the 19.2 line progressively through 19.2.3; the installed 19.2.6 is newer. Later guidance could not be checked. | Runtime and build; RSC advisories are applicable to the framework stack even though the vulnerable protocol is mediated by Next.js. | Raised both peer floors together and retained the tested lock. Current completeness remains an external verification gap. |
-| `sharp` via `next` | 0.34.5 → 0.34.5 | Live npm advisory record unavailable (HTTP 403). | Could not revalidate an affected range or patched version. | Optional runtime image processing dependency; potentially applicable when Next image optimization loads it. | No override: the parent already locks 0.34.5. A live audit and registry/advisory review are still required. |
-| `postcss` via `next`; root `postcss` | 8.4.31 / 8.5.14 → unchanged | Live npm advisory record unavailable (HTTP 403). | Could not revalidate an affected range or patched version. | Next's copy participates in build/runtime CSS handling; the root copy is development/build tooling. | No lock change or override without current evidence; recheck both paths externally. |
-| `nanoid` via both `postcss` paths | 3.3.12 → 3.3.12 | Live npm advisory record unavailable (HTTP 403). | Could not revalidate an affected range or patched version. | Transitive build dependency. | No lock change or override without current evidence; recheck externally. |
-| `js-yaml` via `@eslint/eslintrc` | 4.1.1 → 4.1.1 | Live npm advisory record unavailable (HTTP 403). | Could not revalidate an affected range or patched version. | Development lint configuration only; not shipped by the application. | No lock change or override without current evidence; recheck externally. |
-| `brace-expansion` via `@eslint/eslintrc > minimatch` and `eslint-config-next > @typescript-eslint > minimatch` | 1.1.14 / 5.0.6 → unchanged | Live npm advisory record unavailable (HTTP 403). | Could not revalidate an affected range or patched version. | Development lint tooling only; not shipped by the application. | No lock change or override without current evidence; recheck both versions externally. |
-| `postcss-selector-parser` via `tailwindcss` | 6.1.2 → 6.1.2 | Live npm advisory record unavailable (HTTP 403). | Could not revalidate an affected range or patched version. | Development/build CSS tooling only. | No lock change or override without current evidence; recheck externally. |
-
-To close the external gate, fetch the latest `main`, consult the linked
-maintainer notices plus the current Next.js and React security listings, run
-`npm view` for the selected releases, and rerun both required online audit
-commands. Record every resulting advisory and dependency path. If a current
-critical/high issue has no supported Next.js 15.x resolution, stop and request
-a separate Next.js 16 decision rather than extending this patch.
-
-Rollback for this dependency-only patch is to revert its commit, restoring the
-previous four manifest ranges and previous lockfile. There are no runtime code,
-migration, environment, or data changes.
-
-### Local verification results
-
-- `npm ci`: exit 0 (504 packages installed from the exact lockfile).
-- `npm audit --json`: exit 1; unavailable because the advisory endpoint
-  returned HTTP 403, with no vulnerability counts.
-- `npm audit --omit=dev --json`: exit 1; the same HTTP 403 transport failure,
-  with no vulnerability counts.
-- `npm run typecheck`: exit 0.
-- `npm run lint`: exit 0.
-- `npm run test`: exit 0; 105 total, 98 passed, 0 failed, 0 cancelled,
-  0 skipped, and 7 pre-existing stabilization TODO tests. The authentication,
-  server-action support code, and cron authorization/sync behavior remain
-  covered by mocked deterministic tests; no production service was contacted.
-- `npm run build`: exit 0 with Next.js 15.5.18.
-- `git diff --check`: exit 0.
-
-Because the audits and current official-source review are unavailable, and
-because the repository's seven explicitly deferred stabilization tests remain
-TODO, this record does not label either category as a passed release gate.
+`npm ci`, typecheck, lint, tests, and the production build completed
+successfully. `npm audit` also reached the advisory service successfully, but
+exited 1 because it reported 15 remaining transitive findings (1 low,
+1 moderate, and 13 high). Those findings affect `brace-expansion`, `braces`,
+`js-yaml`, `nanoid`, `postcss`, `postcss-selector-parser`, and `sharp`; they are
+not an HTTP transport failure and are outside this targeted version alignment.
 
 ## Dependency note (2026-09-29)
 
