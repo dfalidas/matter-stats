@@ -91,7 +91,50 @@ processing with static, repository-controlled patterns. Re-run both audits when
 ## Pre-deploy on an isolated Supabase project
 
 1. Prepare both migration paths. For a fresh environment, apply the full migration chain in timestamp order. For an upgrade environment, restore/synthesize the previous schema and apply every outstanding migration in timestamp order. In both cases the required release sequence is `20260929000000_harden_rls_and_auth.sql`, then `20260929010000_atomic_login_limiter.sql`, then application deployment.
-2. Confirm both 20260929 migrations are present before running an integration test that calls `public.record_app_login_attempt`. Set only `STABILIZATION_TEST_SUPABASE_URL`, `STABILIZATION_TEST_SUPABASE_ANON_KEY`, `STABILIZATION_TEST_SUPABASE_SERVICE_ROLE_KEY`, and `DISPOSABLE_DB_ACK=yes`, then run `npm run test:security-db`. It attempts SELECT/INSERT/UPDATE/DELETE on every inventoried table with real `anon` and `authenticated` clients, verifies service-role reads, rejects the limiter RPC for browser roles, and sends 20 concurrent RPCs that must admit/store exactly five.
+2. Confirm both 20260929 migrations are present before running an integration test that calls `public.record_app_login_attempt`. Set only `STABILIZATION_TEST_SUPABASE_URL`, `STABILIZATION_TEST_SUPABASE_ANON_KEY`, `STABILIZATION_TEST_SUPABASE_SERVICE_ROLE_KEY`, and `DISPOSABLE_DB_ACK=yes`, then run `npm run test:security-db`. Do not supply the application's normal Supabase variables, and never target a linked, shared, staging, or production project. A disposable project must permit Auth admin user creation and must have no existing `sync_state` singleton; the suite refuses to replace it or any colliding fixture.
+
+   The suite creates one uniquely named, constraint-valid fixture for every
+   inventoried table in migration/foreign-key order. It uses the real composite
+   key for `item_tags`, `date` for `daily_stats`, `token_hash` for
+   `app_sessions`, `client_key_hash` for the keyless `app_login_attempts`, and
+   the only valid `sync_state` key, `matter`. Service-role controls must insert
+   and read every row, update an existing row and confirm the changed value,
+   then delete it and confirm absence. Anonymous and signed-in clients issue
+   equivalent valid operations against the seeded rows; their expected outcome
+   is PostgreSQL `insufficient_privilege` (`42501`) whose message identifies
+   `permission denied for table <expected table>`, not merely the shared
+   SQLSTATE. A successful empty RLS result, an RLS `WITH CHECK` violation, a
+   denial naming another table/schema, or an arbitrary error is not evidence
+   that the intended object grant was revoked. Schema-cache/missing-object,
+   payload, constraint, authentication, transport, and server errors fail the
+   run. Service-role readback confirms rejected writes changed nothing.
+
+   The limiter check gives both browser roles valid arguments and requires the
+   same `42501` response naming `permission denied for function
+   record_app_login_attempt`. Its service-role control must return `true` and
+   persist one matching attempt. The 20-call smoke check requires all calls to complete
+   without error, exactly 5 `true` results, exactly 15 `false` results, and
+   exactly 5 stored attempts. A `finally` cleanup removes RPC attempts,
+   fixtures in reverse foreign-key order, and the disposable Auth user. Cleanup
+   continues after individual failures and any cleanup failure fails the run;
+   every write is tracked before its request is awaited, so cleanup also
+   reconciles a row that committed before its response was lost. Selectors are
+   run-specific; the fixed-key `sync_state` fixture additionally stores a
+   run-specific ownership marker and is never deleted unless that marker is
+   read back. Uncertain ownership is reported as a cleanup failure rather than
+   risking deletion of unrelated data.
+
+   This distinction follows Supabase's documented Data API model: grants are
+   evaluated before RLS, a missing grant produces a permission error, and a
+   policy matching no rows can instead produce an empty result. PostgreSQL
+   assigns `42501` to the broader `insufficient_privilege` condition, while
+   PostgREST's documented table-grant response includes `permission denied for
+   table <name>`; the suite therefore verifies both the code and expected
+   object-specific message. See
+   [Securing your API](https://supabase.com/docs/guides/api/securing-your-api),
+   [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security),
+   [PostgreSQL error codes](https://www.postgresql.org/docs/current/errcodes-appendix.html),
+   and the [PostgREST authorization tutorial](https://docs.postgrest.org/en/v11/tutorials/tut0.html).
 3. With the service-role key, create/read/revoke a disposable app session and exercise ordinary application queries. Delete the disposable project/data afterward.
 4. Run `supabase/audit/stabilization-read-only.sql`; retain sanitized table, policy, function-grant and view results. Run all application checks and inspect client chunks for secret values/names. Until both fresh and upgrade runs succeed, W1 is not release-ready.
 
