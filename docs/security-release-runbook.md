@@ -91,7 +91,7 @@ processing with static, repository-controlled patterns. Re-run both audits when
 ## Pre-deploy on an isolated Supabase project
 
 1. Prepare both migration paths. For a fresh environment, apply the full migration chain in timestamp order. For an upgrade environment, restore/synthesize the previous schema and apply every outstanding migration in timestamp order. In both cases the required release sequence is `20260929000000_harden_rls_and_auth.sql`, then `20260929010000_atomic_login_limiter.sql`, then application deployment.
-2. Confirm both 20260929 migrations are present before running an integration test that calls `public.record_app_login_attempt`. Set only `STABILIZATION_TEST_SUPABASE_URL`, `STABILIZATION_TEST_SUPABASE_ANON_KEY`, `STABILIZATION_TEST_SUPABASE_SERVICE_ROLE_KEY`, and `DISPOSABLE_DB_ACK=yes`, then run `npm run test:security-db`. Do not supply the application's normal Supabase variables, and never target a linked, shared, staging, or production project. A disposable project must permit Auth admin user creation and must have no existing `sync_state` singleton; the suite refuses to replace it or any colliding fixture.
+2. Confirm both 20260929 migrations are present before running an integration test that calls `public.record_app_login_attempt`. Set only `STABILIZATION_TEST_SUPABASE_URL`, `STABILIZATION_TEST_SUPABASE_ANON_KEY`, `STABILIZATION_TEST_SUPABASE_SERVICE_ROLE_KEY`, and `DISPOSABLE_DB_ACK=yes`, then run `npm run test:security-db`. Separately set `STABILIZATION_TEST_DATABASE_URL` for the same disposable database and run `npm run verify:security-db`. The catalog runner invokes `psql` with startup files disabled, fail-fast SQL execution, and quiet tuples-only output. It compares the database's complete ordered migration history with every repository migration and verifies RLS, exact function signatures/inherited execution, browser-role CRUD absence, and each service-role SELECT, INSERT, UPDATE, and DELETE privilege individually. Do not supply the application's normal Supabase variables, and never target a linked, shared, staging, or production project. A disposable project must permit Auth admin user creation and must have no existing `sync_state` singleton; the suite refuses to replace it or any colliding fixture.
 
    The suite creates one uniquely named, constraint-valid fixture for every
    inventoried table in migration/foreign-key order. It uses the real composite
@@ -112,9 +112,10 @@ processing with static, repository-controlled patterns. Re-run both audits when
    The limiter check gives both browser roles valid arguments and requires the
    same `42501` response naming `permission denied for function
    record_app_login_attempt`. Its service-role control must return `true` and
-   persist one matching attempt. The 20-call smoke check requires all calls to complete
-   without error, exactly 5 `true` results, exactly 15 `false` results, and
-   exactly 5 stored attempts. A `finally` cleanup removes RPC attempts,
+   persist one matching attempt. Two independent 20-call groups must both settle
+   before results are reported or cleanup begins. Each group requires no rejected
+   request or RPC error, only boolean responses, exactly 5 `true` results, exactly
+   15 `false` results, and exactly 5 stored attempts. A `finally` cleanup removes RPC attempts,
    fixtures in reverse foreign-key order, and the disposable Auth user. Cleanup
    continues after individual failures and any cleanup failure fails the run;
    every write is tracked before its request is awaited, so cleanup also
