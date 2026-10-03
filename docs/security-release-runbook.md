@@ -97,15 +97,22 @@ processing with static, repository-controlled patterns. Re-run both audits when
    path first applies migrations through `20260519090000`, inserts synthetic
    legacy items, sessions, tags, relationships, annotations, daily statistics,
    sync-run data, and the `sync_state` singleton, then applies every outstanding
-   migration in place. A before/after JSON snapshot must preserve identifiers,
-   relationships, values, row counts, total reading duration, and singleton
-   state exactly. Both paths run the same catalog and real Data API checks.
+   migration in place. A deterministically ordered before/after JSON snapshot
+   captures every stored column in all eight legacy tables and must preserve
+   identifiers, relationships, values, row counts, total reading duration, and
+   singleton state exactly. Only after that comparison, the runner verifies the
+   singleton's run-specific ownership marker, removes it by key and marker, and
+   confirms absence so the collision-refusing Data API suite can safely run.
+   Unexpected ownership, failed removal, or failed absence verification stops
+   the path without deleting an unrelated singleton. Both paths run the same
+   catalog and real Data API checks.
 
    Catalog verification invokes container `psql` with startup files disabled,
    `ON_ERROR_STOP=1`, quiet tuples-only output, and exact comparison of the
    database's complete ordered migration history with the repository. It checks
    RLS, exact function signatures and inherited execution, browser-role CRUD
-   absence, and service-role SELECT, INSERT, UPDATE, and DELETE individually.
+   absence (including effective SELECT, INSERT, and UPDATE column grants), and
+   service-role SELECT, INSERT, UPDATE, and DELETE individually.
    Sanitized evidence under `artifacts/stabilization-db/<tested-sha>/` records
    tooling, migration histories, verification results, and cleanup status. This
    directory is ignored because evidence is execution-specific. If Docker is

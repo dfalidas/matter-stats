@@ -68,3 +68,12 @@ test("catalog SQL requires every service_role CRUD privilege individually", () =
   }
   assert.match(sql, /has_table_privilege\('anon'.*'SELECT,INSERT,UPDATE,DELETE'\)/);
 });
+
+test("catalog SQL rejects effective browser table and column privileges for both roles", () => {
+  const sql = catalogSql(["sample"]);
+  assert.match(sql, /ARRAY\['anon', 'authenticated'\]/);
+  assert.match(sql, /ARRAY\['SELECT', 'INSERT', 'UPDATE'\]/);
+  assert.match(sql, /has_any_column_privilege\(browser_role,.*privilege_name\)/);
+  assert.match(sql, /has_table_privilege\('anon'.*'SELECT,INSERT,UPDATE,DELETE'\)/);
+  assert.match(sql, /has_table_privilege\('authenticated'.*'SELECT,INSERT,UPDATE,DELETE'\)/);
+});

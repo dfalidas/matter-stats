@@ -73,7 +73,9 @@ async function copyMigrations(workdir, predicate = () => true) {
   }
 }
 
-const legacySeedSql = String.raw`
+export function legacySeedSql(ownershipMarker) {
+  assert.match(ownershipMarker, /^[a-zA-Z0-9_-]+$/, "invalid singleton ownership marker");
+  return String.raw`
 insert into public.matter_items (id,title,source,word_count,progress) values ('legacy-item','Legacy title','legacy.example',1200,0.5);
 insert into public.reading_sessions (id,item_id,started_at,ended_at,duration_seconds,words_estimated) values ('legacy-session','legacy-item','2026-05-19T10:00:00Z','2026-05-19T10:12:34Z',754,2830);
 insert into public.matter_tags (id,name) values ('legacy-tag','Legacy tag');
@@ -81,19 +83,37 @@ insert into public.item_tags (item_id,tag_id) values ('legacy-item','legacy-tag'
 insert into public.annotations (id,item_id,text,note) values ('legacy-annotation','legacy-item','Legacy highlight','Legacy note');
 insert into public.daily_stats (date,reading_time_seconds,words_read,sessions_count,items_read_count,highlights_count,top_source) values ('2026-05-19',754,2830,1,1,1,'legacy.example');
 insert into public.sync_runs (id,status,items_synced,sessions_synced,annotations_synced,tags_synced) values ('00000000-0000-4000-8000-000000000059','complete',1,1,1,1);
-insert into public.sync_state (id,active_phase,sync_mode,item_cursor,recent_activity_checkpoint) values ('matter','sessions','recent_activity','legacy-cursor','2026-05-19T10:12:34Z');
+insert into public.sync_state (id,active_phase,sync_mode,item_cursor,recent_activity_checkpoint) values ('matter','sessions','recent_activity','${ownershipMarker}','2026-05-19T10:12:34Z');
 `;
+}
 
-const preservationSql = String.raw`select jsonb_build_object(
-  'item', (select jsonb_build_object('id',id,'title',title,'source',source,'word_count',word_count,'progress',progress) from public.matter_items where id='legacy-item'),
-  'session', (select jsonb_build_object('id',id,'item_id',item_id,'duration_seconds',duration_seconds,'words_estimated',words_estimated) from public.reading_sessions where id='legacy-session'),
-  'tag_relation', (select jsonb_build_object('item_id',item_id,'tag_id',tag_id) from public.item_tags where item_id='legacy-item' and tag_id='legacy-tag'),
-  'annotation', (select jsonb_build_object('id',id,'item_id',item_id,'text',text,'note',note) from public.annotations where id='legacy-annotation'),
-  'daily', (select jsonb_build_object('date',date,'reading_time_seconds',reading_time_seconds,'words_read',words_read,'sessions_count',sessions_count,'items_read_count',items_read_count,'highlights_count',highlights_count) from public.daily_stats where date='2026-05-19'),
-  'counts', jsonb_build_object('items',(select count(*) from public.matter_items),'sessions',(select count(*) from public.reading_sessions),'tags',(select count(*) from public.matter_tags),'links',(select count(*) from public.item_tags),'annotations',(select count(*) from public.annotations),'daily',(select count(*) from public.daily_stats),'runs',(select count(*) from public.sync_runs)),
+export const preservationSql = String.raw`select jsonb_build_object(
+  'matter_items', (select coalesce(jsonb_agg(to_jsonb(t) order by id), '[]'::jsonb) from public.matter_items t),
+  'reading_sessions', (select coalesce(jsonb_agg(to_jsonb(t) order by id), '[]'::jsonb) from public.reading_sessions t),
+  'matter_tags', (select coalesce(jsonb_agg(to_jsonb(t) order by id), '[]'::jsonb) from public.matter_tags t),
+  'item_tags', (select coalesce(jsonb_agg(to_jsonb(t) order by item_id, tag_id), '[]'::jsonb) from public.item_tags t),
+  'annotations', (select coalesce(jsonb_agg(to_jsonb(t) order by id), '[]'::jsonb) from public.annotations t),
+  'daily_stats', (select coalesce(jsonb_agg(to_jsonb(t) order by date), '[]'::jsonb) from public.daily_stats t),
+  'sync_runs', (select coalesce(jsonb_agg(to_jsonb(t) order by id), '[]'::jsonb) from public.sync_runs t),
+  'sync_state', (select coalesce(jsonb_agg(to_jsonb(t) order by id), '[]'::jsonb) from public.sync_state t),
+  'counts', jsonb_build_object('items',(select count(*) from public.matter_items),'sessions',(select count(*) from public.reading_sessions),'tags',(select count(*) from public.matter_tags),'links',(select count(*) from public.item_tags),'annotations',(select count(*) from public.annotations),'daily',(select count(*) from public.daily_stats),'runs',(select count(*) from public.sync_runs),'sync_state',(select count(*) from public.sync_state)),
   'duration_total', (select sum(duration_seconds) from public.reading_sessions),
-  'sync_state', (select jsonb_build_object('count',(select count(*) from public.sync_state),'id',id,'active_phase',active_phase,'sync_mode',sync_mode,'item_cursor',item_cursor,'recent_activity_checkpoint',recent_activity_checkpoint) from public.sync_state where id='matter')
+  'singleton', (select jsonb_build_object('count',(select count(*) from public.sync_state),'id',id,'ownership_marker',item_cursor) from public.sync_state where id='matter')
 )::text;`;
+
+export function assertLegacyPreserved(before, after) {
+  assert.deepEqual(after, before, "upgrade changed legacy rows, identifiers, relationships, values, counts, duration, or singleton state");
+}
+
+export async function removeOwnedLegacySingleton({ query, ownershipMarker, runIntegration }) {
+  const storedMarker = (await query("select item_cursor from public.sync_state where id = 'matter';")).trim();
+  assert.equal(storedMarker, ownershipMarker, "legacy sync_state ownership is unexpected; refusing deletion");
+  const removed = (await query(`delete from public.sync_state where id = 'matter' and item_cursor = '${ownershipMarker}' returning id;`)).trim();
+  assert.equal(removed, "matter", "runner-owned sync_state singleton was not removed");
+  const remaining = (await query("select count(*) from public.sync_state where id = 'matter';")).trim();
+  assert.equal(remaining, "0", "runner-owned sync_state singleton remains after deletion");
+  return runIntegration();
+}
 
 function containerPsql(projectId, sql, { quiet = true } = {}) {
   const flags = quiet ? "-XAtq" : "-XAt";
@@ -124,18 +144,22 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   cli(["start", "--workdir", workdir], { env: sanitizedEnvironment() });
   if (!upgrade) cli(["db", "reset", "--local", "--workdir", workdir], { env: sanitizedEnvironment() });
   let preservation = null;
+  const ownershipMarker = `task05-${projectId}`;
   if (upgrade) {
-    containerPsql(projectId, legacySeedSql);
+    containerPsql(projectId, legacySeedSql(ownershipMarker));
     const before = containerPsql(projectId, preservationSql).trim();
     await copyMigrations(workdir, (filename) => filename.slice(0, 14) > UPGRADE_BASELINE);
     cli(["migration", "up", "--local", "--workdir", workdir], { env: sanitizedEnvironment() });
     const after = containerPsql(projectId, preservationSql).trim();
-    assert.deepEqual(JSON.parse(after), JSON.parse(before), "upgrade changed legacy identifiers, relationships, values, counts, duration, or singleton state");
+    assertLegacyPreserved(JSON.parse(before), JSON.parse(after));
     preservation = "passed";
   }
   const status = parseStatusEnv(cli(["status", "--workdir", workdir, "-o", "env"], { env: sanitizedEnvironment() }));
   const versions = await catalog(projectId, path.join(workdir, "supabase/migrations"));
-  command(process.execPath, [path.join(repoRoot, "tests/integration/supabase-security.mjs")], { env: integrationEnvironment(status) });
+  const runIntegration = () => command(process.execPath, [path.join(repoRoot, "tests/integration/supabase-security.mjs")], { env: integrationEnvironment(status) });
+  if (upgrade) {
+    await removeOwnedLegacySingleton({ query: (sql) => Promise.resolve(containerPsql(projectId, sql)), ownershipMarker, runIntegration });
+  } else runIntegration();
   return { name, catalog: "passed", dataApi: "passed", preservation, migrationHistory: versions };
 }
 

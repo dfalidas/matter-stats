@@ -14,7 +14,7 @@ export function catalogSql(tables = INVENTORIED_TABLES) {
   const inventory = tables.map((table) => `'${table}'`).join(", ");
   return String.raw`
 DO $catalog$
-DECLARE table_name text; privilege_name text;
+DECLARE table_name text; privilege_name text; browser_role text;
 BEGIN
   FOREACH table_name IN ARRAY ARRAY[${inventory}] LOOP
     IF to_regclass(format('public.%I', table_name)) IS NULL THEN
@@ -32,6 +32,13 @@ BEGIN
        OR has_table_privilege('authenticated', format('public.%I', table_name), 'SELECT,INSERT,UPDATE,DELETE') THEN
       RAISE EXCEPTION 'browser role retains CRUD privilege on public.%', table_name;
     END IF;
+    FOREACH browser_role IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+      FOREACH privilege_name IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE'] LOOP
+        IF has_any_column_privilege(browser_role, format('public.%I', table_name), privilege_name) THEN
+          RAISE EXCEPTION '% retains column-level % privilege on public.%', browser_role, privilege_name, table_name;
+        END IF;
+      END LOOP;
+    END LOOP;
   END LOOP;
   IF to_regprocedure('public.set_updated_at()') IS NULL
      OR to_regprocedure('public.record_app_login_attempt(text,boolean,integer,integer)') IS NULL THEN
