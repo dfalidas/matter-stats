@@ -143,6 +143,9 @@ try {
     rpcHashes.add(browserRpcHash);
     const rpc = await client.rpc("record_app_login_attempt", { p_client_key_hash: browserRpcHash, p_succeeded: false, p_limit: 5, p_window_seconds: 900 });
     assertGrantDenied(rpc, { role, operation: "EXECUTE", kind: "function", name: "record_app_login_attempt" });
+    const deniedRpcStored = await service.from("app_login_attempts").select("*", { count: "exact", head: true }).eq("client_key_hash", browserRpcHash);
+    assertSuccessful(deniedRpcStored, `${role} denied RPC stored-count readback`);
+    assert.equal(deniedRpcStored.count, 0, `${role} denied RPC persisted an attempt`);
   }
 
   // Composite/singleton INSERTs cannot use a second equivalent valid key. Delete the
@@ -181,6 +184,22 @@ try {
     })),
     readStoredCount: () => service.from("app_login_attempts").select("*", { count: "exact", head: true }).eq("client_key_hash", concurrencyHash),
   })));
+
+  const expiryHash = await hash(`${prefix}-rpc-expiry`);
+  rpcHashes.add(expiryHash);
+  const expiredAt = new Date(Date.now() - 3_600_000).toISOString();
+  const expiredRows = Array.from({ length: 3 }, () => ({ client_key_hash: expiryHash, attempted_at: expiredAt, succeeded: false }));
+  const seededExpired = await service.from("app_login_attempts").insert(expiredRows);
+  assertSuccessful(seededExpired, "seed expired limiter attempts");
+  const expiryCall = await service.rpc("record_app_login_attempt", {
+    p_client_key_hash: expiryHash, p_succeeded: false, p_limit: 5, p_window_seconds: 900,
+  });
+  assertSuccessful(expiryCall, "expired-attempt limiter RPC");
+  assert.equal(expiryCall.data, true, "expired attempts must not consume the active limit");
+  const expiryStored = await service.from("app_login_attempts").select("attempted_at").eq("client_key_hash", expiryHash);
+  assertSuccessful(expiryStored, "expired-attempt cleanup readback");
+  assert.equal(expiryStored.data.length, 1, "expired attempts must be removed and replaced by exactly one attempt");
+  assert.ok(new Date(expiryStored.data[0].attempted_at).getTime() > new Date(expiredAt).getTime(), "remaining attempt must be newly created");
 
   // Delete all remaining positive targets in foreign-key-safe reverse order and
   // prove every service-role DELETE affected its target.

@@ -69,9 +69,9 @@ export async function repositoryMigrationVersions(migrationsDir) {
   return files.filter((name) => /^\d+_.+\.sql$/.test(name)).sort().map((name) => name.slice(0, name.indexOf("_")));
 }
 
-export async function verifyCatalog({ databaseUrl, migrationsDir, psqlBinary, env }) {
+export async function verifyCatalog({ databaseUrl, migrationsDir, psqlBinary, env, execute }) {
   const expected = await repositoryMigrationVersions(migrationsDir);
-  const actual = runPsql({ databaseUrl, sql: catalogSql(), psqlBinary, env });
+  const actual = execute ? execute(catalogSql()) : runPsql({ databaseUrl, sql: catalogSql(), psqlBinary, env });
   assert.deepEqual(actual, expected, `database migration history differs from repository chain\nactual: ${actual.join(", ")}\nexpected: ${expected.join(", ")}`);
   return actual;
 }
