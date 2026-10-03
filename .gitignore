@@ -8,3 +8,4 @@ out
 *.tsbuildinfo
 
 .test-build
+audit-results/

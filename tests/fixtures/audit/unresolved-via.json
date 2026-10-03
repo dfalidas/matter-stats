@@ -1,0 +1,37 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "parent": {
+      "name": "parent",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "missing"
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/parent"
+      ],
+      "fixAvailable": false
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 1,
+      "critical": 0,
+      "total": 1
+    },
+    "dependencies": {
+      "prod": 121,
+      "dev": 346,
+      "optional": 62,
+      "peer": 1,
+      "peerOptional": 0,
+      "total": 505
+    }
+  }
+}
