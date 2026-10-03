@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
 import { assertGrantDenied, assertSuccessful } from "./supabase-security-assertions.mjs";
-import { attemptTrackedWrite, cleanupTrackedWrites } from "./supabase-security-runner.mjs";
+import { attemptTrackedWrite, cleanupTrackedWrites, verifyLimiterGroups } from "./supabase-security-runner.mjs";
 
 const required = ["STABILIZATION_TEST_SUPABASE_URL", "STABILIZATION_TEST_SUPABASE_ANON_KEY", "STABILIZATION_TEST_SUPABASE_SERVICE_ROLE_KEY"];
 if (process.env.DISPOSABLE_DB_ACK !== "yes" || required.some((key) => !process.env[key])) {
@@ -143,6 +143,9 @@ try {
     rpcHashes.add(browserRpcHash);
     const rpc = await client.rpc("record_app_login_attempt", { p_client_key_hash: browserRpcHash, p_succeeded: false, p_limit: 5, p_window_seconds: 900 });
     assertGrantDenied(rpc, { role, operation: "EXECUTE", kind: "function", name: "record_app_login_attempt" });
+    const deniedRpcStored = await service.from("app_login_attempts").select("*", { count: "exact", head: true }).eq("client_key_hash", browserRpcHash);
+    assertSuccessful(deniedRpcStored, `${role} denied RPC stored-count readback`);
+    assert.equal(deniedRpcStored.count, 0, `${role} denied RPC persisted an attempt`);
   }
 
   // Composite/singleton INSERTs cannot use a second equivalent valid key. Delete the
@@ -172,17 +175,31 @@ try {
   assertSuccessful(controlStored, "service_role RPC control readback");
   assert.equal(controlStored.data.succeeded, true, "service_role RPC control did not persist its effect");
 
-  const concurrencyHash = await hash(`${prefix}-rpc-concurrency`);
-  rpcHashes.add(concurrencyHash);
-  const calls = await Promise.all(Array.from({ length: 20 }, () => service.rpc("record_app_login_attempt", {
-    p_client_key_hash: concurrencyHash, p_succeeded: false, p_limit: 5, p_window_seconds: 900,
+  const concurrencyHashes = await Promise.all(["a", "b"].map((suffix) => hash(`${prefix}-rpc-concurrency-${suffix}`)));
+  for (const concurrencyHash of concurrencyHashes) rpcHashes.add(concurrencyHash);
+  await verifyLimiterGroups(concurrencyHashes.map((concurrencyHash, index) => ({
+    label: `concurrency group ${index + 1}`,
+    requests: Array.from({ length: 20 }, () => service.rpc("record_app_login_attempt", {
+      p_client_key_hash: concurrencyHash, p_succeeded: false, p_limit: 5, p_window_seconds: 900,
+    })),
+    readStoredCount: () => service.from("app_login_attempts").select("*", { count: "exact", head: true }).eq("client_key_hash", concurrencyHash),
   })));
-  for (const [index, call] of calls.entries()) assertSuccessful(call, `concurrency RPC ${index + 1}`);
-  assert.equal(calls.filter(({ data }) => data === true).length, 5, "atomic limiter must return true exactly five times");
-  assert.equal(calls.filter(({ data }) => data === false).length, 15, "atomic limiter must return false exactly fifteen times");
-  const stored = await service.from("app_login_attempts").select("*", { count: "exact", head: true }).eq("client_key_hash", concurrencyHash);
-  assertSuccessful(stored, "concurrency RPC stored-count readback");
-  assert.equal(stored.count, 5, "atomic limiter must store exactly five attempts");
+
+  const expiryHash = await hash(`${prefix}-rpc-expiry`);
+  rpcHashes.add(expiryHash);
+  const expiredAt = new Date(Date.now() - 3_600_000).toISOString();
+  const expiredRows = Array.from({ length: 3 }, () => ({ client_key_hash: expiryHash, attempted_at: expiredAt, succeeded: false }));
+  const seededExpired = await service.from("app_login_attempts").insert(expiredRows);
+  assertSuccessful(seededExpired, "seed expired limiter attempts");
+  const expiryCall = await service.rpc("record_app_login_attempt", {
+    p_client_key_hash: expiryHash, p_succeeded: false, p_limit: 5, p_window_seconds: 900,
+  });
+  assertSuccessful(expiryCall, "expired-attempt limiter RPC");
+  assert.equal(expiryCall.data, true, "expired attempts must not consume the active limit");
+  const expiryStored = await service.from("app_login_attempts").select("attempted_at").eq("client_key_hash", expiryHash);
+  assertSuccessful(expiryStored, "expired-attempt cleanup readback");
+  assert.equal(expiryStored.data.length, 1, "expired attempts must be removed and replaced by exactly one attempt");
+  assert.ok(new Date(expiryStored.data[0].attempted_at).getTime() > new Date(expiredAt).getTime(), "remaining attempt must be newly created");
 
   // Delete all remaining positive targets in foreign-key-safe reverse order and
   // prove every service-role DELETE affected its target.

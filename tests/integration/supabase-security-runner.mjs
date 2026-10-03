@@ -26,3 +26,34 @@ export async function cleanupTrackedWrites(attempts, { inspect, remove }) {
   }
   return failures;
 }
+
+export async function verifyLimiterGroups(groups) {
+  const results = await Promise.allSettled(groups.map(async ({ label, requests, readStoredCount }) => {
+    const calls = await Promise.allSettled(requests);
+    const failures = calls
+      .map((call, index) => call.status === "rejected" ? new Error(`${label} RPC ${index + 1}: ${call.reason?.message ?? call.reason}`) : null)
+      .filter(Boolean);
+    const responses = calls.filter(({ status }) => status === "fulfilled").map(({ value }) => value);
+    for (const [index, response] of responses.entries()) {
+      if (response?.error) failures.push(new Error(`${label} RPC ${index + 1}: ${response.error.message ?? "RPC error"}`));
+      else if (typeof response?.data !== "boolean") failures.push(new TypeError(`${label} RPC ${index + 1} must return a boolean`));
+    }
+    if (responses.filter(({ data, error }) => !error && data === true).length !== 5) failures.push(new Error(`${label} must return true exactly five times`));
+    if (responses.filter(({ data, error }) => !error && data === false).length !== 15) failures.push(new Error(`${label} must return false exactly fifteen times`));
+
+    try {
+      const stored = await readStoredCount();
+      if (stored?.error) failures.push(new Error(`${label} stored-count readback: ${stored.error.message ?? "query error"}`));
+      else if (stored?.count !== 5) failures.push(new Error(`${label} must store exactly five attempts`));
+    } catch (error) {
+      failures.push(new Error(`${label} stored-count readback: ${error?.message ?? error}`));
+    }
+    if (failures.length) throw new AggregateError(failures, `${label} failed ${failures.length} check(s)`);
+  }));
+
+  const failures = results.filter(({ status }) => status === "rejected").map(({ reason }) => reason);
+  if (failures.length) {
+    const details = failures.map((failure) => failure?.errors?.map((error) => error.message).join(", ") || failure?.message || failure).join("; ");
+    throw new AggregateError(failures, `Limiter verification failed for ${failures.length} group(s): ${details}`);
+  }
+}

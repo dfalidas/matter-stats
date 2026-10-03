@@ -91,7 +91,33 @@ processing with static, repository-controlled patterns. Re-run both audits when
 ## Pre-deploy on an isolated Supabase project
 
 1. Prepare both migration paths. For a fresh environment, apply the full migration chain in timestamp order. For an upgrade environment, restore/synthesize the previous schema and apply every outstanding migration in timestamp order. In both cases the required release sequence is `20260929000000_harden_rls_and_auth.sql`, then `20260929010000_atomic_login_limiter.sql`, then application deployment.
-2. Confirm both 20260929 migrations are present before running an integration test that calls `public.record_app_login_attempt`. Set only `STABILIZATION_TEST_SUPABASE_URL`, `STABILIZATION_TEST_SUPABASE_ANON_KEY`, `STABILIZATION_TEST_SUPABASE_SERVICE_ROLE_KEY`, and `DISPOSABLE_DB_ACK=yes`, then run `npm run test:security-db`. Do not supply the application's normal Supabase variables, and never target a linked, shared, staging, or production project. A disposable project must permit Auth admin user creation and must have no existing `sync_state` singleton; the suite refuses to replace it or any colliding fixture.
+2. From an unlinked checkout with Docker available, set only `DISPOSABLE_DB_ACK=yes` and run `npm run test:stabilization-db`. This is the complete Task 05 entry point; `test:security-db` remains an internal Data API suite invoked by the runner, not a substitute for fresh/upgrade verification. The runner pins Supabase CLI 2.48.3 and creates two uniquely named projects under an OS temporary directory, with separate non-conflicting local ports. It sanitizes child environments, refuses non-temporary cleanup targets, never links a project, and stops only the two project IDs it created. Do not supply the application's normal Supabase or Matter variables and never point this command at a linked, shared, staging, or production project.
+
+   The fresh path applies the complete repository migration chain. The upgrade
+   path first applies migrations through `20260519090000`, inserts synthetic
+   legacy items, sessions, tags, relationships, annotations, daily statistics,
+   sync-run data, and the `sync_state` singleton, then applies every outstanding
+   migration in place. A deterministically ordered before/after JSON snapshot
+   captures every stored column in all eight legacy tables and must preserve
+   identifiers, relationships, values, row counts, total reading duration, and
+   singleton state exactly. Only after that comparison, the runner verifies the
+   singleton's run-specific ownership marker, removes it by key and marker, and
+   confirms absence so the collision-refusing Data API suite can safely run.
+   Unexpected ownership, failed removal, or failed absence verification stops
+   the path without deleting an unrelated singleton. Both paths run the same
+   catalog and real Data API checks.
+
+   Catalog verification invokes container `psql` with startup files disabled,
+   `ON_ERROR_STOP=1`, quiet tuples-only output, and exact comparison of the
+   database's complete ordered migration history with the repository. It checks
+   RLS, exact function signatures and inherited execution, browser-role CRUD
+   absence (including effective SELECT, INSERT, and UPDATE column grants), and
+   service-role SELECT, INSERT, UPDATE, and DELETE individually.
+   Sanitized evidence under `artifacts/stabilization-db/<tested-sha>/` records
+   tooling, migration histories, verification results, and cleanup status. This
+   directory is ignored because evidence is execution-specific. If Docker is
+   unavailable, the runner writes `blocked.json`, exits nonzero, and does not
+   claim that mocked tests establish database behavior.
 
    The suite creates one uniquely named, constraint-valid fixture for every
    inventoried table in migration/foreign-key order. It uses the real composite
@@ -112,9 +138,10 @@ processing with static, repository-controlled patterns. Re-run both audits when
    The limiter check gives both browser roles valid arguments and requires the
    same `42501` response naming `permission denied for function
    record_app_login_attempt`. Its service-role control must return `true` and
-   persist one matching attempt. The 20-call smoke check requires all calls to complete
-   without error, exactly 5 `true` results, exactly 15 `false` results, and
-   exactly 5 stored attempts. A `finally` cleanup removes RPC attempts,
+   persist one matching attempt. Two independent 20-call groups must both settle
+   before results are reported or cleanup begins. Each group requires no rejected
+   request or RPC error, only boolean responses, exactly 5 `true` results, exactly
+   15 `false` results, and exactly 5 stored attempts. A `finally` cleanup removes RPC attempts,
    fixtures in reverse foreign-key order, and the disposable Auth user. Cleanup
    continues after individual failures and any cleanup failure fails the run;
    every write is tracked before its request is awaited, so cleanup also
@@ -138,11 +165,9 @@ processing with static, repository-controlled patterns. Re-run both audits when
 3. With the service-role key, create/read/revoke a disposable app session and exercise ordinary application queries. Delete the disposable project/data afterward.
 4. Run `supabase/audit/stabilization-read-only.sql`; retain sanitized table, policy, function-grant and view results. Run all application checks and inspect client chunks for secret values/names. Until both fresh and upgrade runs succeed, W1 is not release-ready.
 
-For a local Supabase CLI stack, the fresh check is `supabase db reset --local`. For
-the upgrade check, create a second disposable project/branch at migration
-`20260519090000`, then run `supabase migration up --local` with the two 20260929
-migrations present. Run `npm run test:security-db` against each result. Do not
-point these commands at a linked production project.
+Do not replace the full entry point with a catalog-only check or a manually
+provisioned database. Both independently configured local stacks and the real
+Data API checks are required for valid Task 05 evidence.
 
 ### Merge prerequisites
 
