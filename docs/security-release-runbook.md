@@ -101,25 +101,40 @@ processing with static, repository-controlled patterns. Re-run both audits when
    and read every row, update an existing row and confirm the changed value,
    then delete it and confirm absence. Anonymous and signed-in clients issue
    equivalent valid operations against the seeded rows; their expected outcome
-   is PostgreSQL `insufficient_privilege` (`42501`), not a successful empty RLS
-   result or an arbitrary error. Schema-cache/missing-object, payload,
-   constraint, authentication, transport, and server errors fail the run.
-   Service-role readback confirms rejected writes changed nothing.
+   is PostgreSQL `insufficient_privilege` (`42501`) whose message identifies
+   `permission denied for table <expected table>`, not merely the shared
+   SQLSTATE. A successful empty RLS result, an RLS `WITH CHECK` violation, a
+   denial naming another table/schema, or an arbitrary error is not evidence
+   that the intended object grant was revoked. Schema-cache/missing-object,
+   payload, constraint, authentication, transport, and server errors fail the
+   run. Service-role readback confirms rejected writes changed nothing.
 
    The limiter check gives both browser roles valid arguments and requires the
-   same grant denial. Its service-role control must return `true` and persist
-   one matching attempt. The 20-call smoke check requires all calls to complete
+   same `42501` response naming `permission denied for function
+   record_app_login_attempt`. Its service-role control must return `true` and
+   persist one matching attempt. The 20-call smoke check requires all calls to complete
    without error, exactly 5 `true` results, exactly 15 `false` results, and
    exactly 5 stored attempts. A `finally` cleanup removes RPC attempts,
    fixtures in reverse foreign-key order, and the disposable Auth user. Cleanup
    continues after individual failures and any cleanup failure fails the run;
-   selectors are run-specific so unrelated records are never removed.
+   every write is tracked before its request is awaited, so cleanup also
+   reconciles a row that committed before its response was lost. Selectors are
+   run-specific; the fixed-key `sync_state` fixture additionally stores a
+   run-specific ownership marker and is never deleted unless that marker is
+   read back. Uncertain ownership is reported as a cleanup failure rather than
+   risking deletion of unrelated data.
 
    This distinction follows Supabase's documented Data API model: grants are
    evaluated before RLS, a missing grant produces a permission error, and a
-   policy matching no rows can instead produce an empty result. See
-   [Securing your API](https://supabase.com/docs/guides/api/securing-your-api)
-   and [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security).
+   policy matching no rows can instead produce an empty result. PostgreSQL
+   assigns `42501` to the broader `insufficient_privilege` condition, while
+   PostgREST's documented table-grant response includes `permission denied for
+   table <name>`; the suite therefore verifies both the code and expected
+   object-specific message. See
+   [Securing your API](https://supabase.com/docs/guides/api/securing-your-api),
+   [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security),
+   [PostgreSQL error codes](https://www.postgresql.org/docs/current/errcodes-appendix.html),
+   and the [PostgREST authorization tutorial](https://docs.postgrest.org/en/v11/tutorials/tut0.html).
 3. With the service-role key, create/read/revoke a disposable app session and exercise ordinary application queries. Delete the disposable project/data afterward.
 4. Run `supabase/audit/stabilization-read-only.sql`; retain sanitized table, policy, function-grant and view results. Run all application checks and inspect client chunks for secret values/names. Until both fresh and upgrade runs succeed, W1 is not release-ready.
 

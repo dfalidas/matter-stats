@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
 import { assertGrantDenied, assertSuccessful } from "./supabase-security-assertions.mjs";
+import { attemptTrackedWrite, cleanupTrackedWrites } from "./supabase-security-runner.mjs";
 
 const required = ["STABILIZATION_TEST_SUPABASE_URL", "STABILIZATION_TEST_SUPABASE_ANON_KEY", "STABILIZATION_TEST_SUPABASE_SERVICE_ROLE_KEY"];
 if (process.env.DISPOSABLE_DB_ACK !== "yes" || required.some((key) => !process.env[key])) {
@@ -35,7 +36,7 @@ const fixtures = [
   { table: "annotations", row: { id: `${prefix}-annotation`, item_id: `${prefix}-item`, note: "positive" }, deniedRow: { id: `${prefix}-denied-annotation`, item_id: `${prefix}-item`, note: "denied" }, selector: { id: `${prefix}-annotation` }, update: { note: "updated" }, field: "note", expected: "updated" },
   { table: "daily_stats", row: { date: fixtureDate, reading_time_seconds: 1, words_read: 1, sessions_count: 1, items_read_count: 1, highlights_count: 1, top_source: "positive" }, deniedRow: { date: new Date(new Date(`${fixtureDate}T00:00:00Z`).getTime() + 86400000).toISOString().slice(0, 10), top_source: "denied" }, selector: { date: fixtureDate }, update: { top_source: "updated" }, field: "top_source", expected: "updated" },
   { table: "sync_runs", row: { id: runId, status: "positive" }, deniedRow: { id: crypto.randomUUID(), status: "denied" }, selector: { id: runId }, update: { status: "updated" }, field: "status", expected: "updated" },
-  { table: "sync_state", row: { id: "matter", active_phase: "complete", sync_mode: "recent_activity" }, deniedRow: { id: "matter", active_phase: "complete", sync_mode: "recent_activity" }, selector: { id: "matter" }, update: { active_phase: "items" }, field: "active_phase", expected: "items", delayedInsert: true },
+  { table: "sync_state", row: { id: "matter", active_phase: "complete", sync_mode: "recent_activity", item_cursor: prefix }, deniedRow: { id: "matter", active_phase: "complete", sync_mode: "recent_activity", item_cursor: prefix }, selector: { id: "matter" }, update: { active_phase: "items" }, field: "active_phase", expected: "items", delayedInsert: true, ownership: { item_cursor: prefix } },
   { table: "app_sessions", row: { token_hash: sessionHash, credential_version: 1, expires_at: "2099-12-31T00:00:00.000Z" }, deniedRow: { token_hash: await hash(`${prefix}-denied-session`), credential_version: 1, expires_at: "2099-12-31T00:00:00.000Z" }, selector: { token_hash: sessionHash }, update: { credential_version: 2 }, field: "credential_version", expected: 2 },
   { table: "app_login_attempts", row: { client_key_hash: attemptHash, attempted_at: timestamp, succeeded: false }, deniedRow: { client_key_hash: await hash(`${prefix}-denied-attempt`), attempted_at: timestamp, succeeded: false }, selector: { client_key_hash: attemptHash }, update: { succeeded: true }, field: "succeeded", expected: true },
 ];
@@ -52,8 +53,18 @@ function selectorForRow(fixture, row) {
   return { id: row.id };
 }
 
-const createdFixtures = [];
-const attemptedDeniedInserts = [];
+function trackedFixtureWrite(fixture, row, label) {
+  const selector = selectorForRow(fixture, row);
+  const ownership = fixture.ownership ?? selector;
+  return {
+    label,
+    fixture,
+    selector,
+    owns: (stored) => Object.entries(ownership).every(([column, value]) => stored[column] === value),
+  };
+}
+
+const attemptedWrites = [];
 const rpcHashes = new Set();
 let userId;
 const cleanupFailures = [];
@@ -62,7 +73,7 @@ async function cleanup(label, action) {
     const result = await action();
     if (result?.error) throw result.error;
   } catch (error) {
-    cleanupFailures.push(`${label}: ${error?.code ?? error?.name ?? "error"} ${error?.message ?? "cleanup failed"}`);
+    cleanupFailures.push(new Error(`${label}: ${error?.code ?? error?.name ?? "error"} ${error?.message ?? "cleanup failed"}`));
   }
 }
 
@@ -91,9 +102,12 @@ try {
   assert.ok(signIn.data.session, "sign in returned no authenticated session");
 
   for (const fixture of fixtures) {
-    const inserted = await service.from(fixture.table).insert(fixture.row).select("*").single();
+    const inserted = await attemptTrackedWrite(
+      attemptedWrites,
+      trackedFixtureWrite(fixture, fixture.row, `fixture ${fixture.table}`),
+      () => service.from(fixture.table).insert(fixture.row).select("*").single(),
+    );
     assertSuccessful(inserted, `service_role INSERT ${fixture.table}`);
-    createdFixtures.push(fixture);
     const selected = await filtered(service.from(fixture.table).select("*"), fixture.selector).single();
     assertSuccessful(selected, `service_role SELECT ${fixture.table}`);
     const updated = await filtered(service.from(fixture.table).update(fixture.update).select("*"), fixture.selector).single();
@@ -106,16 +120,20 @@ try {
 
   for (const [role, client] of [["anon", anon], ["authenticated", authenticated]]) {
     for (const fixture of fixtures) {
-      assertGrantDenied(await filtered(client.from(fixture.table).select("*"), fixture.selector), `${role} SELECT ${fixture.table}`);
-      assertGrantDenied(await filtered(client.from(fixture.table).update(fixture.update), fixture.selector), `${role} UPDATE ${fixture.table}`);
-      assertGrantDenied(await filtered(client.from(fixture.table).delete(), fixture.selector), `${role} DELETE ${fixture.table}`);
+      assertGrantDenied(await filtered(client.from(fixture.table).select("*"), fixture.selector), { role, operation: "SELECT", kind: "table", name: fixture.table });
+      assertGrantDenied(await filtered(client.from(fixture.table).update(fixture.update), fixture.selector), { role, operation: "UPDATE", kind: "table", name: fixture.table });
+      assertGrantDenied(await filtered(client.from(fixture.table).delete(), fixture.selector), { role, operation: "DELETE", kind: "table", name: fixture.table });
       const unchanged = await filtered(service.from(fixture.table).select(fixture.field), fixture.selector).single();
       assertSuccessful(unchanged, `service_role denied-write readback ${fixture.table}`);
       const actual = fixture.field.endsWith("_at") ? new Date(unchanged.data[fixture.field]).toISOString() : unchanged.data[fixture.field];
       assert.equal(actual, fixture.expected, `${role} write changed ${fixture.table}`);
       if (!fixture.delayedInsert) {
-        attemptedDeniedInserts.push({ fixture, selector: selectorForRow(fixture, fixture.deniedRow) });
-        assertGrantDenied(await client.from(fixture.table).insert(fixture.deniedRow), `${role} INSERT ${fixture.table}`);
+        const denied = await attemptTrackedWrite(
+          attemptedWrites,
+          trackedFixtureWrite(fixture, fixture.deniedRow, `${role} denied INSERT ${fixture.table}`),
+          () => client.from(fixture.table).insert(fixture.deniedRow),
+        );
+        assertGrantDenied(denied, { role, operation: "INSERT", kind: "table", name: fixture.table });
         const deniedInsert = await filtered(service.from(fixture.table).select("*"), selectorForRow(fixture, fixture.deniedRow)).maybeSingle();
         assertSuccessful(deniedInsert, `service_role denied-INSERT readback ${fixture.table}`);
         assert.equal(deniedInsert.data, null, `${role} INSERT persisted in ${fixture.table}`);
@@ -124,7 +142,7 @@ try {
     const browserRpcHash = await hash(`${prefix}-${role}-rpc`);
     rpcHashes.add(browserRpcHash);
     const rpc = await client.rpc("record_app_login_attempt", { p_client_key_hash: browserRpcHash, p_succeeded: false, p_limit: 5, p_window_seconds: 900 });
-    assertGrantDenied(rpc, `${role} RPC record_app_login_attempt`);
+    assertGrantDenied(rpc, { role, operation: "EXECUTE", kind: "function", name: "record_app_login_attempt" });
   }
 
   // Composite/singleton INSERTs cannot use a second equivalent valid key. Delete the
@@ -132,13 +150,16 @@ try {
   for (const fixture of fixtures.filter(({ delayedInsert }) => delayedInsert)) {
     const removed = await filtered(service.from(fixture.table).delete().select("*"), fixture.selector).single();
     assertSuccessful(removed, `service_role DELETE ${fixture.table}`);
-    createdFixtures.splice(createdFixtures.indexOf(fixture), 1);
     const absent = await filtered(service.from(fixture.table).select("*"), fixture.selector).maybeSingle();
     assertSuccessful(absent, `service_role DELETE readback ${fixture.table}`);
     assert.equal(absent.data, null, `service_role DELETE did not remove ${fixture.table}`);
     for (const [role, client] of [["anon", anon], ["authenticated", authenticated]]) {
-      attemptedDeniedInserts.push({ fixture, selector: selectorForRow(fixture, fixture.deniedRow) });
-      assertGrantDenied(await client.from(fixture.table).insert(fixture.deniedRow), `${role} INSERT ${fixture.table}`);
+      const denied = await attemptTrackedWrite(
+        attemptedWrites,
+        trackedFixtureWrite(fixture, fixture.deniedRow, `${role} denied INSERT ${fixture.table}`),
+        () => client.from(fixture.table).insert(fixture.deniedRow),
+      );
+      assertGrantDenied(denied, { role, operation: "INSERT", kind: "table", name: fixture.table });
     }
   }
 
@@ -165,10 +186,9 @@ try {
 
   // Delete all remaining positive targets in foreign-key-safe reverse order and
   // prove every service-role DELETE affected its target.
-  for (const fixture of [...createdFixtures].reverse()) {
+  for (const fixture of [...fixtures].reverse().filter(({ delayedInsert }) => !delayedInsert)) {
     const removed = await filtered(service.from(fixture.table).delete().select("*"), fixture.selector).single();
     assertSuccessful(removed, `service_role DELETE ${fixture.table}`);
-    createdFixtures.splice(createdFixtures.indexOf(fixture), 1);
     const absent = await filtered(service.from(fixture.table).select("*"), fixture.selector).maybeSingle();
     assertSuccessful(absent, `service_role DELETE readback ${fixture.table}`);
     assert.equal(absent.data, null, `service_role DELETE did not remove ${fixture.table}`);
@@ -178,14 +198,12 @@ try {
   for (const clientKeyHash of rpcHashes) {
     await cleanup("RPC-generated app_login_attempts", () => service.from("app_login_attempts").delete().eq("client_key_hash", clientKeyHash));
   }
-  for (const { fixture, selector } of [...attemptedDeniedInserts].reverse()) {
-    await cleanup(`denied INSERT residue ${fixture.table}`, () => filtered(service.from(fixture.table).delete(), selector));
-  }
-  for (const fixture of [...createdFixtures].reverse()) {
-    await cleanup(`fixture ${fixture.table}`, () => filtered(service.from(fixture.table).delete(), fixture.selector));
-  }
+  cleanupFailures.push(...await cleanupTrackedWrites(attemptedWrites, {
+    inspect: ({ fixture, selector }) => filtered(service.from(fixture.table).select("*"), selector).maybeSingle(),
+    remove: ({ fixture, selector }) => filtered(service.from(fixture.table).delete(), selector),
+  }));
   if (userId) await cleanup("disposable auth user", () => service.auth.admin.deleteUser(userId));
   if (cleanupFailures.length) {
-    throw new AggregateError(cleanupFailures.map((message) => new Error(message)), `Cleanup failed (${cleanupFailures.length} resource(s)); all remaining cleanup was attempted`);
+    throw new AggregateError(cleanupFailures, `Cleanup failed (${cleanupFailures.length} resource(s)); all remaining cleanup was attempted`);
   }
 }
