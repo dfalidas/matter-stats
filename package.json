@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsc -p tests/tsconfig.json && node --test .test-build/tests/*.test.js tests/*.test.mjs",
     "audit:ci": "node scripts/audit-policy.mjs",
-    "test:security-db": "node tests/integration/supabase-security.mjs"
+    "test:security-db": "node tests/integration/supabase-security.mjs",
+    "test:stabilization-db": "node scripts/stabilization-db-runner.mjs"
   },
   "dependencies": {
     "@radix-ui/react-separator": "^1.1.0",

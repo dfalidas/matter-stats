@@ -88,6 +88,76 @@ processing with static, repository-controlled patterns. Re-run both audits when
 - New: `APP_CREDENTIAL_VERSION=1`. Increment it to revoke every existing app session after an access-password rotation. This does not rotate the Matter token.
 - `x-forwarded-for`'s first address is the limiter key because Vercel supplies that boundary. On another proxy, normalize/overwrite it at the trusted edge. Five failed attempts per key in 15 minutes are permitted; state is shared in Supabase. Unknown/missing addresses share the `unknown` bucket.
 
+## Reproducible isolated database verification
+
+The repository runner creates **two separate local Supabase projects** in
+temporary directories: one fresh install and one in-place upgrade. It uses
+Supabase CLI `2.119.0` through `npx`, as recommended by the official CLI
+installation documentation, and verifies the returned version before creating
+anything. Docker (or a Docker-API-compatible running container runtime), Node
+20.9 or newer, npm, and internet access for the pinned CLI/container images are
+prerequisites. The runner does not log in, link, accept a project reference, or
+read the application's `SUPABASE_*` variables. It refuses to start when remote
+CLI variables are present.
+
+Run from a clean checkout of the exact commit to be tested:
+
+```sh
+npm ci
+STABILIZATION_TEST_DISPOSABLE_ACK=I_ACKNOWLEDGE_THIS_CREATES_AND_DESTROYS_ONLY_DISPOSABLE_LOCAL_STACKS \
+  npm run test:stabilization-db
+```
+
+Optionally set `STABILIZATION_TEST_EVIDENCE_DIR` to a private output directory.
+Otherwise sanitized `fresh.json` and `upgrade.json` reports are written beneath
+the gitignored `stabilization-evidence/` directory with mode 0600. They contain
+the tested Git SHA, Node/Docker/CLI versions, migration versions, preservation,
+catalog, Data API/RPC, status, and cleanup results—but no URLs, keys, JWTs,
+container/project identifiers, or fixture values. A missing Docker executable
+or daemon produces a `blocked.json` report and a nonzero exit. Missing CLI
+downloads, image pulls, startup failures, test failures, and cleanup failures
+also produce a nonzero exit; mocks and unit tests are never reported as live
+database evidence.
+
+Each path gets a unique project identity, temporary working directory, and
+checked non-conflicting port block. `finally` cleanup targets that exact local
+project with `supabase stop --project-id ... --no-backup`; it never uses
+`supabase stop --all`, `db reset`, a linked project, or a hosted database. The
+temporary directory is then removed. Do not bypass the acknowledgement or run
+with remote-link environment variables.
+
+The fresh path starts from an empty CLI database and lets the CLI apply every
+repository migration in filename order. The upgrade path starts a different
+empty stack with only migrations through `20260519090000`, inserts
+constraint-valid synthetic legacy rows across every legacy table, and captures
+full JSON rows plus counts and reading-duration total. It then copies only the
+outstanding repository migration files and runs `supabase migration up
+--local`, without reset or recreation. Exact before/after equality is required.
+The fixed-key `sync_state` marker must survive first; only then is that
+runner-owned singleton deleted so Task 04's collision guard remains intact.
+
+Both paths require exact migration history and inspect PostgreSQL's effective
+privileges separately from Data API behavior: all ten inventoried tables must
+exist with RLS enabled, `anon`/`authenticated` must lack effective CRUD grants,
+and `service_role` must retain them. The exact
+`record_app_login_attempt(text,boolean,integer,integer)` signature must be
+non-executable by browser roles and `PUBLIC` (including inherited access) and
+executable by `service_role`. The real Data API suite then exercises valid
+service-role CRUD controls and object-specific `42501` browser denials.
+
+The RPC suite runs two independent keys with 20 parallel calls apiece. Every
+request must settle with `error === null` and a Boolean response; each key must
+produce exactly 5 `true`, 15 `false`, and 5 persisted attempts. Five failures
+dated in 2000 verify expiry without sleeping: the next request must succeed and
+the RPC must remove the expired rows. Anonymous and authenticated calls must be
+denied and leave zero rows. All run-owned fixtures, Auth users, and RPC rows are
+cleaned on success or failure before the stack itself is destroyed.
+
+Expected successful console output ends with `Fresh and upgrade verification
+passed`. Both JSON reports must say `status: passed`, `cleanup: passed`,
+`catalog: true`, and `data_api: true`; upgrade must additionally say
+`preservation: true`. Anything else remains a release blocker.
+
 ## Pre-deploy on an isolated Supabase project
 
 1. Prepare both migration paths. For a fresh environment, apply the full migration chain in timestamp order. For an upgrade environment, restore/synthesize the previous schema and apply every outstanding migration in timestamp order. In both cases the required release sequence is `20260929000000_harden_rls_and_auth.sql`, then `20260929010000_atomic_login_limiter.sql`, then application deployment.
@@ -138,11 +208,11 @@ processing with static, repository-controlled patterns. Re-run both audits when
 3. With the service-role key, create/read/revoke a disposable app session and exercise ordinary application queries. Delete the disposable project/data afterward.
 4. Run `supabase/audit/stabilization-read-only.sql`; retain sanitized table, policy, function-grant and view results. Run all application checks and inspect client chunks for secret values/names. Until both fresh and upgrade runs succeed, W1 is not release-ready.
 
-For a local Supabase CLI stack, the fresh check is `supabase db reset --local`. For
-the upgrade check, create a second disposable project/branch at migration
-`20260519090000`, then run `supabase migration up --local` with the two 20260929
-migrations present. Run `npm run test:security-db` against each result. Do not
-point these commands at a linked production project.
+Use the repository runner above rather than manually resetting a development
+stack. `npm run test:security-db` remains available only for an already-created,
+explicitly disposable environment and requires its three dedicated
+`STABILIZATION_TEST_SUPABASE_*` variables plus `DISPOSABLE_DB_ACK=yes`; it does
+not perform migration-path or catalog verification by itself.
 
 ### Merge prerequisites
 
