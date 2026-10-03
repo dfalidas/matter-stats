@@ -22,15 +22,21 @@ The audit command retains the unmodified full and production JSON reports in
 `audit-results/`. Production must have zero findings. The full graph permits
 only `GHSA-vfj7-8cjw-p6xm` and package entries whose `via` chains resolve
 exclusively to that advisory; it does not waive a package or severity class.
-Malformed/incomplete responses, audit transport failures, any other advisory,
-or any production occurrence fail the gate. Low and moderate counts are always
-printed explicitly.
+Reports must contain non-negative, internally consistent severity counters and
+complete vulnerability/advisory/remediation records. Explicit npm errors,
+malformed or incomplete responses, audit transport failures, unresolved or
+cyclic `via` chains, any other advisory, and any production occurrence fail the
+gate. Low and moderate counts are always printed explicitly.
 
 The exception is limited to development/build glob processing over static,
 repository-controlled patterns. Re-review it whenever the lockfile or
 Tailwind/ESLint dependency graph changes, and remove it as soon as `braces` or
 an upstream dependency publishes a supported fix. A published fix must not be
-left silently excepted.
+left silently excepted. The gate therefore fails with an actionable message
+when npm reports a non-major compatible remediation. A proposal explicitly
+marked by npm as a semver-major migration (including the currently suggested
+`eslint-config-next` downgrade) does not by itself end the exception; malformed
+remediation metadata fails closed and requires review.
 
 ## W2 dependency baseline update (completed 2026-10-03)
 

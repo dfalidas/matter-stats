@@ -4,6 +4,10 @@ import { spawnSync } from "node:child_process";
 export const ALLOWED_ADVISORY = "GHSA-vfj7-8cjw-p6xm";
 const SEVERITIES = ["info", "low", "moderate", "high", "critical"];
 
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 function parseReport(raw, label) {
   let report;
   try {
@@ -11,22 +15,67 @@ function parseReport(raw, label) {
   } catch {
     throw new Error(`${label} audit did not return valid JSON`);
   }
-  if (report?.auditReportVersion !== 2 || !report.vulnerabilities || !report.metadata?.vulnerabilities) {
+  if (!isRecord(report) || Object.hasOwn(report, "error")) {
+    throw new Error(`${label} audit returned an explicit error or invalid payload`);
+  }
+  if (
+    report.auditReportVersion !== 2 ||
+    !isRecord(report.vulnerabilities) ||
+    !isRecord(report.metadata) ||
+    !isRecord(report.metadata.vulnerabilities)
+  ) {
     throw new Error(`${label} audit result is incomplete or has an unsupported format`);
   }
-  for (const severity of SEVERITIES) {
-    if (!Number.isInteger(report.metadata.vulnerabilities[severity])) {
-      throw new Error(`${label} audit is missing the ${severity} count`);
+  const counters = report.metadata.vulnerabilities;
+  for (const counter of [...SEVERITIES, "total"]) {
+    if (!Number.isSafeInteger(counters[counter]) || counters[counter] < 0) {
+      throw new Error(`${label} audit has an invalid ${counter} count`);
     }
   }
   const entries = Object.keys(report.vulnerabilities);
-  const severityTotal = SEVERITIES.reduce((total, severity) => total + report.metadata.vulnerabilities[severity], 0);
-  if (report.metadata.vulnerabilities.total !== entries.length || severityTotal !== entries.length) {
+  const severityTotal = SEVERITIES.reduce((total, severity) => total + counters[severity], 0);
+  if (counters.total !== entries.length || severityTotal !== entries.length) {
     throw new Error(`${label} audit totals do not match its vulnerability entries`);
   }
+  const actualCounts = Object.fromEntries(SEVERITIES.map((severity) => [severity, 0]));
   for (const [name, entry] of Object.entries(report.vulnerabilities)) {
-    if (!entry || entry.name !== name || !SEVERITIES.includes(entry.severity) || !Array.isArray(entry.via)) {
+    if (
+      !isRecord(entry) ||
+      entry.name !== name ||
+      !SEVERITIES.includes(entry.severity) ||
+      typeof entry.isDirect !== "boolean" ||
+      !Array.isArray(entry.via) ||
+      entry.via.length === 0 ||
+      !Array.isArray(entry.effects) ||
+      typeof entry.range !== "string" ||
+      !Array.isArray(entry.nodes) ||
+      entry.nodes.length === 0 ||
+      !Object.hasOwn(entry, "fixAvailable")
+    ) {
       throw new Error(`${label} audit contains an incomplete vulnerability entry for ${name}`);
+    }
+    actualCounts[entry.severity] += 1;
+    for (const via of entry.via) {
+      if (typeof via === "string") {
+        if (!via || !Object.hasOwn(report.vulnerabilities, via)) {
+          throw new Error(`${label} audit contains an unresolved via reference from ${name}`);
+        }
+      } else if (
+        !isRecord(via) ||
+        (typeof via.source !== "number" && typeof via.source !== "string") ||
+        typeof via.name !== "string" ||
+        !via.name ||
+        !SEVERITIES.includes(via.severity) ||
+        typeof via.url !== "string" ||
+        !via.url
+      ) {
+        throw new Error(`${label} audit contains malformed advisory metadata for ${name}`);
+      }
+    }
+  }
+  for (const severity of SEVERITIES) {
+    if (counters[severity] !== actualCounts[severity]) {
+      throw new Error(`${label} audit ${severity} count does not match its vulnerability entries`);
     }
   }
   return report;
@@ -43,6 +92,23 @@ function advisoryId(via) {
   if (!via || typeof via !== "object") return null;
   const match = typeof via.url === "string" && via.url.match(/GHSA-[\w-]+/i);
   return match?.[0]?.toLowerCase() ?? null;
+}
+
+function compatibleFix(entry, name) {
+  const fix = entry.fixAvailable;
+  if (fix === false) return false;
+  if (fix === true) return true;
+  if (
+    !isRecord(fix) ||
+    typeof fix.name !== "string" ||
+    !fix.name ||
+    typeof fix.version !== "string" ||
+    !fix.version ||
+    typeof fix.isSemVerMajor !== "boolean"
+  ) {
+    throw new Error(`Full audit contains malformed remediation metadata for ${name}`);
+  }
+  return fix.isSemVerMajor === false;
 }
 
 export function enforcePolicy(fullReport, productionReport) {
@@ -69,6 +135,13 @@ export function enforcePolicy(fullReport, productionReport) {
 
   const rejected = Object.keys(vulnerabilities).filter((name) => !derivesOnlyFromException(name));
   if (rejected.length) throw new Error(`Full audit contains findings outside ${ALLOWED_ADVISORY}: ${rejected.join(", ")}`);
+
+  const remediable = Object.entries(vulnerabilities)
+    .filter(([name, entry]) => compatibleFix(entry, name))
+    .map(([name]) => name);
+  if (remediable.length) {
+    throw new Error(`A compatible remediation is available for ${remediable.join(", ")}; update the reviewed dependency baseline and remove the ${ALLOWED_ADVISORY} exception`);
+  }
 
   const counts = full.metadata.vulnerabilities;
   console.log(`Full audit: ${counts.total} finding entries (low ${counts.low}, moderate ${counts.moderate}, high ${counts.high}, critical ${counts.critical}).`);

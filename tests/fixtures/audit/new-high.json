@@ -1,1 +1,81 @@
-{"auditReportVersion":2,"vulnerabilities":{"other":{"name":"other","severity":"critical","via":[{"url":"https://github.com/advisories/GHSA-xxxx-yyyy-zzzz"}]}},"metadata":{"vulnerabilities":{"info":0,"low":0,"moderate":0,"high":0,"critical":1,"total":1}}}
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "other-high": {
+      "name": "other-high",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1240992,
+          "name": "other-high",
+          "dependency": "other-high",
+          "title": "other-high security advisory",
+          "url": "https://github.com/advisories/GHSA-xxxx-yyyy-zzzz",
+          "severity": "high",
+          "cwe": [
+            "CWE-674"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": "<=3.0.3"
+        }
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/other-high"
+      ],
+      "fixAvailable": false
+    },
+    "other-critical": {
+      "name": "other-critical",
+      "severity": "critical",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1240992,
+          "name": "other-critical",
+          "dependency": "other-critical",
+          "title": "other-critical security advisory",
+          "url": "https://github.com/advisories/GHSA-aaaa-bbbb-cccc",
+          "severity": "critical",
+          "cwe": [
+            "CWE-674"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": "<=3.0.3"
+        }
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/other-critical"
+      ],
+      "fixAvailable": false
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 1,
+      "critical": 1,
+      "total": 2
+    },
+    "dependencies": {
+      "prod": 121,
+      "dev": 346,
+      "optional": 62,
+      "peer": 1,
+      "peerOptional": 0,
+      "total": 505
+    }
+  }
+}
