@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsc -p tests/tsconfig.json && node --test .test-build/tests/*.test.js",
+    "test": "tsc -p tests/tsconfig.json && node --test .test-build/tests/*.test.js tests/*.test.mjs",
+    "audit:ci": "node scripts/audit-policy.mjs",
     "test:security-db": "node tests/integration/supabase-security.mjs"
   },
   "dependencies": {

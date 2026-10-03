@@ -1,0 +1,1 @@
+{"auditReportVersion":2,"vulnerabilities":{"braces":{"name":"braces","severity":"high","via":[{"url":"https://github.com/advisories/GHSA-vfj7-8cjw-p6xm"}]},"other":{"name":"other","severity":"moderate","via":[{"url":"https://github.com/advisories/GHSA-xxxx-yyyy-zzzz"}]}},"metadata":{"vulnerabilities":{"info":0,"low":0,"moderate":1,"high":1,"critical":0,"total":2}}}
