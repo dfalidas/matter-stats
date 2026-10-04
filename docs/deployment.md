@@ -97,6 +97,7 @@ After deployment, record sanitized evidence rather than assuming implementation 
 
 1. Record the deployed Git SHA and migration identifiers.
 2. Open `/login`, verify a failed login is rejected, then verify a valid login reaches `/dashboard`.
+   In an isolated environment, also make the limiter RPC and session storage unavailable in turn: login must show the generic retryable outage message without setting a cookie or redirecting, and server logs must contain only the sanitized login operation/reason identifiers.
 3. Confirm **Overview**, **Activity**, **Library**, and **Reports** load. On mobile, confirm **Account** exposes Settings and Log out. Check `/settings` and any retained legacy route required by the release (`/sources`, `/authors`, `/tags`, `/year-in-reading`).
 4. Log out and confirm the old session cannot be replayed.
 5. Test cron with missing, wrong, and correct Bearer values without using a query parameter. Run a real Matter sync only when separately authorized.
