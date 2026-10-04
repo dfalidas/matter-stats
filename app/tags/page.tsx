@@ -21,7 +21,7 @@ export default async function TagsPage({ searchParams }: TagsPageProps) {
     <PageShell
       eyebrow="Tags"
       title="Tag trends"
-      description="Explore Matter topics by reading time, article count, words read, and highlights."
+      description="Explore Matter topics by reading time, article count, estimated words, and highlights. Estimated from reading time at 225 words/min."
     >
       {rankingResult.ok ? (
         <TagsRanking period={period} ranking={rankingResult.ranking} />

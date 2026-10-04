@@ -35,7 +35,7 @@ const periodLabels: Record<MetricsPeriodPreset, string> = {
 const sortLabels: Record<SourceRankingSortKey, string> = {
   "reading-time": "Reading time",
   articles: "Articles",
-  words: "Words read",
+  words: "Estimated words",
   highlights: "Highlights",
 };
 
@@ -74,7 +74,7 @@ export function SourcesRanking({ period, ranking }: SourcesRankingProps) {
     <div className="space-y-5">
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Reading time" value={formatDuration(ranking.totals.readingTimeSeconds)} icon={Clock} />
-        <StatCard label="Words read" value={formatInteger(ranking.totals.wordsRead)} icon={BookOpen} />
+        <StatCard label="Estimated words" value={formatInteger(ranking.totals.wordsRead)} icon={BookOpen} />
         <StatCard label="Articles" value={formatInteger(ranking.totals.articlesRead)} icon={Newspaper} />
         <StatCard label="Highlights" value={formatInteger(ranking.totals.highlights)} icon={Highlighter} />
       </section>
@@ -155,7 +155,7 @@ export function SourcesRanking({ period, ranking }: SourcesRankingProps) {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="min-w-[220px]">Source</TableHead>
                   <TableHead className="text-right">Reading time</TableHead>
-                  <TableHead className="text-right">Words read</TableHead>
+                  <TableHead className="text-right">Estimated words</TableHead>
                   <TableHead className="text-right">Articles</TableHead>
                   <TableHead className="text-right">Highlights</TableHead>
                   <TableHead className="min-w-[180px] text-right">Share of reading</TableHead>

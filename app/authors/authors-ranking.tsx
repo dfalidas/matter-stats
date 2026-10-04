@@ -35,7 +35,7 @@ const periodLabels: Record<MetricsPeriodPreset, string> = {
 const sortLabels: Record<AuthorRankingSortKey, string> = {
   "reading-time": "Reading time",
   articles: "Articles",
-  words: "Words read",
+  words: "Estimated words",
   "top-source": "Top source",
 };
 
@@ -85,7 +85,7 @@ export function AuthorsRanking({ period, ranking }: AuthorsRankingProps) {
         <StatCard label="Reading time" value={formatDuration(ranking.totals.readingTimeSeconds)} icon={Clock} />
         <StatCard label="Authors" value={formatInteger(ranking.totals.authors)} icon={Users} />
         <StatCard label="Articles" value={formatInteger(ranking.totals.articlesRead)} icon={Newspaper} />
-        <StatCard label="Words read" value={formatInteger(ranking.totals.wordsRead)} icon={BookOpen} />
+        <StatCard label="Estimated words" value={formatInteger(ranking.totals.wordsRead)} icon={BookOpen} />
       </section>
 
       <Card className="border-white/10 bg-background/55 shadow-soft">
@@ -165,7 +165,7 @@ export function AuthorsRanking({ period, ranking }: AuthorsRankingProps) {
                   <TableHead className="min-w-[220px]">Author</TableHead>
                   <TableHead className="text-right">Reading time</TableHead>
                   <TableHead className="text-right">Articles</TableHead>
-                  <TableHead className="text-right">Words read</TableHead>
+                  <TableHead className="text-right">Estimated words</TableHead>
                   <TableHead className="min-w-[180px] text-right">Top source</TableHead>
                 </TableRow>
               </TableHeader>

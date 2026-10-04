@@ -1,8 +1,17 @@
 export const DEFAULT_READING_WPM = 225;
 
-export function estimateWordsFromSeconds(seconds: number, wpm = DEFAULT_READING_WPM): number {
+/** Canonical estimate for one reading session. Aggregate only after calling this per session. */
+export function estimateWordsFromSeconds(seconds: number): number {
   const safeSeconds = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
-  return Math.round((safeSeconds / 60) * wpm);
+  return Math.round((safeSeconds / 60) * DEFAULT_READING_WPM);
+}
+
+export function sumSessionWordEstimates(sessions: Iterable<{ duration_seconds: number | null }>): number {
+  let total = 0;
+  for (const session of sessions) {
+    total += estimateWordsFromSeconds(session.duration_seconds ?? 0);
+  }
+  return total;
 }
 
 export const SESSION_LENGTH_LABELS = ["<5 min", "5–<15 min", "15–<30 min", "≥30 min"] as const;

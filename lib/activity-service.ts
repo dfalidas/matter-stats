@@ -55,13 +55,14 @@ export async function getActivityMonth(
   const start = localDateToUtc(year, monthNumber, 1, timezone);
   const end = localDateToUtc(year, monthNumber + 1, 1, timezone);
   const rows = await fetchAllSessions(client, start, end);
-  const days = new Map<string, { seconds: number; sessions: number }>();
+  const days = new Map<string, { seconds: number; estimatedWords: number; sessions: number }>();
 
   for (const row of rows) {
     if (!row.started_at) continue;
     const date = formatDateInTimezone(new Date(row.started_at), timezone);
-    const value = days.get(date) ?? { seconds: 0, sessions: 0 };
+    const value = days.get(date) ?? { seconds: 0, estimatedWords: 0, sessions: 0 };
     value.seconds += positiveSeconds(row.duration_seconds);
+    value.estimatedWords += estimateWordsFromSeconds(positiveSeconds(row.duration_seconds));
     value.sessions += 1;
     days.set(date, value);
   }
@@ -76,6 +77,10 @@ export async function getActivityMonth(
   );
   const normalizedPage = Math.min(Math.max(1, Math.trunc(page)), Math.max(1, Math.ceil(selectedRows.length / SESSION_PAGE_SIZE)));
   const daySeconds = selectedRows.reduce((total, row) => total + positiveSeconds(row.duration_seconds), 0);
+  const dayWords = selectedRows.reduce(
+    (total, row) => total + estimateWordsFromSeconds(positiveSeconds(row.duration_seconds)),
+    0,
+  );
 
   return {
     month,
@@ -85,11 +90,10 @@ export async function getActivityMonth(
     days: [...days].map(([date, value]) => ({
       date,
       ...value,
-      estimatedWords: estimateWordsFromSeconds(value.seconds),
     })),
     dayTotal: {
       seconds: daySeconds,
-      estimatedWords: estimateWordsFromSeconds(daySeconds),
+      estimatedWords: dayWords,
       sessions: selectedRows.length,
     },
     sessions: selectedRows

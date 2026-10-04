@@ -73,11 +73,11 @@ test("builds rankings from synced Matter tags without breaking on untagged items
   assert.equal(ranking.tags.length, 1);
   assert.equal(ranking.tags[0]?.tag, "Productivity");
   assert.equal(ranking.tags[0]?.readingTimeSeconds, 600);
-  assert.equal(ranking.tags[0]?.wordsRead, 1_500);
+  assert.equal(ranking.tags[0]?.wordsRead, 2_250);
   assert.equal(ranking.tags[0]?.articlesRead, 1);
   assert.equal(ranking.tags[0]?.highlights, 1);
   assert.equal(ranking.totals.readingTimeSeconds, 600);
-  assert.equal(ranking.totals.wordsRead, 1_500);
+  assert.equal(ranking.totals.wordsRead, 2_250);
   assert.equal(ranking.totals.articlesRead, 1);
   assert.equal(ranking.totals.highlights, 1);
 });

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getReadingReport, isValidReportReference, resolveReportRange } from '../lib/reports-service';
 
-type Session={id:string;item_id:string|null;started_at:string|null;ended_at:string|null;duration_seconds:number|null;words_estimated:number|null;matter_items:null};
+type Session={id:string;item_id:string|null;started_at:string|null;ended_at:string|null;duration_seconds:number|null;words_estimated:number|null;matter_items:null|{id:string;title:string|null;url:string|null;source:string|null;author:string|null;estimated_reading_time_minutes:number|null;word_count:number|null}};
 class Q {
   private filters: Record<string, string | number | boolean> = {};
   private sort: {col:string;asc:boolean}|null=null;
@@ -133,4 +133,14 @@ test('resolves historical week, month, and year at Athens local boundaries',()=>
   } finally {
     if(oldTimezone===undefined) delete process.env.APP_TIMEZONE; else process.env.APP_TIMEZONE=oldTimezone;
   }
+});
+
+test('report totals, timeline, heatmap, and grouped longform sum one-second session estimates', async()=>{
+  const item={id:'same',title:'Same article',url:null,source:'Source',author:'Author',estimated_reading_time_minutes:5,word_count:1000};
+  const sessions: Session[]=[0,1,2].map((index)=>({id:`tiny-${index}`,item_id:'same',started_at:`2026-10-04T10:00:0${index}Z`,ended_at:null,duration_seconds:1,words_estimated:index===0?999:null,matter_items:item}));
+  const report=await getReadingReport(client([],sessions),'daily',{reference:'2026-10-04',now:new Date('2026-10-04T12:00:00Z')});
+  assert.equal(report.metrics.totals.wordsRead,12);
+  assert.equal(report.metrics.heatmap.find((day)=>day.date==='2026-10-04')?.wordsRead,12);
+  assert.deepEqual(report.timeline.map((session)=>session.wordsRead),[4,4,4]);
+  assert.equal(report.longformReads[0]?.wordsRead,12);
 });

@@ -8,7 +8,7 @@ These instructions apply to the entire repository.
 - Authentication uses an opaque `matter_stats_session` cookie whose SHA-256 hash is stored in `public.app_sessions`. Every data page and server action must call the server-side session guard. Middleware is an early redirect, not the authorization boundary.
 - Keep `/api/cron/sync-recent-activity` outside cookie authentication. It accepts only `Authorization: Bearer <CRON_SECRET>` and must not accept a query-string secret.
 - The analytics timezone comes from `APP_TIMEZONE` and defaults to `Europe/Athens`. Preserve explicit timezone handling when changing dates or reporting periods.
-- Treat `matter_items.word_count` as nullable Matter metadata. Session word estimates currently use rounded `word_count * progress` when both values exist, otherwise rounded duration at 225 WPM; see `docs/architecture.md` before changing metric semantics.
+- Treat `matter_items.word_count` as nullable Matter metadata for library/article size only. Reading estimates are calculated for each session as `Math.round(duration_seconds / 60 * 225)` and then summed; see `docs/architecture.md` before changing metric semantics.
 
 ## Working practices
 
