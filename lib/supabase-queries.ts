@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database, DailyStat, MatterItem, SyncRun } from "@/lib/supabase-types";
+import { formatDateInTimezone, getDefaultMetricsTimezone } from "@/lib/metrics-service";
 
 export type MatterStatsSupabaseClient = SupabaseClient<Database>;
 
@@ -11,7 +12,7 @@ export type DashboardSummary = {
   currentStreakDays: number;
 };
 
-export async function getDashboardSummary(client: MatterStatsSupabaseClient): Promise<DashboardSummary> {
+export async function getDashboardSummary(client: MatterStatsSupabaseClient, now = new Date()): Promise<DashboardSummary> {
   const { data, error } = await client
     .from("daily_stats")
     .select("date, reading_time_seconds, items_read_count, top_source")
@@ -28,7 +29,7 @@ export async function getDashboardSummary(client: MatterStatsSupabaseClient): Pr
     articlesRead: stats.reduce((total, stat) => total + stat.items_read_count, 0),
     readingTimeSeconds: stats.reduce((total, stat) => total + stat.reading_time_seconds, 0),
     topSource,
-    currentStreakDays: countCurrentStreak(stats),
+    currentStreakDays: countCurrentStreak(stats, now),
   };
 }
 
@@ -74,22 +75,31 @@ export async function getLatestSyncRun(client: MatterStatsSupabaseClient): Promi
   return data;
 }
 
-function countCurrentStreak(stats: Pick<DailyStat, "date" | "reading_time_seconds" | "items_read_count">[]): number {
+function countCurrentStreak(stats: Pick<DailyStat, "date" | "reading_time_seconds">[], now: Date): number {
   const activeDates = new Set(
     stats
-      .filter((stat) => stat.reading_time_seconds > 0 || stat.items_read_count > 0)
+      .filter((stat) => stat.reading_time_seconds > 0)
       .map((stat) => stat.date)
   );
 
-  const cursor = new Date();
-  cursor.setUTCHours(0, 0, 0, 0);
+  const timezone = getDefaultMetricsTimezone();
+  let cursor = formatDateInTimezone(now, timezone);
+  if (!activeDates.has(cursor)) {
+    cursor = shiftCalendarDate(cursor, -1);
+    if (!activeDates.has(cursor)) return 0;
+  }
 
   let streak = 0;
 
-  while (activeDates.has(cursor.toISOString().slice(0, 10))) {
+  while (activeDates.has(cursor)) {
     streak += 1;
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
+    cursor = shiftCalendarDate(cursor, -1);
   }
 
   return streak;
+}
+
+function shiftCalendarDate(value: string, days: number): string {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
