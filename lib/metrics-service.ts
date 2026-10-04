@@ -5,6 +5,8 @@ import {
   addLocalDays,
   getAppTimezone,
   getLocalDateParts,
+  getLocalDateTimeParts,
+  localDateTimeToUtc,
   localDateToUtc,
   normalizeTimezone,
   timestampToCalendarDate,
@@ -98,6 +100,8 @@ export type GetReadingMetricsOptions = {
     start?: Date | string | null;
     end?: Date | string;
   };
+  /** Explicit comparison window. Null disables comparison (for example all-time). */
+  comparisonRange?: { start: Date; end: Date } | null;
   timezone?: string;
   now?: Date | string;
   /** Optional local calendar date for a historical, explicitly as-of streak. */
@@ -259,7 +263,11 @@ export async function getReadingMetrics(
 ): Promise<ReadingMetrics> {
   const now = normalizeDateInput(options.now ?? new Date());
   const range = resolveMetricsDateRange({ ...options, now });
-  const previousRange = getPreviousEquivalentRange(range);
+  const previousRange = options.comparisonRange === null
+    ? null
+    : options.comparisonRange
+      ? metricsRange(options.comparisonRange.start, options.comparisonRange.end, range.timezone)
+      : getPreviousEquivalentRange(range);
   const topLimit = Math.max(1, options.topLimit ?? 10);
   const recentLimit = Math.max(1, options.recentLimit ?? 10);
 
@@ -334,6 +342,33 @@ function startOfNextLocalDay(date: Date, timezone: string): Date {
     getLocalDateParts(date, timezone).day,
     timezone,
   ), 1, timezone);
+}
+
+function metricsRange(start: Date, end: Date, timezone: string): MetricsDateRange {
+  return { start, end, startDate: timestampToCalendarDate(start, timezone), endDate: timestampToCalendarDate(end, timezone), timezone, preset: "custom" };
+}
+
+/** Period-to-date bounds and the same local calendar position in the preceding period. */
+export function resolvePeriodToDateRanges(preset: Exclude<MetricsPeriodPreset, "all-time">, now: Date, timezone = getAppTimezone()) {
+  const full = resolveMetricsDateRange({ preset, now, timezone });
+  const current = { start: full.start!, end: new Date(now) };
+  const parts = getLocalDateTimeParts(now, timezone);
+  let target = { ...parts };
+  if (preset === "today") target.day -= 1;
+  else if (preset === "week") target.day -= 7;
+  else if (preset === "month") target = clampedShift(parts, 0, -1);
+  else target = clampedShift(parts, -1, 0);
+  const previousEnd = localDateTimeToUtc(target, timezone);
+  const previousFull = resolveMetricsDateRange({ preset, now: previousEnd, timezone });
+  return { range: current, comparisonRange: { start: previousFull.start!, end: previousEnd } };
+}
+
+function clampedShift(parts: ReturnType<typeof getLocalDateTimeParts>, years: number, months: number) {
+  const monthIndex = parts.month - 1 + months;
+  const year = parts.year + years + Math.floor(monthIndex / 12);
+  const month = ((monthIndex % 12) + 12) % 12 + 1;
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return { ...parts, year, month, day: Math.min(parts.day, lastDay) };
 }
 
 function getLocalWeekday(year: number, month: number, day: number): number {
@@ -546,7 +581,7 @@ function buildHeatmap(sessions: MetricsSession[], range: MetricsDateRange, timez
     return rankHeatmapDates(byDate);
   }
 
-  const days = differenceInLocalDays(range.start, range.end, timezone);
+  const days = Math.max(1, differenceInLocalDays(range.start, range.end, timezone) + (isLocalMidnight(range.end, timezone) ? 0 : 1));
   const heatmap: ReadingHeatmapDay[] = [];
 
   for (let index = 0; index < days; index += 1) {
@@ -562,6 +597,11 @@ function buildHeatmap(sessions: MetricsSession[], range: MetricsDateRange, timez
   }
 
   return heatmap;
+}
+
+function isLocalMidnight(date: Date, timezone: string): boolean {
+  const p = getLocalDateTimeParts(date, timezone);
+  return p.hour === 0 && p.minute === 0 && p.second === 0 && p.millisecond === 0;
 }
 
 function rankHeatmapDates(byDate: Map<string, MetricsAccumulator>): ReadingHeatmapDay[] {

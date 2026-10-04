@@ -8,7 +8,9 @@ import {
   getPreviousEquivalentRange,
   getReadingMetrics,
   resolveMetricsDateRange,
+  resolvePeriodToDateRanges,
 } from "../lib/metrics-service";
+import { localDateTimeToUtc } from "../lib/calendar";
 
 type TestSession = {
   id: string;
@@ -211,6 +213,39 @@ test("calculates previous calendar month for month-over-month comparisons", () =
   assert.equal(previousRange?.endDate, "2026-05-01");
 });
 
+test("Overview month-to-date uses one intraday now and clamps short months", async () => {
+  const now = new Date("2026-03-31T09:00:00.000Z"); // 12:00 Athens
+  const windows = resolvePeriodToDateRanges("month", now, "Europe/Athens");
+  assert.equal(windows.range.start.toISOString(), "2026-02-28T22:00:00.000Z");
+  assert.equal(windows.range.end.toISOString(), now.toISOString());
+  assert.equal(windows.comparisonRange.start.toISOString(), "2026-01-31T22:00:00.000Z");
+  assert.equal(windows.comparisonRange.end.toISOString(), "2026-02-28T10:00:00.000Z");
+
+  const sessions: TestSession[] = [
+    { id: "previous", item_id: "p", started_at: "2026-02-28T09:59:59.000Z", ended_at: null, duration_seconds: 60, words_estimated: null },
+    { id: "current", item_id: "c", started_at: "2026-03-31T08:59:59.000Z", ended_at: null, duration_seconds: 120, words_estimated: null },
+    { id: "boundary", item_id: "x", started_at: now.toISOString(), ended_at: null, duration_seconds: 999, words_estimated: null },
+  ];
+  const metrics = await getReadingMetrics(createClient({ sessions }), { ...windows, now, timezone: "Europe/Athens" });
+  assert.equal(metrics.totals.totalReadingTimeSeconds, 120);
+  assert.equal(metrics.comparison.totals.totalReadingTimeSeconds, 60);
+  assert.equal(metrics.comparison.delta.totalReadingTimePercentChange, 1);
+  assert.equal(metrics.heatmap.at(-1)?.date, "2026-03-31");
+});
+
+test("Overview period-to-date clamps leap years and preserves DST wall time", () => {
+  const leap = resolvePeriodToDateRanges("year", new Date("2028-02-29T10:00:00.000Z"), "Europe/Athens");
+  assert.equal(leap.comparisonRange.end.toISOString(), "2027-02-28T10:00:00.000Z");
+  const dstDay = resolvePeriodToDateRanges("today", new Date("2026-03-29T01:30:00.000Z"), "Europe/Athens");
+  assert.equal(dstDay.comparisonRange.end.toISOString(), "2026-03-28T02:30:00.000Z");
+});
+
+test("local wall-time conversion advances gaps and chooses the earlier repeated time", () => {
+  const base = { year: 2026, month: 3, day: 29, hour: 3, minute: 30, second: 0, millisecond: 0 };
+  assert.equal(localDateTimeToUtc(base, "Europe/Athens").toISOString(), "2026-03-29T01:30:00.000Z");
+  assert.equal(localDateTimeToUtc({ ...base, month: 10, day: 25 }, "Europe/Athens").toISOString(), "2026-10-25T00:30:00.000Z");
+});
+
 test("returns typed zero metrics for an empty data set", async () => {
   const metrics = await getReadingMetrics(emptyClient, {
     preset: "today",
@@ -240,6 +275,7 @@ test("returns typed zero metrics for an empty data set", async () => {
     sessionsCount: 0,
   });
   assert.deepEqual(metrics.comparison.totals, metrics.totals);
+  assert.equal(metrics.comparison.delta.totalReadingTimePercentChange, 0);
 });
 
 

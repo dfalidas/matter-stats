@@ -7,7 +7,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { CalendarDays, Clock3, Library, Timer } from "lucide-react";
 import type { MetricsPeriodPreset, ReadingMetrics } from "@/lib/metrics-service";
 import type { MatterItem } from "@/lib/supabase-types";
-import { addCalendarDays, formatCalendarDate } from "@/lib/calendar";
+import { addCalendarDays, formatCalendarDate, getLocalDateTimeParts } from "@/lib/calendar";
 
 type LibraryPreview = Pick<MatterItem, "id" | "title" | "source" | "author" | "word_count" | "estimated_reading_time_minutes" | "progress" | "status">;
 type Result = { ok: true; metrics: ReadingMetrics; todayMetrics: ReadingMetrics; allTimeMetrics: ReadingMetrics; library: LibraryPreview[]; dataStatus: { lastSuccessfulSync: string | null; coverage: "unverified" | "unavailable" } } | { ok: false; message: string };
@@ -32,4 +32,4 @@ function Metric({icon:Icon,label,value,hint,prominent}:{icon:typeof Clock3;label
 function Chart({title,detail,children}:{title:string;detail:string;children:React.ReactNode}){return <section><h3 className="text-xl font-semibold">{title}</h3><p className="mb-5 text-sm text-muted-foreground">{detail}</p><div className="h-72">{children}</div></section>}
 function State({title,detail}:{title:string;detail:string}){return <div className="rounded-xl border bg-card p-8"><h2 className="font-semibold">{title}</h2><p className="mt-2 text-sm text-muted-foreground">{detail}</p></div>}
 function duration(s:number){const m=Math.round(s/60);return m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m} min`}
-function range(m:ReadingMetrics){const end=addCalendarDays(m.range.endDate,-1);return `${m.range.startDate?formatCalendarDate(m.range.startDate,{day:"numeric",month:"short"}):"All time"} – ${formatCalendarDate(end,{day:"numeric",month:"short",year:"numeric"})} · ${m.range.timezone}`}
+function range(m:ReadingMetrics){const p=getLocalDateTimeParts(m.range.end,m.range.timezone);const end=p.hour===0&&p.minute===0&&p.second===0&&p.millisecond===0?addCalendarDays(m.range.endDate,-1):m.range.endDate;return `${m.range.startDate?formatCalendarDate(m.range.startDate,{day:"numeric",month:"short"}):"All time"} – ${formatCalendarDate(end,{day:"numeric",month:"short",year:"numeric"})} · ${m.range.timezone}`}

@@ -2,7 +2,7 @@ import { PageShell } from "../_components/page-shell";
 import { DashboardOverview } from "./dashboard-overview";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { requireAccessSession } from "@/lib/require-auth";
-import { getDefaultMetricsTimezone, getReadingMetrics, localDateToUtc, METRICS_PERIOD_PRESETS, type MetricsPeriodPreset } from "@/lib/metrics-service";
+import { getDefaultMetricsTimezone, getReadingMetrics, localDateToUtc, METRICS_PERIOD_PRESETS, resolvePeriodToDateRanges, type MetricsPeriodPreset } from "@/lib/metrics-service";
 import type { MatterItem } from "@/lib/supabase-types";
 import { validateCustomRange } from "@/lib/custom-range";
 
@@ -69,10 +69,16 @@ async function getDashboardMetrics(period: MetricsPeriodPreset, start: string | 
       start: localDateToUtc(...dateParts(start), timezone),
       end: localDateToUtc(...addOneDay(end), timezone),
     } : null;
+    const selectedOptions = range
+      ? { range }
+      : period === "all-time"
+        ? { preset: period, comparisonRange: null }
+        : resolvePeriodToDateRanges(period, now, timezone);
+    const todayOptions = resolvePeriodToDateRanges("today", now, timezone);
     const [metrics, todayMetrics, allTimeMetrics, library, latestSync, syncState] = await Promise.all([
-      getReadingMetrics(client, range ? { range, now, topLimit: 5, recentLimit: 6 } : { preset: period, now, topLimit: 5, recentLimit: 6 }),
-      getReadingMetrics(client, { preset: "today", now, topLimit: 5, recentLimit: 6 }),
-      getReadingMetrics(client, { preset: "all-time", now, topLimit: 5, recentLimit: 6 }),
+      getReadingMetrics(client, { ...selectedOptions, now, topLimit: 5, recentLimit: 6 }),
+      getReadingMetrics(client, { ...todayOptions, now, topLimit: 5, recentLimit: 6 }),
+      getReadingMetrics(client, { preset: "all-time", comparisonRange: null, now, topLimit: 5, recentLimit: 6 }),
       client.from("matter_items").select("id,title,source,author,word_count,estimated_reading_time_minutes,progress,status").order("updated_at", { ascending: false }).limit(4),
       client.from("sync_runs").select("finished_at,started_at").eq("status", "success").order("finished_at", { ascending: false, nullsFirst: false }).limit(1).maybeSingle(),
       client.from("sync_state").select("session_cursor,recent_activity_checkpoint").eq("id", "matter").maybeSingle(),
