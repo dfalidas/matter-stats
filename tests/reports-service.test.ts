@@ -162,6 +162,38 @@ test('yearly report keeps its local 2026 reference and month data despite a 2025
   }
 });
 
+test('historical report production paths retain calendar comparison identity', async()=>{
+  const oldTimezone=process.env.APP_TIMEZONE; process.env.APP_TIMEZONE='Europe/Athens';
+  try {
+    const sessions: Session[]=[
+      {id:'feb',item_id:null,started_at:'2026-02-15T10:00:00Z',ended_at:null,duration_seconds:60,words_estimated:null,matter_items:null},
+      {id:'mar',item_id:null,started_at:'2026-03-15T10:00:00Z',ended_at:null,duration_seconds:120,words_estimated:null,matter_items:null},
+      {id:'dec',item_id:null,started_at:'2025-12-15T10:00:00Z',ended_at:null,duration_seconds:30,words_estimated:null,matter_items:null},
+    ];
+    const march=await getReadingReport(client([],sessions),'monthly',{reference:'2026-03',now:new Date('2030-01-01T00:00:00Z')});
+    assert.equal(march.metrics.range.start?.toISOString(),'2026-02-28T22:00:00.000Z');
+    assert.equal(march.metrics.range.end.toISOString(),'2026-03-31T21:00:00.000Z');
+    assert.equal(march.metrics.comparison.range?.start?.toISOString(),'2026-01-31T22:00:00.000Z');
+    assert.equal(march.metrics.comparison.range?.end.toISOString(),'2026-02-28T22:00:00.000Z');
+    assert.equal(march.metrics.comparison.totals.totalReadingTimeSeconds,60);
+    const january=await getReadingReport(client([],sessions),'monthly',{reference:'2026-01'});
+    assert.equal(january.metrics.comparison.range?.startDate,'2025-12-01');
+    assert.equal(january.metrics.comparison.totals.totalReadingTimeSeconds,30);
+    const year=await getReadingReport(client([],sessions),'yearly',{reference:'2026'});
+    assert.equal(year.metrics.comparison.range?.startDate,'2025-01-01');
+    assert.equal(year.metrics.comparison.range?.endDate,'2026-01-01');
+  } finally { if(oldTimezone===undefined) delete process.env.APP_TIMEZONE; else process.env.APP_TIMEZONE=oldTimezone; }
+});
+
+test('March 2028 report compares all 29 days of February', async()=>{
+  const oldTimezone=process.env.APP_TIMEZONE; process.env.APP_TIMEZONE='Europe/Athens';
+  try {
+    const report=await getReadingReport(client([],[]),'monthly',{reference:'2028-03'});
+    assert.equal(report.metrics.comparison.range?.startDate,'2028-02-01');
+    assert.equal(report.metrics.comparison.range?.endDate,'2028-03-01');
+  } finally { if(oldTimezone===undefined) delete process.env.APP_TIMEZONE; else process.env.APP_TIMEZONE=oldTimezone; }
+});
+
 test('report totals, timeline, heatmap, and grouped longform sum one-second session estimates', async()=>{
   const item={id:'same',title:'Same article',url:null,source:'Source',author:'Author',estimated_reading_time_minutes:5,word_count:1000};
   const sessions: Session[]=[0,1,2].map((index)=>({id:`tiny-${index}`,item_id:'same',started_at:`2026-10-04T10:00:0${index}Z`,ended_at:null,duration_seconds:1,words_estimated:index===0?999:null,matter_items:item}));

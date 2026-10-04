@@ -2,7 +2,8 @@ import { PageShell } from "../_components/page-shell";
 import { DashboardOverview } from "./dashboard-overview";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { requireAccessSession } from "@/lib/require-auth";
-import { getDefaultMetricsTimezone, getReadingMetrics, localDateToUtc, METRICS_PERIOD_PRESETS, type MetricsPeriodPreset } from "@/lib/metrics-service";
+import { getDefaultMetricsTimezone, METRICS_PERIOD_PRESETS, type MetricsPeriodPreset } from "@/lib/metrics-service";
+import { getOverviewReadingMetrics } from "@/lib/overview-service";
 import type { MatterItem } from "@/lib/supabase-types";
 import { validateCustomRange } from "@/lib/custom-range";
 
@@ -65,23 +66,15 @@ async function getDashboardMetrics(period: MetricsPeriodPreset, start: string | 
     const client = getSupabaseAdminClient();
     const timezone = getDefaultMetricsTimezone();
     const now = new Date();
-    const range = start && end ? {
-      start: localDateToUtc(...dateParts(start), timezone),
-      end: localDateToUtc(...addOneDay(end), timezone),
-    } : null;
-    const [metrics, todayMetrics, allTimeMetrics, library, latestSync, syncState] = await Promise.all([
-      getReadingMetrics(client, range ? { range, now, topLimit: 5, recentLimit: 6 } : { preset: period, now, topLimit: 5, recentLimit: 6 }),
-      getReadingMetrics(client, { preset: "today", now, topLimit: 5, recentLimit: 6 }),
-      getReadingMetrics(client, { preset: "all-time", now, topLimit: 5, recentLimit: 6 }),
+    const [overviewMetrics, library, latestSync, syncState] = await Promise.all([
+      getOverviewReadingMetrics(client, period, start, end, now, timezone),
       client.from("matter_items").select("id,title,source,author,word_count,estimated_reading_time_minutes,progress,status").order("updated_at", { ascending: false }).limit(4),
       client.from("sync_runs").select("finished_at,started_at").eq("status", "success").order("finished_at", { ascending: false, nullsFirst: false }).limit(1).maybeSingle(),
       client.from("sync_state").select("session_cursor,recent_activity_checkpoint").eq("id", "matter").maybeSingle(),
     ]);
     return {
       ok: true as const,
-      metrics,
-      todayMetrics,
-      allTimeMetrics,
+      ...overviewMetrics,
       library: (library.data ?? []) as Pick<MatterItem, "id" | "title" | "source" | "author" | "word_count" | "estimated_reading_time_minutes" | "progress" | "status">[],
       dataStatus: {
         lastSuccessfulSync: latestSync.data?.finished_at ?? latestSync.data?.started_at ?? null,
@@ -92,14 +85,4 @@ async function getDashboardMetrics(period: MetricsPeriodPreset, start: string | 
     const message = error instanceof Error ? error.message : "Unable to load dashboard metrics.";
     return { ok: false as const, message };
   }
-}
-
-function dateParts(value: string): [number, number, number] {
-  const [year, month, day] = value.split("-").map(Number);
-  return [year, month, day];
-}
-
-function addOneDay(value: string): [number, number, number] {
-  const [year, month, day] = dateParts(value);
-  return [year, month, day + 1];
 }

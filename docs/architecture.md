@@ -30,6 +30,14 @@ The cron route is intentionally outside cookie authentication. `GET /api/cron/sy
 
 The current primary navigation is **Overview** (`/dashboard`), **Activity** (`/activity`), **Library** (`/articles`), and **Reports** (`/reports`). Desktop navigation also links Settings and Log out. On mobile, Settings and Log out are in the **Account** menu while the four primary destinations remain in the bottom navigation.
 
+### Analytics comparison windows
+
+Reports use complete local calendar periods and compare them with the immediately preceding period of the same identity: day, Monday-based week, month, or year. Historical reports are never clipped to the current clock. Overview presets are period-to-date: one request-scoped `now` closes the current window, and the comparison closes at the same local calendar position and wall-clock time in the preceding day, week, month, or year. Custom Overview dates remain complete inclusive user dates (represented by an exclusive midnight boundary) and compare with the immediately preceding equal-length local-calendar span. All-time has no comparison.
+
+Month/year comparisons clamp a missing corresponding day to the target month's last valid day while retaining the local clock time; they never overflow into the next month or beyond that period's exclusive end. Local times in a daylight-saving gap advance by the transition gap, while repeated local times select the earlier instant. These deterministic rules match JavaScript/Temporal `compatible` disambiguation. Every query uses half-open bounds (`start <= started_at < end`), and heatmaps include an ending calendar day when the exclusive end is intraday but exclude that day when the end is local midnight.
+
+An Overview request made exactly at the local start of its selected preset has an empty period-to-date window: its heatmap has no day buckets and its range copy displays that boundary as an `As of` date rather than an inverted range.
+
 Other implemented routes are:
 
 - `/` redirects to `/dashboard`; `/login` is the public password form.
