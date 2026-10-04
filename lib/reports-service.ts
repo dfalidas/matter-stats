@@ -87,6 +87,7 @@ export async function getReadingReport(
   const latestWeekWithDataStartDate = period === "weekly" ? await getLatestWeekWithDataStartDate(client) : null;
   const metrics = await getReadingMetrics(client, {
     range: selectedRange,
+    comparisonRange: resolvePreviousReportRange(period, selectedRange),
     now,
     historicalStreakDate: formatDateInTimezone(addLocalDays(selectedRange.end, -1, timezone), timezone),
     topLimit: 6,
@@ -101,6 +102,21 @@ export async function getReadingReport(
     longformReads: buildLongformReads(sessions, 6),
     latestWeekWithDataStartDate,
   };
+}
+
+function resolvePreviousReportRange(period: ReportPeriod, range: { start: Date; end: Date }) {
+  const timezone = getDefaultMetricsTimezone();
+  if (period === "monthly") {
+    const key = formatDateInTimezone(range.start, timezone);
+    const [year, month] = key.split("-").map(Number);
+    return { start: localDateToUtc(year, month - 1, 1, timezone), end: range.start };
+  }
+  if (period === "yearly") {
+    const year = Number(formatDateInTimezone(range.start, timezone).slice(0, 4));
+    return { start: localDateToUtc(year - 1, 1, 1, timezone), end: range.start };
+  }
+  const days = period === "weekly" ? 7 : 1;
+  return { start: addLocalDays(range.start, -days, timezone), end: range.start };
 }
 
 export function resolveReportRange(period: ReportPeriod, requested?: string | null, now = new Date()) {

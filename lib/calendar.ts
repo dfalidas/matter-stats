@@ -19,7 +19,7 @@ export function normalizeTimezone(timezone?: string): string {
   return isValidTimezone(value) ? value : DEFAULT_APP_TIMEZONE;
 }
 
-function dateTimeParts(date: Date, timezone: string) {
+export function getLocalDateTimeParts(date: Date, timezone: string) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: timezone,
     year: "numeric",
@@ -28,23 +28,58 @@ function dateTimeParts(date: Date, timezone: string) {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
+    fractionalSecondDigits: 3,
     hourCycle: "h23",
   }).formatToParts(date);
   const values = new Map(parts.map((part) => [part.type, part.value]));
   return {
     year: Number(values.get("year")), month: Number(values.get("month")), day: Number(values.get("day")),
     hour: Number(values.get("hour")), minute: Number(values.get("minute")), second: Number(values.get("second")),
+    millisecond: Number(values.get("fractionalSecond") ?? 0),
   };
 }
 
 export function getLocalDateParts(date: Date, timezone: string) {
-  const { year, month, day } = dateTimeParts(date, timezone);
+  const { year, month, day } = getLocalDateTimeParts(date, timezone);
   return { year, month, day };
 }
 
 function timezoneOffsetMs(date: Date, timezone: string): number {
-  const parts = dateTimeParts(date, timezone);
-  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - date.getTime();
+  const parts = getLocalDateTimeParts(date, timezone);
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second, parts.millisecond) - date.getTime();
+}
+
+export type LocalDateTime = ReturnType<typeof getLocalDateTimeParts>;
+
+/**
+ * Convert a local wall time deterministically. Repeated times choose the earlier
+ * instant; gap times move forward by the transition gap (Temporal-compatible).
+ */
+export function localDateTimeToUtc(parts: LocalDateTime, timezone: string): Date {
+  const normalizedDate = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  if (
+    normalizedDate.getUTCFullYear() !== parts.year ||
+    normalizedDate.getUTCMonth() !== parts.month - 1 ||
+    normalizedDate.getUTCDate() !== parts.day ||
+    parts.hour < 0 || parts.hour > 23 || parts.minute < 0 || parts.minute > 59 ||
+    parts.second < 0 || parts.second > 59 || parts.millisecond < 0 || parts.millisecond > 999
+  ) throw new Error("Invalid local date-time");
+  const wall = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second, parts.millisecond);
+  const offsets = new Set<number>();
+  for (let hours = -48; hours <= 48; hours += 1) offsets.add(timezoneOffsetMs(new Date(wall + hours * 3_600_000), timezone));
+  const candidates = [...offsets]
+    .map((offset) => new Date(wall - offset))
+    .filter((date) => sameLocalDateTime(getLocalDateTimeParts(date, timezone), parts))
+    .sort((a, b) => a.getTime() - b.getTime());
+  if (candidates[0]) return candidates[0];
+  // For a spring-forward gap, the pre-transition (smaller) offset advances the wall time by the gap.
+  return new Date(wall - Math.min(...offsets));
+}
+
+function sameLocalDateTime(left: LocalDateTime, right: LocalDateTime): boolean {
+  return left.year === right.year && left.month === right.month && left.day === right.day &&
+    left.hour === right.hour && left.minute === right.minute && left.second === right.second &&
+    left.millisecond === right.millisecond;
 }
 
 /** Convert a local calendar midnight to its UTC instant. */

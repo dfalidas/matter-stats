@@ -8,7 +8,10 @@ import {
   getPreviousEquivalentRange,
   getReadingMetrics,
   resolveMetricsDateRange,
+  resolvePeriodToDateRanges,
 } from "../lib/metrics-service";
+import { localDateTimeToUtc } from "../lib/calendar";
+import { formatOverviewRangeLabel, getOverviewReadingMetrics } from "../lib/overview-service";
 
 type TestSession = {
   id: string;
@@ -40,7 +43,7 @@ class TestQuery<Row extends TestSession | TestTagRow> {
   private startedAtAscending: boolean | null = null;
   private window: [number, number] | null = null;
 
-  constructor(private readonly rows: Row[]) {}
+  constructor(private readonly rows: Row[], private readonly record?: (operator: "gte" | "lt", value: string) => void) {}
 
   select() {
     return this;
@@ -49,6 +52,7 @@ class TestQuery<Row extends TestSession | TestTagRow> {
   lt(column: string, value: string) {
     if (column === "started_at") {
       this.startedBefore = value;
+      this.record?.("lt", value);
     }
     return this;
   }
@@ -56,6 +60,7 @@ class TestQuery<Row extends TestSession | TestTagRow> {
   gte(column: string, value: string) {
     if (column === "started_at") {
       this.startedAtOrAfter = value;
+      this.record?.("gte", value);
     }
     return this;
   }
@@ -127,6 +132,16 @@ function createClient({ sessions = [], tags = [] }: { sessions?: TestSession[]; 
       return new TestQuery([]);
     },
   } as never;
+}
+
+function createRecordingClient(sessions: TestSession[]) {
+  const bounds: Array<{ operator: "gte" | "lt"; value: string }> = [];
+  const client = {
+    from(table: string) {
+      return new TestQuery(table === "reading_sessions" ? sessions : [], (operator, value) => bounds.push({ operator, value }));
+    },
+  } as never;
+  return { client, bounds };
 }
 
 const emptyClient = createClient({});
@@ -211,6 +226,88 @@ test("calculates previous calendar month for month-over-month comparisons", () =
   assert.equal(previousRange?.endDate, "2026-05-01");
 });
 
+test("Overview month-to-date uses one intraday now and clamps short months", async () => {
+  const now = new Date("2026-03-31T09:00:00.000Z"); // 12:00 Athens
+  const windows = resolvePeriodToDateRanges("month", now, "Europe/Athens");
+  assert.equal(windows.range.start.toISOString(), "2026-02-28T22:00:00.000Z");
+  assert.equal(windows.range.end.toISOString(), now.toISOString());
+  assert.equal(windows.comparisonRange.start.toISOString(), "2026-01-31T22:00:00.000Z");
+  assert.equal(windows.comparisonRange.end.toISOString(), "2026-02-28T10:00:00.000Z");
+
+  const sessions: TestSession[] = [
+    { id: "previous", item_id: "p", started_at: "2026-02-28T09:59:59.000Z", ended_at: null, duration_seconds: 60, words_estimated: null },
+    { id: "current", item_id: "c", started_at: "2026-03-31T08:59:59.000Z", ended_at: null, duration_seconds: 120, words_estimated: null },
+    { id: "boundary", item_id: "x", started_at: now.toISOString(), ended_at: null, duration_seconds: 999, words_estimated: null },
+  ];
+  const metrics = await getReadingMetrics(createClient({ sessions }), { ...windows, now, timezone: "Europe/Athens" });
+  assert.equal(metrics.totals.totalReadingTimeSeconds, 120);
+  assert.equal(metrics.comparison.totals.totalReadingTimeSeconds, 60);
+  assert.equal(metrics.comparison.delta.totalReadingTimePercentChange, 1);
+  assert.equal(metrics.heatmap.at(-1)?.date, "2026-03-31");
+});
+
+test("Overview period-to-date clamps leap years and preserves DST wall time", () => {
+  const leap = resolvePeriodToDateRanges("year", new Date("2028-02-29T10:00:00.000Z"), "Europe/Athens");
+  assert.equal(leap.comparisonRange.end.toISOString(), "2027-02-28T10:00:00.000Z");
+  const dstDay = resolvePeriodToDateRanges("today", new Date("2026-03-29T01:30:00.000Z"), "Europe/Athens");
+  assert.equal(dstDay.comparisonRange.end.toISOString(), "2026-03-28T02:30:00.000Z");
+});
+
+test("local wall-time conversion advances gaps and chooses the earlier repeated time", () => {
+  const base = { year: 2026, month: 3, day: 29, hour: 3, minute: 30, second: 0, millisecond: 0 };
+  assert.equal(localDateTimeToUtc(base, "Europe/Athens").toISOString(), "2026-03-29T01:30:00.000Z");
+  assert.equal(localDateTimeToUtc({ ...base, month: 10, day: 25 }, "Europe/Athens").toISOString(), "2026-10-25T00:30:00.000Z");
+});
+
+test("Overview production caller normalizes cross-month and DST comparison ends", async () => {
+  const now = new Date("2026-04-05T09:00:00.000Z");
+  const sessions: TestSession[] = [
+    { id: "previous-in", item_id: "p", started_at: "2026-03-29T08:59:59.000Z", ended_at: null, duration_seconds: 60, words_estimated: 999 },
+    { id: "previous-edge", item_id: "e", started_at: "2026-03-29T09:00:00.000Z", ended_at: null, duration_seconds: 180, words_estimated: 999 },
+    { id: "previous-after", item_id: "a", started_at: "2026-03-29T09:30:00.000Z", ended_at: null, duration_seconds: 120, words_estimated: 999 },
+    { id: "current", item_id: "c", started_at: "2026-04-05T08:59:59.000Z", ended_at: null, duration_seconds: 120, words_estimated: 999 },
+  ];
+  const { client, bounds } = createRecordingClient(sessions);
+  const { metrics } = await getOverviewReadingMetrics(client, "week", null, null, now, "Europe/Athens");
+  assert.equal(metrics.range.start?.toISOString(), "2026-03-29T21:00:00.000Z");
+  assert.equal(metrics.range.end.toISOString(), now.toISOString());
+  assert.equal(metrics.comparison.range?.start?.toISOString(), "2026-03-22T22:00:00.000Z");
+  assert.equal(metrics.comparison.range?.end.toISOString(), "2026-03-29T09:00:00.000Z");
+  assert.equal(metrics.totals.totalReadingTimeSeconds, 120);
+  assert.equal(metrics.totals.wordsRead, 450);
+  assert.equal(metrics.comparison.totals.totalReadingTimeSeconds, 60);
+  assert.equal(metrics.comparison.totals.wordsRead, 225);
+  assert.equal(metrics.comparison.delta.totalReadingTimePercentChange, 1);
+  assert.equal(metrics.heatmap.reduce((sum, day) => sum + day.readingTimeSeconds, 0), 120);
+  assert.ok(bounds.some((bound) => bound.operator === "gte" && bound.value === "2026-03-22T22:00:00.000Z"));
+  assert.ok(bounds.some((bound) => bound.operator === "lt" && bound.value === "2026-03-29T09:00:00.000Z"));
+  assert.equal(formatOverviewRangeLabel(metrics), "30 Mar – 5 Apr 2026 · Europe/Athens");
+});
+
+test("Overview production caller handles normalized day shifts and repeated times", async () => {
+  const empty = createClient({});
+  const day = await getOverviewReadingMetrics(empty, "today", null, null, new Date("2026-03-31T21:30:00.000Z"), "Europe/Athens");
+  assert.equal(day.metrics.comparison.range?.end.toISOString(), "2026-03-30T21:30:00.000Z");
+  const repeated = await getOverviewReadingMetrics(empty, "week", null, null, new Date("2026-11-01T01:30:00.000Z"), "Europe/Athens");
+  assert.equal(repeated.metrics.comparison.range?.end.toISOString(), "2026-10-25T00:30:00.000Z");
+});
+
+test("Overview empty period-to-date windows have no heatmap buckets and use as-of labels", async () => {
+  const empty = createClient({});
+  const fixtures: Array<["today" | "week" | "month" | "year", string, string]> = [
+    ["today", "2026-04-01T21:00:00.000Z", "As of 2 Apr 2026 · Europe/Athens"],
+    ["week", "2026-04-05T21:00:00.000Z", "As of 6 Apr 2026 · Europe/Athens"],
+    ["month", "2026-03-31T21:00:00.000Z", "As of 1 Apr 2026 · Europe/Athens"],
+    ["year", "2025-12-31T22:00:00.000Z", "As of 1 Jan 2026 · Europe/Athens"],
+  ];
+  for (const [period, timestamp, label] of fixtures) {
+    const { metrics } = await getOverviewReadingMetrics(empty, period, null, null, new Date(timestamp), "Europe/Athens");
+    assert.equal(metrics.range.start?.getTime(), metrics.range.end.getTime());
+    assert.deepEqual(metrics.heatmap, []);
+    assert.equal(formatOverviewRangeLabel(metrics), label);
+  }
+});
+
 test("returns typed zero metrics for an empty data set", async () => {
   const metrics = await getReadingMetrics(emptyClient, {
     preset: "today",
@@ -240,6 +337,7 @@ test("returns typed zero metrics for an empty data set", async () => {
     sessionsCount: 0,
   });
   assert.deepEqual(metrics.comparison.totals, metrics.totals);
+  assert.equal(metrics.comparison.delta.totalReadingTimePercentChange, 0);
 });
 
 
