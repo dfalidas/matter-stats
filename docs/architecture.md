@@ -70,7 +70,7 @@ The SQL expresses the intended RLS and grant policy, and the TypeScript implemen
 - Current session normalization uses `round(item.word_count * item.progress)` for each session when both item fields are available; otherwise it uses `round(duration_seconds / 60 * 225)`. Reusing cumulative item progress for every session can over-count across multiple sessions.
 - The target policy recorded by stabilization work is additive per-session duration estimation and rounding (for example, three 60-second sessions total 675 words at 225 WPM). That target is **not implemented** where the item metadata branch applies.
 - Matter session payloads may lack a usable item identifier. Those sessions can be stored with a null `item_id`, so time/session totals can remain available while source, author, tag, article counts, and other attribution-dependent breakdowns are incomplete. Missing attribution is an unsupported capability with the observed payload—not a promise that another sync will repair it.
-- Timezone behavior is improved and defaults to `Europe/Athens`, but full streak/word/timezone consistency remains open. Do not describe all aggregates as reconciled.
+- Timezone behavior defaults to `Europe/Athens`. Current reading streaks use positive-duration sessions on local calendar dates, are anchored to one request-scoped current time rather than the selected report range, and may carry through an empty today only when yesterday is active. Reports expose their selected-date streak separately. Broader word and timezone consistency remains open; do not describe all aggregates as reconciled.
 
 ## Remaining stabilization work
 
@@ -79,7 +79,7 @@ The merged interface redesign does not complete the stabilization plan. Remainin
 - review official advisories and apply the smallest supported security dependency patches;
 - reliable sync continuation, leases/concurrency control, and large-history behavior;
 - complete/paginated database queries rather than implicit Data API result limits;
-- consistent streak, word-estimation, and timezone semantics;
+- consistent word-estimation and broader timezone semantics outside reading streaks;
 - repair/rebuild tooling for derived data and interrupted sync state; and
 - CI coverage, including isolated database authorization and migration checks.
 

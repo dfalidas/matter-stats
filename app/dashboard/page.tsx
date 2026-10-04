@@ -64,14 +64,15 @@ async function getDashboardMetrics(period: MetricsPeriodPreset, start: string | 
   try {
     const client = getSupabaseAdminClient();
     const timezone = getDefaultMetricsTimezone();
+    const now = new Date();
     const range = start && end ? {
       start: localDateToUtc(...dateParts(start), timezone),
       end: localDateToUtc(...addOneDay(end), timezone),
     } : null;
     const [metrics, todayMetrics, allTimeMetrics, library, latestSync, syncState] = await Promise.all([
-      getReadingMetrics(client, range ? { range, topLimit: 5, recentLimit: 6 } : { preset: period, topLimit: 5, recentLimit: 6 }),
-      getReadingMetrics(client, { preset: "today", topLimit: 5, recentLimit: 6 }),
-      getReadingMetrics(client, { preset: "all-time", topLimit: 5, recentLimit: 6 }),
+      getReadingMetrics(client, range ? { range, now, topLimit: 5, recentLimit: 6 } : { preset: period, now, topLimit: 5, recentLimit: 6 }),
+      getReadingMetrics(client, { preset: "today", now, topLimit: 5, recentLimit: 6 }),
+      getReadingMetrics(client, { preset: "all-time", now, topLimit: 5, recentLimit: 6 }),
       client.from("matter_items").select("id,title,source,author,word_count,estimated_reading_time_minutes,progress,status").order("updated_at", { ascending: false }).limit(4),
       client.from("sync_runs").select("finished_at,started_at").eq("status", "success").order("finished_at", { ascending: false, nullsFirst: false }).limit(1).maybeSingle(),
       client.from("sync_state").select("session_cursor,recent_activity_checkpoint").eq("id", "matter").maybeSingle(),

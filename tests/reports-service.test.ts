@@ -8,12 +8,12 @@ class Q {
   private sort: {col:string;asc:boolean}|null=null;
   private lim:number|null=null;
   private window:[number,number]|null=null;
-  constructor(private table:string, private rows:Record<string, unknown>[]){}
-  select(){return this;} lt(c:string,v:string){this.filters[`lt_${c}`]=v;return this;} gte(c:string,v:string){this.filters[`gte_${c}`]=v;return this;}
-  gt(c:string,v:number){this.filters[`gt_${c}`]=v;return this;} not(c:string){this.filters[`not_${c}`]=true;return this;}
+  constructor(private table:string, private rows:Record<string, unknown>[], private onMaybeSingle?: (table:string)=>void){}
+  select(){return this;} lt(c:string,v:string){this.filters[`lt:${c}`]=v;return this;} gte(c:string,v:string){this.filters[`gte:${c}`]=v;return this;}
+  gt(c:string,v:number){this.filters[`gt:${c}`]=v;return this;} not(c:string){this.filters[`not:${c}`]=true;return this;}
   order(col:string,opt:{ascending?:boolean}){this.sort={col,asc:opt.ascending??true};return this;} limit(n:number){this.lim=n;return this;}
   range(from:number,to:number){this.window=[from,to];return this;}
-  maybeSingle(){const data=this.result()[0]??null; return Promise.resolve({data,error:null});}
+  maybeSingle(){return Promise.resolve().then(()=>{this.onMaybeSingle?.(this.table); const data=this.result()[0]??null; return {data,error:null};});}
   in(){return this;}
   then<TResult1 = { data: unknown[]; error: null }, TResult2 = never>(
     onf?: ((value: { data: unknown[]; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
@@ -21,7 +21,7 @@ class Q {
   ){return Promise.resolve({data:this.result(),error:null}).then(onf,onr);}
   private result(){let out=[...this.rows];
     for (const [k,v] of Object.entries(this.filters)) {
-      const [op,col]=k.split('_');
+      const [op,col]=k.split(':');
       if (!col) continue;
       if(op==='lt') out=out.filter((r)=>r[col]!==null && String(r[col]) < String(v));
       if(op==='gte') out=out.filter((r)=>r[col]!==null && String(r[col]) >= String(v));
@@ -34,8 +34,8 @@ class Q {
     return out;
   }
 }
-function client(daily:{date:string;reading_time_seconds:number}[], sessions:Session[]){
-  return {from(table:string){if(table==='daily_stats') return new Q(table,daily); if(table==='reading_sessions') return new Q(table,sessions); if(table==='item_tags') return new Q(table,[]); return new Q(table,[]);} } as never;
+function client(daily:{date:string;reading_time_seconds:number}[], sessions:Session[], onMaybeSingle?: (table:string)=>void){
+  return {from(table:string){if(table==='daily_stats') return new Q(table,daily,onMaybeSingle); if(table==='reading_sessions') return new Q(table,sessions,onMaybeSingle); if(table==='item_tags') return new Q(table,[],onMaybeSingle); return new Q(table,[],onMaybeSingle);} } as never;
 }
 
 test('weekly report stays empty for empty current week and exposes latest week with data', async()=>{
@@ -57,6 +57,56 @@ test('weekly report renders populated historical week with null item_id sessions
   assert.equal(report.metrics.range.startDate,'2026-05-04');
   assert.ok(report.metrics.totals.sessionsCount >= 0);
   assert.ok(report.timeline.length >= 0);
+});
+
+test('report forwards its request-scoped now and exposes a separate selected-date streak', async()=>{
+  const sessions: Session[] = [
+    {id:'s26',item_id:null,started_at:'2026-09-26T10:00:00Z',ended_at:null,duration_seconds:60,words_estimated:225,matter_items:null},
+    {id:'s27',item_id:null,started_at:'2026-09-27T10:00:00Z',ended_at:null,duration_seconds:60,words_estimated:225,matter_items:null},
+    {id:'s28',item_id:null,started_at:'2026-09-28T10:00:00Z',ended_at:null,duration_seconds:60,words_estimated:225,matter_items:null},
+  ];
+  const report=await getReadingReport(client([],sessions),'daily',{reference:'2026-09-28',now:new Date('2026-09-30T12:00:00Z')});
+  assert.equal(report.metrics.currentStreakDays,0);
+  assert.deepEqual(report.metrics.historicalStreak,{asOfDate:'2026-09-28',days:3});
+});
+
+const midnightSessions: Session[] = [
+  {id:'midnight-26',item_id:null,started_at:'2026-09-26T10:00:00Z',ended_at:null,duration_seconds:60,words_estimated:225,matter_items:null},
+  {id:'midnight-27',item_id:null,started_at:'2026-09-27T10:00:00Z',ended_at:null,duration_seconds:60,words_estimated:225,matter_items:null},
+];
+
+test('daily report captures default now once when the clock crosses Athens midnight', async(t)=>{
+  const oldTimezone=process.env.APP_TIMEZONE;
+  process.env.APP_TIMEZONE='Europe/Athens';
+  t.mock.timers.enable({apis:['Date'],now:new Date('2026-09-28T20:59:59.999Z')});
+  try {
+    const pending=getReadingReport(client([],midnightSessions),'daily');
+    t.mock.timers.tick(1);
+    const report=await pending;
+    assert.equal(report.metrics.range.startDate,'2026-09-28');
+    assert.equal(report.metrics.currentStreakDays,2);
+  } finally {
+    t.mock.timers.reset();
+    if(oldTimezone===undefined) delete process.env.APP_TIMEZONE; else process.env.APP_TIMEZONE=oldTimezone;
+  }
+});
+
+test('weekly report retains captured default now while awaiting its latest-week lookup', async(t)=>{
+  const oldTimezone=process.env.APP_TIMEZONE;
+  process.env.APP_TIMEZONE='Europe/Athens';
+  t.mock.timers.enable({apis:['Date'],now:new Date('2026-09-28T20:59:59.999Z')});
+  let advanced=false;
+  try {
+    const report=await getReadingReport(client([],midnightSessions,(table)=>{
+      if(table==='daily_stats'&&!advanced){advanced=true;t.mock.timers.tick(1);}
+    }),'weekly');
+    assert.equal(advanced,true);
+    assert.equal(report.metrics.range.startDate,'2026-09-28');
+    assert.equal(report.metrics.currentStreakDays,2);
+  } finally {
+    t.mock.timers.reset();
+    if(oldTimezone===undefined) delete process.env.APP_TIMEZONE; else process.env.APP_TIMEZONE=oldTimezone;
+  }
 });
 
 test('validates URL-persisted report references by period',()=>{

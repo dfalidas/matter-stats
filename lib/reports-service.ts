@@ -79,11 +79,15 @@ export async function getReadingReport(
   period: ReportPeriod,
   options?: { reference?: string | null; weekStartDate?: string | null; now?: Date }
 ): Promise<ReadingReport> {
+  const now = options?.now ?? new Date();
   const requestedReference = options?.reference ?? options?.weekStartDate;
-  const selectedRange = resolveReportRange(period, requestedReference, options?.now);
+  const selectedRange = resolveReportRange(period, requestedReference, now);
+  const timezone = getDefaultMetricsTimezone();
   const latestWeekWithDataStartDate = period === "weekly" ? await getLatestWeekWithDataStartDate(client) : null;
   const metrics = await getReadingMetrics(client, {
     range: selectedRange,
+    now,
+    historicalStreakDate: formatDateInTimezone(addLocalDays(selectedRange.end, -1, timezone), timezone),
     topLimit: 6,
     recentLimit: 8,
   });

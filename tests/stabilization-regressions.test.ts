@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { normalizeReadingSession } from "../lib/matter-normalizers.js";
 import { getMatterSyncInitialPhase, getMatterSyncSessionsLimit, getRecentActivityWindowStart } from "../lib/matter-sync-progress.js";
-import { getDefaultMetricsTimezone } from "../lib/metrics-service.js";
+import { getDefaultMetricsTimezone, getReadingMetrics } from "../lib/metrics-service.js";
 
 /** W0 characterization tests remain green; adjacent TODOs are W4/W5 gates. */
 test("R3 characterization: current sync is one bounded page and defaults to the current year", () => {
@@ -27,8 +27,41 @@ test("R5 synthetic fixture independently defines the complete expected total", (
 });
 test.todo("R5 target (W5): dashboard totals retrieve all 1,200 rows when the mocked Data API caps pages at 1,000");
 
-test.todo("R6 target (W5): sessions on 26–28 September yield current streak 3 as of 28 September regardless of preset");
-test.todo("R6 target (W5): yesterday's streak survives an empty today, while empty today and yesterday yields zero");
+function streakClient(dates: string[]) {
+  const sessions = dates.map((started_at, index) => ({
+    id: `streak-${index}`, item_id: null, started_at, ended_at: null,
+    duration_seconds: 60, words_estimated: 225, matter_items: null,
+  }));
+  return { from(table: string) {
+    const rows = table === "reading_sessions" ? sessions : [];
+    let window: [number, number] | null = null;
+    const query = {
+      select: () => query, lt: () => query, gte: () => query, order: () => query,
+      range: (from: number, to: number) => { window = [from, to]; return query; },
+      in: () => Promise.resolve({ data: [], error: null }),
+      then: (resolve: (value: { data: typeof rows; error: null }) => unknown) => {
+        const data = window ? rows.slice(window[0], window[1] + 1) : rows;
+        return Promise.resolve({ data, error: null }).then(resolve);
+      },
+    };
+    return query;
+  } } as never;
+}
+
+test("R6 target (W5): sessions on 26–28 September yield current streak 3 as of 28 September regardless of preset", async () => {
+  const client = streakClient(["2026-09-26T10:00:00Z", "2026-09-27T10:00:00Z", "2026-09-28T10:00:00Z"]);
+  for (const preset of ["today", "week", "month", "year", "all-time"] as const) {
+    const metrics = await getReadingMetrics(client, { preset, now: "2026-09-28T18:00:00Z", timezone: "UTC" });
+    assert.equal(metrics.currentStreakDays, 3, preset);
+  }
+});
+test("R6 target (W5): yesterday's streak survives an empty today, while empty today and yesterday yields zero", async () => {
+  const client = streakClient(["2026-09-26T10:00:00Z", "2026-09-27T10:00:00Z", "2026-09-28T10:00:00Z"]);
+  const on29 = await getReadingMetrics(client, { preset: "today", now: "2026-09-29T18:00:00Z", timezone: "UTC" });
+  const on30 = await getReadingMetrics(client, { preset: "today", now: "2026-09-30T18:00:00Z", timezone: "UTC" });
+  assert.equal(on29.currentStreakDays, 3);
+  assert.equal(on30.currentStreakDays, 0);
+});
 
 test("R7 characterization: item word_count×progress is currently copied to every session", () => {
   const normalized = normalizeReadingSession({ id: "s-1", date: "2026-09-29T10:00:00Z", seconds_read: 60 }, { item: { word_count: 1_000, progress: 1 } });

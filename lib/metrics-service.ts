@@ -70,6 +70,10 @@ export type ReadingMetrics = {
   range: MetricsDateRange;
   totals: MetricTotals;
   currentStreakDays: number;
+  historicalStreak: {
+    asOfDate: string;
+    days: number;
+  } | null;
   bestStreakDays: number;
   topSources: RankedMetric[];
   topAuthors: RankedMetric[];
@@ -87,6 +91,8 @@ export type GetReadingMetricsOptions = {
   };
   timezone?: string;
   now?: Date | string;
+  /** Optional local calendar date for a historical, explicitly as-of streak. */
+  historicalStreakDate?: string;
   topLimit?: number;
   recentLimit?: number;
 };
@@ -243,15 +249,26 @@ export async function getReadingMetrics(
   client: MatterStatsSupabaseClient,
   options: GetReadingMetricsOptions = {}
 ): Promise<ReadingMetrics> {
-  const range = resolveMetricsDateRange(options);
+  const now = normalizeDateInput(options.now ?? new Date());
+  const range = resolveMetricsDateRange({ ...options, now });
   const previousRange = getPreviousEquivalentRange(range);
   const topLimit = Math.max(1, options.topLimit ?? 10);
   const recentLimit = Math.max(1, options.recentLimit ?? 10);
 
-  const [rangeSessions, previousSessions, streakSessions] = await Promise.all([
+  const currentStreakEnd = startOfNextLocalDay(now, range.timezone);
+  const historicalStreakDate = options.historicalStreakDate
+    ? normalizeLocalDate(options.historicalStreakDate)
+    : null;
+  const historicalStreakEnd = historicalStreakDate
+    ? addLocalDays(localDateFromString(historicalStreakDate, range.timezone), 1, range.timezone)
+    : null;
+
+  const [rangeSessions, previousSessions, bestStreakSessions, currentStreakSessions, historicalStreakSessions] = await Promise.all([
     fetchSessionsForRange(client, range),
     previousRange ? fetchSessionsForRange(client, previousRange) : Promise.resolve([]),
     fetchSessionsForStreaks(client, range.end),
+    fetchSessionsForStreaks(client, currentStreakEnd),
+    historicalStreakEnd ? fetchSessionsForStreaks(client, historicalStreakEnd) : Promise.resolve([]),
   ]);
 
   const rangeItemIds = uniqueStrings(rangeSessions.map((session) => session.item_id).filter(isNonEmptyString));
@@ -263,8 +280,11 @@ export async function getReadingMetrics(
   return {
     range,
     totals,
-    currentStreakDays: calculateCurrentStreak(streakSessions, range.end, range.timezone),
-    bestStreakDays: calculateBestStreak(streakSessions, range.timezone),
+    currentStreakDays: calculateStreakAsOf(currentStreakSessions, formatDateInTimezone(now, range.timezone), range.timezone, true),
+    historicalStreak: historicalStreakDate
+      ? { asOfDate: historicalStreakDate, days: calculateStreakAsOf(historicalStreakSessions, historicalStreakDate, range.timezone, true) }
+      : null,
+    bestStreakDays: calculateBestStreak(bestStreakSessions, range.timezone),
     topSources: rankBySessionItem(rangeSessions, (item) => item?.source, topLimit),
     topAuthors: rankBySessionItem(rangeSessions, (item) => item?.author, topLimit),
     topTags: rankTags(rangeSessions, rangeTagsByItemId, topLimit),
@@ -276,6 +296,21 @@ export async function getReadingMetrics(
       delta: buildComparisonDelta(totals, previousTotals),
     },
   };
+}
+
+function normalizeLocalDate(value: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error(`Invalid historical streak date: ${value}`);
+  const [year, month, day] = value.split("-").map(Number);
+  const normalized = new Date(Date.UTC(year, month - 1, day));
+  if (normalized.getUTCFullYear() !== year || normalized.getUTCMonth() !== month - 1 || normalized.getUTCDate() !== day) {
+    throw new Error(`Invalid historical streak date: ${value}`);
+  }
+  return value;
+}
+
+function localDateFromString(value: string, timezone: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return localDateToUtc(year, month, day, timezone);
 }
 
 function normalizeTimezone(timezone?: string): string {
@@ -598,9 +633,19 @@ function rankHeatmapDates(byDate: Map<string, MetricsAccumulator>): ReadingHeatm
     }));
 }
 
-function calculateCurrentStreak(sessions: MetricsSession[], end: Date, timezone: string): number {
+function calculateStreakAsOf(
+  sessions: MetricsSession[],
+  asOfDate: string,
+  timezone: string,
+  allowYesterdayFallback: boolean,
+): number {
   const activeDates = getActiveDates(sessions, timezone);
-  let cursor = addLocalDays(end, -1, timezone);
+  let cursor = localDateFromString(asOfDate, timezone);
+  if (!activeDates.has(asOfDate)) {
+    if (!allowYesterdayFallback) return 0;
+    cursor = addLocalDays(cursor, -1, timezone);
+    if (!activeDates.has(formatDateInTimezone(cursor, timezone))) return 0;
+  }
   let streak = 0;
 
   while (activeDates.has(formatDateInTimezone(cursor, timezone))) {
@@ -634,7 +679,7 @@ function calculateBestStreak(sessions: MetricsSession[], timezone: string): numb
 function getActiveDates(sessions: MetricsSession[], timezone: string): Set<string> {
   return new Set(
     sessions
-      .filter((session) => positiveInteger(session.duration_seconds) > 0 || positiveInteger(session.words_estimated) > 0)
+      .filter((session) => positiveInteger(session.duration_seconds) > 0)
       .map((session) => (session.started_at ? formatDateInTimezone(new Date(session.started_at), timezone) : null))
       .filter(isNonEmptyString)
   );

@@ -448,3 +448,86 @@ test("dashboard metrics work with partial item metadata", async () => {
     },
   ]);
 });
+
+function unlinkedSession(id: string, startedAt: string, durationSeconds = 60, wordsEstimated = 225): TestSession {
+  return {
+    id,
+    item_id: null,
+    started_at: startedAt,
+    ended_at: null,
+    duration_seconds: durationSeconds,
+    words_estimated: wordsEstimated,
+    matter_items: null,
+  };
+}
+
+test("current streak is independent of every reporting preset and an excluding custom range", async () => {
+  const sessions = [
+    unlinkedSession("sep-26", "2026-09-26T09:00:00Z"),
+    unlinkedSession("sep-27-a", "2026-09-27T09:00:00Z"),
+    unlinkedSession("sep-27-b", "2026-09-27T18:00:00Z"),
+    unlinkedSession("sep-28", "2026-09-28T09:00:00Z"),
+  ];
+  const client = createClient({ sessions });
+
+  for (const preset of METRICS_PERIOD_PRESETS) {
+    const metrics = await getReadingMetrics(client, { preset, now: "2026-09-28T12:00:00Z", timezone: "UTC" });
+    assert.equal(metrics.currentStreakDays, 3, preset);
+  }
+
+  const custom = await getReadingMetrics(client, {
+    range: { start: "2026-08-01T00:00:00Z", end: "2026-08-02T00:00:00Z" },
+    now: "2026-09-28T12:00:00Z",
+    timezone: "UTC",
+  });
+  assert.equal(custom.currentStreakDays, 3);
+  assert.equal(custom.totals.totalReadingTimeSeconds, 0);
+  assert.equal(custom.bestStreakDays, 0);
+});
+
+test("current and explicit historical streaks apply today/yesterday/gap semantics", async () => {
+  const client = createClient({
+    sessions: [
+      unlinkedSession("sep-26", "2026-09-26T09:00:00Z"),
+      unlinkedSession("sep-27", "2026-09-27T09:00:00Z"),
+      unlinkedSession("sep-28", "2026-09-28T09:00:00Z"),
+      unlinkedSession("legacy-zero", "2026-09-29T09:00:00Z", 0, 9_999),
+    ],
+  });
+
+  const yesterdayCarry = await getReadingMetrics(client, {
+    preset: "today",
+    now: "2026-09-29T12:00:00Z",
+    timezone: "UTC",
+    historicalStreakDate: "2026-09-28",
+  });
+  assert.equal(yesterdayCarry.currentStreakDays, 3);
+  assert.deepEqual(yesterdayCarry.historicalStreak, { asOfDate: "2026-09-28", days: 3 });
+
+  const expired = await getReadingMetrics(client, { preset: "today", now: "2026-09-30T12:00:00Z", timezone: "UTC" });
+  assert.equal(expired.currentStreakDays, 0);
+  assert.equal(expired.historicalStreak, null);
+});
+
+test("streak dates use Athens midnight and local calendar arithmetic across DST and year boundaries", async () => {
+  const athens = await getReadingMetrics(createClient({ sessions: [
+    unlinkedSession("before-midnight", "2026-09-27T20:59:00Z"),
+    unlinkedSession("after-midnight", "2026-09-27T21:01:00Z"),
+  ] }), { preset: "today", now: "2026-09-27T21:30:00Z", timezone: "Europe/Athens" });
+  assert.equal(athens.currentStreakDays, 2);
+  assert.equal(athens.totals.sessionsCount, 1);
+
+  const boundaries = await getReadingMetrics(createClient({ sessions: [
+    unlinkedSession("year-1", "2026-12-30T22:30:00Z"),
+    unlinkedSession("year-2", "2026-12-31T22:30:00Z"),
+    unlinkedSession("dst-1", "2026-10-24T21:30:00Z"),
+    unlinkedSession("dst-2", "2026-10-25T22:30:00Z"),
+  ] }), {
+    preset: "year",
+    now: "2027-01-01T10:00:00Z",
+    timezone: "Europe/Athens",
+    historicalStreakDate: "2026-10-26",
+  });
+  assert.equal(boundaries.currentStreakDays, 2);
+  assert.deepEqual(boundaries.historicalStreak, { asOfDate: "2026-10-26", days: 2 });
+});
