@@ -4,10 +4,12 @@ import test from "node:test";
 /* eslint-disable @typescript-eslint/no-explicit-any -- compact Supabase test double */
 
 import {
+  accessCookieOptions,
   createAccessSession,
   hashAuthValue,
   isValidAccessToken,
   LOGIN_ATTEMPT_LIMIT,
+  isCorrectAccessPassword,
   recordLoginAttempt,
   revokeAccessSession,
 } from "../lib/auth-cookie.js";
@@ -58,7 +60,9 @@ test("opaque sessions expire, revoke, and respect credential rotation", async ()
   assert.equal(db.sessions[0]?.token_hash, await hashAuthValue(token));
   assert.notEqual(db.sessions[0]?.token_hash, token);
   assert.equal(await isValidAccessToken(db.client, token, now), true);
-  assert.equal(await isValidAccessToken(db.client, token, new Date("2026-10-30T12:00:01Z")), false);
+  const expiry = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  assert.equal(await isValidAccessToken(db.client, token, new Date(expiry.getTime() - 1)), true);
+  assert.equal(await isValidAccessToken(db.client, token, expiry), false);
   process.env.APP_CREDENTIAL_VERSION = "2";
   assert.equal(await isValidAccessToken(db.client, token, now), false);
   process.env.APP_CREDENTIAL_VERSION = "1";
@@ -66,11 +70,51 @@ test("opaque sessions expire, revoke, and respect credential rotation", async ()
   assert.equal(await isValidAccessToken(db.client, token, now), false);
 });
 
+test("shared password accepts the configured value and rejects an incorrect value", () => {
+  assert.equal(isCorrectAccessPassword("synthetic-test-password"), true);
+  assert.equal(isCorrectAccessPassword("incorrect-password"), false);
+});
+
 test("malformed and storage-error tokens fail closed", async () => {
   const db = fakeClient();
+  assert.equal(await isValidAccessToken(db.client, undefined), false);
   assert.equal(await isValidAccessToken(db.client, "short"), false);
+  assert.equal(await isValidAccessToken(db.client, "z".repeat(43)), false);
   const broken = { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: new Error("offline") }) }) }) }) } as any;
   assert.equal(await isValidAccessToken(broken, "x".repeat(43)), false);
+  const rejected = { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => { throw new Error("offline"); } }) }) }) } as any;
+  assert.equal(await isValidAccessToken(rejected, "x".repeat(43)), false);
+});
+
+test("successful session stores only its hash and retains secure cookie attributes", async () => {
+  const db = fakeClient();
+  const token = await createAccessSession(db.client);
+  assert.equal(JSON.stringify(db.sessions).includes(token), false);
+  assert.deepEqual(accessCookieOptions(token, true), {
+    name: "matter_stats_session", value: token, httpOnly: true, secure: true,
+    sameSite: "lax", path: "/", maxAge: 2_592_000,
+  });
+});
+
+test("failed revocation rejects and cannot be reported as successful", async () => {
+  const broken = { from: () => ({ update: () => ({ eq: async () => ({ error: new Error("offline") }) }) }) } as any;
+  await assert.rejects(revokeAccessSession(broken, "x".repeat(43)));
+});
+
+test("returned and rejected login storage failures propagate to the controlled flow", async () => {
+  const returnedError = {
+    from: () => ({ insert: async () => ({ error: new Error("insert failed") }) }),
+    rpc: async () => ({ data: null, error: new Error("rpc missing") }),
+  } as any;
+  await assert.rejects(createAccessSession(returnedError));
+  await assert.rejects(recordLoginAttempt(returnedError, "synthetic-client", true));
+
+  const rejected = {
+    from: () => ({ insert: async () => { throw new Error("network failed"); } }),
+    rpc: async () => { throw new Error("network failed"); },
+  } as any;
+  await assert.rejects(createAccessSession(rejected));
+  await assert.rejects(recordLoginAttempt(rejected, "synthetic-client", true));
 });
 
 test("twenty concurrent attempts atomically allow only the configured limit", async () => {

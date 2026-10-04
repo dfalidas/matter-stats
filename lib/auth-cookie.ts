@@ -7,6 +7,18 @@ export const ACCESS_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 export const LOGIN_ATTEMPT_WINDOW_SECONDS = 15 * 60;
 export const LOGIN_ATTEMPT_LIMIT = 5;
 
+export function accessCookieOptions(token: string, production = process.env.NODE_ENV === "production") {
+  return {
+    name: ACCESS_COOKIE_NAME,
+    value: token,
+    httpOnly: true as const,
+    secure: production,
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: ACCESS_COOKIE_MAX_AGE_SECONDS,
+  };
+}
+
 type AuthClient = SupabaseClient<Database>;
 
 function readAccessPassword(): string {
@@ -64,13 +76,17 @@ export async function createAccessSession(client: AuthClient, now = new Date()):
 
 export async function isValidAccessToken(client: AuthClient, token: string | undefined, now = new Date()): Promise<boolean> {
   if (!token || token.length < 32 || token.length > 128) return false;
-  const tokenHash = await hashAuthValue(token);
-  const { data, error } = await client.from("app_sessions")
-    .select("expires_at,revoked_at,credential_version")
-    .eq("token_hash", tokenHash).maybeSingle();
-  if (error) return false; // Authentication fails closed when storage is unavailable.
-  return Boolean(data && !data.revoked_at && Date.parse(data.expires_at) > now.getTime()
-    && data.credential_version === readCredentialVersion());
+  try {
+    const tokenHash = await hashAuthValue(token);
+    const { data, error } = await client.from("app_sessions")
+      .select("expires_at,revoked_at,credential_version")
+      .eq("token_hash", tokenHash).maybeSingle();
+    if (error) return false;
+    return Boolean(data && !data.revoked_at && Date.parse(data.expires_at) > now.getTime()
+      && data.credential_version === readCredentialVersion());
+  } catch {
+    return false; // Rejected storage/network operations also fail closed.
+  }
 }
 
 export async function revokeAccessSession(client: AuthClient, token: string | undefined, now = new Date()): Promise<void> {
