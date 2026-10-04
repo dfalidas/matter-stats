@@ -17,6 +17,8 @@ Matter Stats is a private, single-user reading analytics application:
 
 Login compares the submitted shared password in constant time, then calls `public.record_app_login_attempt` through the service role. A successful login creates a random opaque token. Only its SHA-256 hash, credential version, creation time, expiry, and revocation state are stored in `public.app_sessions`; the raw token is placed in the HTTP-only, same-site `matter_stats_session` cookie. Sessions have a 30-day server-side expiry and can be revoked at logout. Raising `APP_CREDENTIAL_VERSION` invalidates sessions created under older versions.
 
+Login fails closed when the limiter RPC, session table, Data API, or network is unavailable: the form receives a generic retryable message and no session cookie or dashboard redirect. Server diagnostics are limited to allowlisted operation and reason identifiers rather than raw database errors or request credentials. Incorrect-password and rate-limit messages remain distinct. Session validation likewise denies access when storage returns an error or rejects its operation.
+
 Authorization has two layers:
 
 1. `middleware.ts` permits `/login`, `/favicon.ico`, `/robots.txt`, `/sitemap.xml`, `/icon.svg`, Next.js assets, and `/api/cron/*` without the app session. For other paths it validates the database-backed session and redirects failures to `/login`. This is an early user-experience redirect.

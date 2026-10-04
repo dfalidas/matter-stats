@@ -7,18 +7,13 @@ import { ACCESS_COOKIE_NAME, isValidAccessToken } from "@/lib/auth-cookie";
 import { getMatterSyncAvailability, syncMatterData, type MatterSyncResult } from "@/lib/matter-sync";
 import { normalizeRecentActivityWindow, type MatterSyncMode } from "@/lib/matter-sync-progress";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
+import { getAuthorizedSyncAvailability, runAuthorizedSync } from "@/lib/dashboard-actions";
+import { authorizeAccessSession } from "@/lib/access-control";
 
 export type SyncMatterActionState = MatterSyncResult | null;
 
 export async function getMatterSyncAvailabilityAction() {
-  const cookieStore = await cookies();
-  const hasAccess = await isValidAccessToken(getSupabaseAdminClient(), cookieStore.get(ACCESS_COOKIE_NAME)?.value);
-
-  if (!hasAccess) {
-    return { rateLimitedUntil: null, message: null };
-  }
-
-  return getMatterSyncAvailability();
+  return getAuthorizedSyncAvailability({ authorize: authorizeAction, getAvailability: getMatterSyncAvailability });
 }
 
 export async function syncMatterAction(previousState: SyncMatterActionState, formData?: FormData): Promise<MatterSyncResult> {
@@ -26,18 +21,16 @@ export async function syncMatterAction(previousState: SyncMatterActionState, for
   const mode = parseSyncMode(formData?.get("mode"));
   const recentActivityWindow = normalizeRecentActivityWindow(formData?.get("recentActivityWindow"));
 
-  const cookieStore = await cookies();
-  const hasAccess = await isValidAccessToken(getSupabaseAdminClient(), cookieStore.get(ACCESS_COOKIE_NAME)?.value);
+  const result = await runAuthorizedSync({
+    authorize: authorizeAction,
+    sync: () => syncMatterData(mode, { recentActivityWindow }),
+    afterSync: revalidateDashboardPaths,
+  });
 
-  if (!hasAccess) {
-    return {
-      ok: false,
-      message: "Your session expired. Sign in again before syncing Matter.",
-    };
-  }
+  return result;
+}
 
-  const result = await syncMatterData(mode, { recentActivityWindow });
-
+function revalidateDashboardPaths(): void {
   revalidatePath("/dashboard");
   revalidatePath("/articles");
   revalidatePath("/reports");
@@ -46,8 +39,13 @@ export async function syncMatterAction(previousState: SyncMatterActionState, for
   revalidatePath("/tags");
   revalidatePath("/year-in-reading");
   revalidatePath("/settings");
+}
 
-  return result;
+async function authorizeAction(): Promise<boolean> {
+  return authorizeAccessSession({
+    readToken: async () => (await cookies()).get(ACCESS_COOKIE_NAME)?.value,
+    validateToken: (token) => isValidAccessToken(getSupabaseAdminClient(), token),
+  });
 }
 
 function parseSyncMode(value: FormDataEntryValue | null | undefined): MatterSyncMode {

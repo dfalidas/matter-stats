@@ -15,6 +15,9 @@
   },
   "include": [
     "../lib/auth-cookie.ts",
+    "../lib/auth-actions.ts",
+    "../lib/require-auth.ts",
+    "../app/dashboard/actions.ts",
     "../lib/matter-normalizers.ts",
     "../lib/matter-sync-progress.ts",
     "../lib/metrics-service.ts",

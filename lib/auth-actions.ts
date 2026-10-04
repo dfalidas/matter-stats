@@ -4,7 +4,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { headers } from "next/headers";
-import { ACCESS_COOKIE_MAX_AGE_SECONDS, ACCESS_COOKIE_NAME, createAccessSession, isCorrectAccessPassword, recordLoginAttempt, revokeAccessSession } from "@/lib/auth-cookie";
+import { ACCESS_COOKIE_NAME, accessCookieOptions, createAccessSession, isCorrectAccessPassword, recordLoginAttempt, revokeAccessSession } from "@/lib/auth-cookie";
+import { runLoginFlow } from "@/lib/auth-flow";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 
 export type LoginState = {
@@ -15,25 +16,14 @@ export async function login(_previousState: LoginState, formData: FormData): Pro
   const submittedPassword = formData.get("password");
   const headerStore = await headers();
   const clientKey = headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  const client = getSupabaseAdminClient();
-  const passwordIsCorrect = typeof submittedPassword === "string" && isCorrectAccessPassword(submittedPassword);
-  const allowed = await recordLoginAttempt(client, clientKey, passwordIsCorrect);
-  if (!allowed) return { error: "Too many attempts. Please wait 15 minutes and try again." };
-
-  if (!passwordIsCorrect) {
-    return { error: "Invalid password. Please try again." };
-  }
-
-  const cookieStore = await cookies();
-  cookieStore.set({
-    name: ACCESS_COOKIE_NAME,
-    value: await createAccessSession(client),
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: ACCESS_COOKIE_MAX_AGE_SECONDS,
+  const result = await runLoginFlow({
+    passwordIsCorrect: () => typeof submittedPassword === "string" && isCorrectAccessPassword(submittedPassword),
+    recordAttempt: (succeeded) => recordLoginAttempt(getSupabaseAdminClient(), clientKey, succeeded),
+    createSession: () => createAccessSession(getSupabaseAdminClient()),
+    issueCookie: async (token) => { (await cookies()).set(accessCookieOptions(token)); },
+    diagnose: (reason) => console.error("auth_operation_failed", { operation: "login", reason }),
   });
+  if (result) return result;
 
   redirect("/dashboard");
 }

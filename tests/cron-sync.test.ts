@@ -28,14 +28,29 @@ test("GET with wrong bearer token returns 401", async () => {
   assert.equal(response.status, 401);
 });
 
+test("query-string secret or session cookie alone returns 401 before downstream work", async () => {
+  for (const request of [
+    new Request("https://example.com/api/cron/sync-recent-activity?secret=expected"),
+    new Request("https://example.com/api/cron/sync-recent-activity", { headers: { cookie: "matter_stats_session=valid" } }),
+  ]) {
+    let calls = 0;
+    const response = await handleRecentActivityCron(request, createDeps({
+      getAvailability: async () => { calls += 1; return { rateLimitedUntil: null, message: null }; },
+      syncRecentActivity: async () => { calls += 1; return { ok: true, message: "done" }; },
+    }));
+    assert.equal(response.status, 401);
+    assert.equal(calls, 0);
+  }
+});
+
 test("authorized cron request calls sync", async () => {
-  let called = false;
+  let called = 0;
   const response = await handleRecentActivityCron(
     new Request("https://example.com/api/cron/sync-recent-activity", { headers: { authorization: "Bearer expected" } }),
-    createDeps({ syncRecentActivity: async () => ((called = true), { ok: true, message: "done", syncRunId: "run-1" }) })
+    createDeps({ syncRecentActivity: async () => ((called += 1), { ok: true, message: "done", syncRunId: "run-1" }) })
   );
   assert.equal(response.status, 200);
-  assert.equal(called, true);
+  assert.equal(called, 1);
 });
 
 test("rate-limited state causes safe skip", async () => {
