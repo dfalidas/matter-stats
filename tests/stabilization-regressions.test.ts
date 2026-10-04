@@ -4,6 +4,8 @@ import test from "node:test";
 import { normalizeReadingSession } from "../lib/matter-normalizers.js";
 import { getMatterSyncInitialPhase, getMatterSyncSessionsLimit, getRecentActivityWindowStart } from "../lib/matter-sync-progress.js";
 import { getDefaultMetricsTimezone, getReadingMetrics } from "../lib/metrics-service.js";
+import { calendarDayBounds, calendarYear, timestampToCalendarDate } from "../lib/calendar.js";
+import { resolveReportRange } from "../lib/reports-service.js";
 
 /** W0 characterization tests remain green; adjacent TODOs are W4/W5 gates. */
 test("R3 characterization: current sync is one bounded page and defaults to the current year", () => {
@@ -77,4 +79,24 @@ test("R8: the default timezone is Europe/Athens", () => {
   assert.equal(getDefaultMetricsTimezone(), "Europe/Athens");
   if (previous === undefined) delete process.env.APP_TIMEZONE; else process.env.APP_TIMEZONE = previous;
 });
-test.todo("R8 target (W5): Athens midnight, Monday boundary, DST and year boundary bucket identically in every metric/rollup");
+test("R8 target (W5): Athens midnight, DST, year ranges, and explicit UTC use local half-open boundaries", () => {
+  assert.equal(timestampToCalendarDate("2026-09-27T20:59:59Z", "Europe/Athens"), "2026-09-27");
+  assert.equal(timestampToCalendarDate("2026-09-27T21:00:00Z", "Europe/Athens"), "2026-09-28");
+
+  const spring = calendarDayBounds("2026-03-29", "Europe/Athens");
+  assert.deepEqual([spring.start.toISOString(), spring.end.toISOString()], ["2026-03-28T22:00:00.000Z", "2026-03-29T21:00:00.000Z"]);
+  assert.equal(spring.end.getTime() - spring.start.getTime(), 23 * 60 * 60 * 1000);
+  const autumn = calendarDayBounds("2026-10-25", "Europe/Athens");
+  assert.deepEqual([autumn.start.toISOString(), autumn.end.toISOString()], ["2026-10-24T21:00:00.000Z", "2026-10-25T22:00:00.000Z"]);
+  assert.equal(autumn.end.getTime() - autumn.start.getTime(), 25 * 60 * 60 * 1000);
+
+  const year = resolveReportRange("yearly", "2026", new Date("2026-06-01T00:00:00Z"));
+  assert.deepEqual([year.start.toISOString(), year.end.toISOString()], ["2025-12-31T22:00:00.000Z", "2026-12-31T22:00:00.000Z"]);
+  const utc = calendarDayBounds("2026-10-25", "UTC");
+  assert.deepEqual([utc.start.toISOString(), utc.end.toISOString()], ["2026-10-25T00:00:00.000Z", "2026-10-26T00:00:00.000Z"]);
+});
+
+test("R8 target (W5): configured local year changes at Athens midnight independently of UTC", () => {
+  assert.equal(calendarYear(timestampToCalendarDate("2026-12-31T22:30:00Z", "Europe/Athens")), 2027);
+  assert.equal(calendarYear(timestampToCalendarDate("2026-12-31T22:30:00Z", "UTC")), 2026);
+});

@@ -9,6 +9,7 @@ import {
 } from "./metrics-service";
 import type { MatterStatsSupabaseClient } from "./supabase-queries";
 import { estimateWordsFromSeconds } from "./reading-estimates";
+import { addCalendarDays, timestampToCalendarDate } from "./calendar";
 
 type ReportSessionItem = {
   id: string;
@@ -147,18 +148,6 @@ function isRealDate(value: string): boolean {
 }
 
 async function getLatestWeekWithDataStartDate(client: MatterStatsSupabaseClient): Promise<string | null> {
-  const { data, error } = await client
-    .from("daily_stats")
-    .select("date")
-    .gt("reading_time_seconds", 0)
-    .order("date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  if (data?.date) {
-    return formatWeekStart(getWeekStart(new Date(`${data.date}T00:00:00.000Z`)));
-  }
-
   const { data: session, error: sessionError } = await client
     .from("reading_sessions")
     .select("started_at")
@@ -169,19 +158,11 @@ async function getLatestWeekWithDataStartDate(client: MatterStatsSupabaseClient)
     .maybeSingle();
   if (sessionError) throw sessionError;
   if (!session?.started_at) return null;
-  return formatWeekStart(getWeekStart(new Date(session.started_at)));
-}
-
-function getWeekStart(date: Date): Date {
-  const result = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const weekday = result.getUTCDay();
-  const daysSinceMonday = (weekday + 6) % 7;
-  result.setUTCDate(result.getUTCDate() - daysSinceMonday);
-  return result;
-}
-
-function formatWeekStart(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  const timezone = getDefaultMetricsTimezone();
+  const localDate = timestampToCalendarDate(session.started_at, timezone);
+  const [year, month, day] = localDate.split("-").map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return addCalendarDays(localDate, -((weekday + 6) % 7));
 }
 
 async function fetchReportSessions(

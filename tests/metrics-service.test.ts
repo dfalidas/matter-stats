@@ -532,6 +532,19 @@ test("streak dates use Athens midnight and local calendar arithmetic across DST 
   assert.deepEqual(boundaries.historicalStreak, { asOfDate: "2026-10-26", days: 2 });
 });
 
+test("daily metrics include start, exclude end, and count both Athens repeated-hour sessions", async () => {
+  const metrics = await getReadingMetrics(createClient({ sessions: [
+    unlinkedSession("before", "2026-10-24T20:59:59.999Z"),
+    unlinkedSession("start", "2026-10-24T21:00:00.000Z"),
+    unlinkedSession("repeated-one", "2026-10-25T00:30:00.000Z"),
+    unlinkedSession("repeated-two", "2026-10-25T01:30:00.000Z"),
+    unlinkedSession("end", "2026-10-25T22:00:00.000Z"),
+  ] }), { preset: "today", now: "2026-10-25T12:00:00Z", timezone: "Europe/Athens" });
+  assert.equal(metrics.range.start?.toISOString(), "2026-10-24T21:00:00.000Z");
+  assert.equal(metrics.range.end.toISOString(), "2026-10-25T22:00:00.000Z");
+  assert.equal(metrics.totals.sessionsCount, 3);
+});
+
 test("rounds each tiny session before totals, rankings, heatmap, and grouped recent reads", async () => {
   const item = { id: "same", title: "Same", url: null, source: "Source", author: "Author" };
   const sessions: TestSession[] = [0, 1, 2].map((index) => ({

@@ -70,7 +70,8 @@ The SQL expresses the intended RLS and grant policy, and the TypeScript implemen
 - Session normalization and normal future writes persist the duration-based estimate. Production reads independently derive the same value from session duration, so missing or bogus legacy `words_estimated`, item word counts, progress, and missing item links do not change analytics.
 - Existing historical `reading_sessions.words_estimated` and `daily_stats.words_read` rows may remain stale until the repair/rebuild work in Tasks 19–20. This change does not backfill or rewrite them; normal future session and daily-rollup writes are canonical, and current application reporting calculates from sessions.
 - Matter session payloads may lack a usable item identifier. Those sessions can be stored with a null `item_id`, so time/session totals can remain available while source, author, tag, article counts, and other attribution-dependent breakdowns are incomplete. Missing attribution is an unsupported capability with the observed payload—not a promise that another sync will repair it.
-- Timezone behavior defaults to `Europe/Athens`. Current reading streaks use positive-duration sessions on local calendar dates, are anchored to one request-scoped current time rather than the selected report range, and may carry through an empty today only when yesterday is active. Reports expose their selected-date streak separately. Broader word and timezone consistency remains open; do not describe all aggregates as reconciled.
+- Analytics calendar behavior uses the validated `APP_TIMEZONE`, defaulting to `Europe/Athens`. Raw timestamps stay UTC; session, annotation, activity, report, and new daily-rollup windows use local calendar boundaries converted to UTC with half-open `[start, end)` queries. Reading sessions are attributed wholly to their start date. Current reading streaks are anchored to one request-scoped current time and may carry through an empty today only when yesterday is active; reports expose their selected-date streak separately.
+- Legacy `daily_stats` rows may still reflect the former UTC-day buckets until the authorized repair/rebuild work in Tasks 19–20. Latest-week discovery therefore uses raw reading-session timestamps rather than treating those historical rollups as authoritative. This release does not recalculate, backfill, or otherwise repair production history.
 
 ## Remaining stabilization work
 
@@ -79,7 +80,7 @@ The merged interface redesign does not complete the stabilization plan. Remainin
 - review official advisories and apply the smallest supported security dependency patches;
 - reliable sync continuation, leases/concurrency control, and large-history behavior;
 - complete/paginated database queries rather than implicit Data API result limits;
-- broader timezone semantics outside reading streaks;
+- historical timezone rollup repair and reconciliation;
 - repair/rebuild tooling for derived data and interrupted sync state; and
 - CI coverage, including isolated database authorization and migration checks.
 

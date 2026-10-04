@@ -2,10 +2,9 @@ import { PageShell } from "../_components/page-shell";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { requireAccessSession } from "@/lib/require-auth";
 import { getReadingReport } from "@/lib/reports-service";
+import { calendarYear, getAppTimezone, timestampToCalendarDate } from "@/lib/calendar";
 
 import { YearInReadingOverview } from "./year-in-reading-overview";
-
-const FALLBACK_YEAR = new Date().getFullYear();
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +20,11 @@ type YearInReadingResult =
 
 export default async function YearInReadingPage() {
   await requireAccessSession();
+  const now = new Date();
+  const localYear = calendarYear(timestampToCalendarDate(now, getAppTimezone()));
   const client = getSupabaseAdminClient();
-  const recapResult = await getYearInReadingResult(client);
-  const year = recapResult.ok ? getReportYear(recapResult.report) : FALLBACK_YEAR;
+  const recapResult = await getYearInReadingResult(client, now);
+  const year = recapResult.ok ? getReportYear(recapResult.report) : localYear;
 
   return (
     <PageShell
@@ -38,9 +39,10 @@ export default async function YearInReadingPage() {
 
 async function getYearInReadingResult(
   client: ReturnType<typeof getSupabaseAdminClient>,
+  now: Date,
 ): Promise<YearInReadingResult> {
   try {
-    const report = await getReadingReport(client, "yearly");
+    const report = await getReadingReport(client, "yearly", { now });
     return { ok: true, report };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load year-in-reading recap.";
@@ -49,6 +51,5 @@ async function getYearInReadingResult(
 }
 
 function getReportYear(report: Awaited<ReturnType<typeof getReadingReport>>): number {
-  const startYear = report.metrics.range.start?.getUTCFullYear();
-  return startYear ?? FALLBACK_YEAR;
+  return calendarYear(report.metrics.range.startDate!);
 }
