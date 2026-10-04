@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
 import { assertGrantDenied, assertSuccessful } from "./supabase-security-assertions.mjs";
-import { attemptTrackedWrite, cleanupTrackedWrites, verifyLimiterGroups } from "./supabase-security-runner.mjs";
+import { attemptTrackedWrite, cleanupTrackedWrites, isMigrationSeededStream, verifyLimiterGroups } from "./supabase-security-runner.mjs";
 
 const required = ["STABILIZATION_TEST_SUPABASE_URL", "STABILIZATION_TEST_SUPABASE_ANON_KEY", "STABILIZATION_TEST_SUPABASE_SERVICE_ROLE_KEY"];
 if (process.env.DISPOSABLE_DB_ACK !== "yes" || required.some((key) => !process.env[key])) {
@@ -37,6 +37,7 @@ const fixtures = [
   { table: "daily_stats", row: { date: fixtureDate, reading_time_seconds: 1, words_read: 1, sessions_count: 1, items_read_count: 1, highlights_count: 1, top_source: "positive" }, deniedRow: { date: new Date(new Date(`${fixtureDate}T00:00:00Z`).getTime() + 86400000).toISOString().slice(0, 10), top_source: "denied" }, selector: { date: fixtureDate }, update: { top_source: "updated" }, field: "top_source", expected: "updated" },
   { table: "sync_runs", row: { id: runId, status: "positive" }, deniedRow: { id: crypto.randomUUID(), status: "denied" }, selector: { id: runId }, update: { status: "updated" }, field: "status", expected: "updated" },
   { table: "sync_state", row: { id: "matter", active_phase: "complete", sync_mode: "recent_activity", item_cursor: prefix }, deniedRow: { id: "matter", active_phase: "complete", sync_mode: "recent_activity", item_cursor: prefix }, selector: { id: "matter" }, update: { active_phase: "items" }, field: "active_phase", expected: "items", delayedInsert: true, ownership: { item_cursor: prefix } },
+  { table: "matter_sync_streams", row: { stream: "recent_sessions", endpoint: "/reading_sessions", filters: { since: timestamp }, page_limit: 25, transition_status: "native", completed_watermark: timestamp, coverage_window: "current_year" }, deniedRow: { stream: "recent_sessions", endpoint: "/reading_sessions", filters: {}, page_limit: 25 }, selector: { stream: "recent_sessions" }, update: { cycle_generation: 1 }, field: "cycle_generation", expected: 1, delayedInsert: true, ownership: { completed_watermark: timestamp } },
   { table: "app_sessions", row: { token_hash: sessionHash, credential_version: 1, expires_at: "2099-12-31T00:00:00.000Z" }, deniedRow: { token_hash: await hash(`${prefix}-denied-session`), credential_version: 1, expires_at: "2099-12-31T00:00:00.000Z" }, selector: { token_hash: sessionHash }, update: { credential_version: 2 }, field: "credential_version", expected: 2 },
   { table: "app_login_attempts", row: { client_key_hash: attemptHash, attempted_at: timestamp, succeeded: false }, deniedRow: { client_key_hash: await hash(`${prefix}-denied-attempt`), attempted_at: timestamp, succeeded: false }, selector: { client_key_hash: attemptHash }, update: { succeeded: true }, field: "succeeded", expected: true },
 ];
@@ -46,6 +47,7 @@ function filtered(query, selector) {
 }
 
 function selectorForRow(fixture, row) {
+  if (fixture.table === "matter_sync_streams") return { stream: row.stream };
   if (fixture.table === "item_tags") return { item_id: row.item_id, tag_id: row.tag_id };
   if (fixture.table === "daily_stats") return { date: row.date };
   if (fixture.table === "app_sessions") return { token_hash: row.token_hash };
@@ -68,6 +70,7 @@ const attemptedWrites = [];
 const rpcHashes = new Set();
 let userId;
 const cleanupFailures = [];
+let seededRecentSessions = null;
 async function cleanup(label, action) {
   try {
     const result = await action();
@@ -78,6 +81,18 @@ async function cleanup(label, action) {
 }
 
 try {
+  // The migration owns this singleton key. Preserve its exact recognized seed,
+  // temporarily remove it for INSERT controls, and restore it in finally.
+  const seeded = await service.from("matter_sync_streams").select("*").eq("stream", "recent_sessions").maybeSingle();
+  assertSuccessful(seeded, "read migration-seeded recent_sessions");
+  assert.ok(isMigrationSeededStream(seeded.data, "recent_sessions"), "Refusing to replace an unrecognized recent_sessions row");
+  seededRecentSessions = seeded.data;
+  const seedRemoved = await service.from("matter_sync_streams").delete().eq("stream", "recent_sessions").select("*").single();
+  assertSuccessful(seedRemoved, "temporarily remove migration-seeded recent_sessions");
+  const seedAbsent = await service.from("matter_sync_streams").select("*").eq("stream", "recent_sessions").maybeSingle();
+  assertSuccessful(seedAbsent, "migration seed removal readback");
+  assert.equal(seedAbsent.data, null, "migration seed remained after temporary removal");
+
   // Refuse collisions instead of overwriting or deleting data not created here.
   for (const fixture of fixtures) {
     const existing = await filtered(service.from(fixture.table).select("*"), fixture.selector).maybeSingle();
@@ -219,6 +234,14 @@ try {
     inspect: ({ fixture, selector }) => filtered(service.from(fixture.table).select("*"), selector).maybeSingle(),
     remove: ({ fixture, selector }) => filtered(service.from(fixture.table).delete(), selector),
   }));
+  if (seededRecentSessions) {
+    await cleanup("restore migration-seeded recent_sessions", async () => {
+      const collision = await service.from("matter_sync_streams").select("*").eq("stream", "recent_sessions").maybeSingle();
+      assertSuccessful(collision, "restore seed collision check");
+      assert.equal(collision.data, null, "Refusing to overwrite recent_sessions while restoring migration seed");
+      return service.from("matter_sync_streams").insert(seededRecentSessions);
+    });
+  }
   if (userId) await cleanup("disposable auth user", () => service.auth.admin.deleteUser(userId));
   if (cleanupFailures.length) {
     throw new AggregateError(cleanupFailures, `Cleanup failed (${cleanupFailures.length} resource(s)); all remaining cleanup was attempted`);

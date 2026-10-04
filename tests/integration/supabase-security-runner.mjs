@@ -3,6 +3,21 @@ export async function attemptTrackedWrite(attempts, attempt, write) {
   return await write();
 }
 
+export function isMigrationSeededStream(row, stream) {
+  const expectedFilters = stream === "recent_sessions" ? {} : { status: "all", order: "updated" };
+  return row?.stream === stream
+    && row.endpoint === (stream === "recent_sessions" ? "/reading_sessions" : "/items")
+    && JSON.stringify(row.filters) === JSON.stringify(expectedFilters)
+    && row.page_limit === 25
+    && row.cursor === null
+    && row.cycle_started_at === null
+    && row.cycle_generation === 0
+    && row.completed_watermark === null
+    && row.cycle_active === false
+    && row.transition_status === "legacy_recoverable_restart"
+    && (stream !== "recent_sessions" || row.coverage_window === "current_year");
+}
+
 export async function cleanupTrackedWrites(attempts, { inspect, remove }) {
   const failures = [];
   for (const attempt of [...attempts].reverse()) {

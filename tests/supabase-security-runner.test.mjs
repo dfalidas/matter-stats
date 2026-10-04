@@ -1,6 +1,38 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { attemptTrackedWrite, cleanupTrackedWrites, verifyLimiterGroups } from "./integration/supabase-security-runner.mjs";
+import { attemptTrackedWrite, cleanupTrackedWrites, isMigrationSeededStream, verifyLimiterGroups } from "./integration/supabase-security-runner.mjs";
+
+test("recognizes only the exact fresh/upgrade migration stream seed", () => {
+  const seed = {
+    stream: "recent_sessions", endpoint: "/reading_sessions", filters: {}, page_limit: 25,
+    cursor: null, cycle_started_at: null, cycle_generation: 0, completed_watermark: null,
+    cycle_active: false, transition_status: "legacy_recoverable_restart", coverage_window: "current_year",
+  };
+  assert.equal(isMigrationSeededStream(seed, "recent_sessions"), true);
+  assert.equal(isMigrationSeededStream({ ...seed, completed_watermark: "2026-01-01T00:00:00Z" }, "recent_sessions"), false);
+  assert.equal(isMigrationSeededStream({ ...seed, filters: { since: "test-owned" } }, "recent_sessions"), false);
+});
+
+test("test-owned stream cleanup after failure leaves the migration seed restorable", async () => {
+  const seed = {
+    stream: "recent_sessions", endpoint: "/reading_sessions", filters: {}, page_limit: 25,
+    cursor: null, cycle_started_at: null, cycle_generation: 0, completed_watermark: null,
+    cycle_active: false, transition_status: "legacy_recoverable_restart", coverage_window: "current_year",
+  };
+  let stored = { ...seed, transition_status: "native", completed_watermark: "2099-01-02T03:04:05.000Z" };
+  const failures = await cleanupTrackedWrites([{
+    label: "failed-run stream fixture",
+    selector: { stream: "recent_sessions" },
+    owns: (row) => row.completed_watermark === "2099-01-02T03:04:05.000Z",
+  }], {
+    inspect: async () => ({ data: stored, error: null }),
+    remove: async () => { stored = null; return { error: null }; },
+  });
+  assert.deepEqual(failures, []);
+  assert.equal(stored, null);
+  stored = seed;
+  assert.equal(isMigrationSeededStream(stored, "recent_sessions"), true);
+});
 
 const validResponses = () => Array.from({ length: 20 }, (_, index) => Promise.resolve({ data: index < 5, error: null }));
 

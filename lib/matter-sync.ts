@@ -6,29 +6,28 @@ import {
   iterateMatterAnnotations,
   listMatterItems,
   listMatterReadingSessions,
-  listMatterTags,
   logMatterApiError,
   MatterApiError,
   MatterRateLimitError,
   type MatterListResponse,
-  type MatterTag,
 } from "@/lib/matter-api";
 import {
   createSyncRun,
-  getLatestSuccessfulSyncCheckpoint,
+  getMatterSyncStream,
+  getMatterSyncStreams,
   getMatterSyncState,
   getSupabaseAdminClient,
   updateSyncRun,
   upsertAnnotations,
   upsertItemTags,
   upsertMatterItems,
-  upsertMatterSyncState,
+  upsertMatterSyncStream,
   upsertMatterTags,
   upsertReadingSessions,
 } from "@/lib/supabase-admin";
 import { recalculateDailyStats } from "@/lib/daily-stats";
 import { getAppTimezone, timestampToCalendarDate } from "@/lib/calendar";
-import type { Json, SyncState, TablesInsert } from "@/lib/supabase-types";
+import type { Json, MatterSyncStream, TablesInsert } from "@/lib/supabase-types";
 import {
   createPlaceholderMatterItem,
   extractEmbeddedMatterItem,
@@ -36,7 +35,6 @@ import {
   normalizeAnnotation,
   normalizeMatterItem,
   normalizeMatterItemTags,
-  normalizeMatterTag,
   normalizeReadingSession,
   summarizeReadingSessionShape,
   type MatterItemRow,
@@ -47,8 +45,6 @@ import {
   collectLinkedMatterItemIds,
   createEmptyMatterBatchCounts,
   buildMatterRateLimitMessage,
-  buildRateLimitedMatterSyncState,
-  getMatterSyncInitialPhase,
   getMatterSyncItemsLimit,
   getMatterSyncSessionsLimit,
   getRecentActivityWindowStart,
@@ -57,26 +53,17 @@ import {
   type MatterBatchCounts,
   type MatterRecentActivityWindow,
   type MatterSyncMode,
-  type MatterSyncPhase,
 } from "@/lib/matter-sync-progress";
+
+import {
+  completeMatterCycle,
+  persistActiveMatterCycle,
+  startOrResumeMatterCycle,
+  type ActiveMatterCycle,
+} from "@/lib/matter-sync-cycle";
 
 const UPSERT_BATCH_SIZE = 100;
 const OPTIONAL_MATTER_STATUSES = new Set([403, 404]);
-
-type MutableMatterSyncState = Pick<
-  SyncState,
-  | "completed_checkpoint_timestamp"
-  | "active_since_timestamp"
-  | "active_phase"
-  | "item_cursor"
-  | "tag_cursor"
-  | "session_cursor"
-  | "next_checkpoint_timestamp"
-  | "rate_limited_until"
-  | "sync_mode"
-  | "recent_activity_checkpoint"
-  | "backfill_items_cursor"
->;
 
 export type MatterSyncResult = {
   ok: boolean;
@@ -106,6 +93,38 @@ type MatterSyncDiagnostics = {
   firstSessionShape: Json | null;
 };
 
+export type MatterSyncRuntimeDeps = {
+  now: () => Date;
+  getStreams: typeof getMatterSyncStreams;
+  getLegacyState: typeof getMatterSyncState;
+  getStream: typeof getMatterSyncStream;
+  upsertStream: typeof upsertMatterSyncStream;
+  createRun: typeof createSyncRun;
+  updateRun: typeof updateSyncRun;
+  getAccount: typeof getMatterAccount;
+  listSessions: typeof listMatterReadingSessions;
+  listItems: typeof listMatterItems;
+  recalculate: typeof recalculateDailyStats;
+  importSessions: typeof importMatterSessionPage;
+  importItems: typeof importMatterItemPage;
+};
+
+const productionSyncDeps: MatterSyncRuntimeDeps = {
+  now: () => new Date(),
+  getStreams: getMatterSyncStreams,
+  getLegacyState: getMatterSyncState,
+  getStream: getMatterSyncStream,
+  upsertStream: upsertMatterSyncStream,
+  createRun: createSyncRun,
+  updateRun: updateSyncRun,
+  getAccount: getMatterAccount,
+  listSessions: listMatterReadingSessions,
+  listItems: listMatterItems,
+  recalculate: recalculateDailyStats,
+  importSessions: importMatterSessionPage,
+  importItems: importMatterItemPage,
+};
+
 function createEmptyMatterSyncDiagnostics(): MatterSyncDiagnostics {
   return {
     requestCount: 0,
@@ -125,11 +144,29 @@ function recordMatterPageDiagnostics(diagnostics: MatterSyncDiagnostics, page: M
   diagnostics.lastNextCursorPresent = page.next_cursor !== null && page.next_cursor.trim().length > 0;
 }
 
-export async function getMatterSyncAvailability(): Promise<{ rateLimitedUntil: string | null; message: string | null }> {
-  const state = await getMatterSyncState();
-  const rateLimitedUntil = state?.rate_limited_until ?? null;
+export function getActiveMatterCooldown(
+  states: MatterSyncStream[],
+  legacyRateLimitedUntil: string | null | undefined,
+  now: Date = new Date()
+): string | null {
+  const rateLimitedUntil = [...states.map((state) => state.retry_at), legacyRateLimitedUntil]
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1) ?? null;
+  return isMatterRateLimitActive(rateLimitedUntil, now) ? rateLimitedUntil : null;
+}
 
-  if (!isMatterRateLimitActive(rateLimitedUntil)) {
+async function loadActiveMatterCooldown(deps: MatterSyncRuntimeDeps, now: Date = deps.now()): Promise<string | null> {
+  const [states, legacy] = await Promise.all([deps.getStreams(), deps.getLegacyState()]);
+  return getActiveMatterCooldown(states, legacy?.rate_limited_until, now);
+}
+
+export async function getMatterSyncAvailability(
+  deps: MatterSyncRuntimeDeps = productionSyncDeps
+): Promise<{ rateLimitedUntil: string | null; message: string | null }> {
+  const rateLimitedUntil = await loadActiveMatterCooldown(deps);
+
+  if (!rateLimitedUntil) {
     return { rateLimitedUntil: null, message: null };
   }
 
@@ -141,43 +178,63 @@ export async function getMatterSyncAvailability(): Promise<{ rateLimitedUntil: s
 
 export async function syncMatterData(
   mode: MatterSyncMode = "recent_activity_manual",
-  options: { recentActivityWindow?: MatterRecentActivityWindow } = {}
+  options: { recentActivityWindow?: MatterRecentActivityWindow } = {},
+  deps: MatterSyncRuntimeDeps = productionSyncDeps
 ): Promise<MatterSyncResult> {
   let syncRunId: string | null = null;
-  let storedState: SyncState | null = null;
+  let storedState: MatterSyncStream | null = null;
+  let activeCycle: ActiveMatterCycle | null = null;
 
   try {
-    const [loadedState, legacyCheckpoint] = await Promise.all([getMatterSyncState(), getLatestSuccessfulSyncCheckpoint()]);
-    storedState = loadedState;
-
-    if (isMatterRateLimitActive(storedState?.rate_limited_until)) {
+    const invocationNow = deps.now();
+    const stream = mode === "backfill_library" ? "library_items" : "recent_sessions";
+    const rateLimitedUntil = await loadActiveMatterCooldown(deps, invocationNow);
+    if (rateLimitedUntil) {
       return {
         ok: false,
-        message: buildMatterRateLimitMessage(storedState?.rate_limited_until ?? null),
-        rateLimitedUntil: storedState?.rate_limited_until ?? null,
+        message: buildMatterRateLimitMessage(rateLimitedUntil),
+        rateLimitedUntil,
+      };
+    }
+    storedState = await deps.getStream(stream);
+
+    const requestedWindow = isRecentActivityMode(mode) ? options.recentActivityWindow : undefined;
+    if (requestedWindow && storedState?.coverage_window && requestedWindow !== storedState.coverage_window) {
+      return {
+        ok: false,
+        message: `The requested ${requestedWindow} history window differs from this stream's ${storedState.coverage_window} contract. Finish or explicitly restart that history operation before changing coverage.`,
       };
     }
 
-    const startedAt = new Date().toISOString();
-    const syncRun = await createSyncRun({ status: "running", started_at: startedAt, sync_mode: mode });
+    const startedAt = invocationNow.toISOString();
+    const syncRun = await deps.createRun({ status: "running", started_at: startedAt, sync_mode: mode });
     syncRunId = syncRun.id;
 
-    // Validate the configured Matter token before mutating local Matter-derived rows.
-    await getMatterAccount();
-
     const recentActivitySince = isRecentActivityMode(mode) ? getRecentActivityWindowStart(new Date(startedAt), options.recentActivityWindow) : null;
-    const batchState = startBatchState(storedState, legacyCheckpoint, mode, recentActivitySince);
+    activeCycle = startOrResumeMatterCycle({
+      stream,
+      stored: storedState,
+      now: new Date(startedAt),
+      configuredLimit: stream === "recent_sessions" ? getMatterSyncSessionsLimit() : getMatterSyncItemsLimit(),
+      initialSince: recentActivitySince,
+      requestedWindow: requestedWindow ?? null,
+    });
+    // Persist the complete request contract before making any upstream call.
+    await deps.upsertStream(persistActiveMatterCycle(activeCycle, activeCycle.cursor));
+    await deps.getAccount();
     const counts = createEmptyMatterBatchCounts();
     const diagnostics = createEmptyMatterSyncDiagnostics();
     const affectedDates = new Set<string>();
-    const checkpoint: SyncCheckpoint = { next: batchState.next_checkpoint_timestamp ?? batchState.active_since_timestamp };
-    const hasMore = await importNextMatterBatch({ state: batchState, counts, affectedDates, checkpoint, mode, diagnostics });
+    const checkpoint: SyncCheckpoint = { next: null };
+    const nextCursor = await importNextMatterBatch({ cycle: activeCycle, counts, affectedDates, checkpoint, diagnostics, deps });
+    const hasMore = nextCursor !== undefined;
+    const persistedState = hasMore
+      ? persistActiveMatterCycle(activeCycle, nextCursor ?? null)
+      : completeMatterCycle(activeCycle);
 
-    const persistedState = buildPersistedSyncState(batchState, checkpoint.next, hasMore, mode);
+    await deps.recalculate({ affectedDates });
 
-    await recalculateDailyStats({ affectedDates });
-
-    const finishedRun = await updateSyncRun(syncRunId, {
+    const finishedRun = await deps.updateRun(syncRunId, {
       status: "success",
       finished_at: new Date().toISOString(),
       items_synced: counts.items,
@@ -194,10 +251,10 @@ export async function syncMatterData(
       matter_has_more: diagnostics.lastHasMore,
       matter_next_cursor_present: diagnostics.lastNextCursorPresent,
       error_message: null,
-      checkpoint_timestamp: (isRecentActivityMode(mode) ? persistedState.recent_activity_checkpoint : persistedState.completed_checkpoint_timestamp) ?? null,
+      checkpoint_timestamp: persistedState.completed_watermark ?? null,
     });
 
-    await upsertMatterSyncState(persistedState);
+    await deps.upsertStream(persistedState);
 
     return {
       ok: true,
@@ -219,7 +276,9 @@ export async function syncMatterData(
 
     if (rateLimitedUntil) {
       try {
-        await upsertMatterSyncState(buildRateLimitedSyncState(storedState, rateLimitedUntil));
+        if (activeCycle) {
+          await deps.upsertStream(persistActiveMatterCycle(activeCycle, activeCycle.cursor, rateLimitedUntil));
+        }
       } catch (stateError) {
         console.error("Matter sync rate-limit state update failed", { error: sanitizeLogError(stateError) });
       }
@@ -227,7 +286,7 @@ export async function syncMatterData(
 
     if (syncRunId) {
       try {
-        await updateSyncRun(syncRunId, {
+        await deps.updateRun(syncRunId, {
           status: "error",
           finished_at: new Date().toISOString(),
           error_message: sanitizedError,
@@ -259,110 +318,57 @@ export async function syncMatterData(
 }
 
 async function importNextMatterBatch({
-  state,
+  cycle,
   counts,
   affectedDates,
   checkpoint,
-  mode,
   diagnostics,
+  deps,
 }: {
-  state: MutableMatterSyncState;
+  cycle: ActiveMatterCycle;
   counts: MatterBatchCounts;
   affectedDates: Set<string>;
   checkpoint: SyncCheckpoint;
-  mode: MatterSyncMode;
   diagnostics: MatterSyncDiagnostics;
-}): Promise<boolean> {
-  if (state.active_phase === "items") {
-    diagnostics.requestCount += 1;
-    const itemPage = await listMatterItems({
-      status: "all",
-      updatedSince: state.active_since_timestamp ?? undefined,
-      cursor: (mode === "backfill_library" ? state.backfill_items_cursor : state.item_cursor) ?? undefined,
-      limit: getMatterSyncItemsLimit(),
+  deps: MatterSyncRuntimeDeps;
+}): Promise<string | null | undefined> {
+  diagnostics.requestCount += 1;
+
+  if (cycle.stream === "library_items") {
+    const itemPage = await deps.listItems({
+      status: cycle.filters.status === "all" ? "all" : undefined,
+      order: cycle.filters.order === "updated" ? "updated" : undefined,
+      updatedSince: cycle.filters.updated_since,
+      cursor: cycle.cursor ?? undefined,
+      limit: cycle.pageLimit,
     });
     diagnostics.itemsReturned += itemPage.results.length;
     recordMatterPageDiagnostics(diagnostics, itemPage);
-    const itemRows = await importMatterItemPage(itemPage, affectedDates, checkpoint);
-    counts.items += itemRows.itemCount;
-    counts.tags += itemRows.tagCount;
-    counts.annotations += itemRows.annotationCount;
-
-    if (matterPageHasMore(itemPage)) {
-      if (itemPage.next_cursor) {
-        if (mode === "backfill_library") {
-          state.backfill_items_cursor = itemPage.next_cursor;
-        } else {
-          state.item_cursor = itemPage.next_cursor;
-        }
-      }
-      return true;
-    }
-
-    if (mode === "backfill_library") {
-      state.backfill_items_cursor = null;
-    } else {
-      state.item_cursor = null;
-    }
-    state.active_phase = mode === "backfill_library" ? "complete" : "tags";
+    const imported = await deps.importItems(itemPage, affectedDates, checkpoint);
+    counts.items += imported.itemCount;
+    counts.tags += imported.tagCount;
+    counts.annotations += imported.annotationCount;
+    return matterPageHasMore(itemPage) ? requireNextCursor(itemPage.next_cursor) : undefined;
   }
 
-  if (state.active_phase === "tags") {
-    diagnostics.requestCount += 1;
-    const tagPage = await listOptionalMatterTagsPage({
-      updatedSince: state.active_since_timestamp ?? undefined,
-      cursor: state.tag_cursor ?? undefined,
-      limit: getMatterSyncItemsLimit(),
-    });
+  const sessionPage = await deps.listSessions({
+    since: cycle.filters.since,
+    cursor: cycle.cursor ?? undefined,
+    limit: cycle.pageLimit,
+  });
+  diagnostics.sessionsReturned += sessionPage.results.length;
+  recordMatterPageDiagnostics(diagnostics, sessionPage);
+  const imported = await deps.importSessions(sessionPage, affectedDates, checkpoint, diagnostics);
+  counts.sessions += imported.sessions;
+  counts.items += imported.items;
+  counts.tags += imported.tags;
+  counts.annotations += imported.annotations;
+  return matterPageHasMore(sessionPage) ? requireNextCursor(sessionPage.next_cursor) : undefined;
+}
 
-    if (tagPage) {
-      recordMatterPageDiagnostics(diagnostics, tagPage);
-      const tagRows = tagPage.results.map((tag) => {
-        const tagRow = normalizeMatterTag(tag);
-        advanceCheckpoint(checkpoint, tagRow.updated_at_matter);
-        return tagRow;
-      });
-      await upsertInBatches(tagRows, upsertMatterTags);
-      counts.tags += tagRows.length;
-
-      if (matterPageHasMore(tagPage)) {
-        state.tag_cursor = tagPage.next_cursor;
-        return true;
-      }
-    }
-
-    state.tag_cursor = null;
-    state.active_phase = "sessions";
-  }
-
-  if (state.active_phase === "sessions") {
-    // Matter reading sessions are a dedicated endpoint, not the library items endpoint.
-    // The API supports ISO `since`, `limit`, and `cursor` query params and returns
-    // `results`, `has_more`, and `next_cursor` for cursor pagination.
-    diagnostics.requestCount += 1;
-    const sessionPage = await listMatterReadingSessions({
-      since: state.active_since_timestamp ?? undefined,
-      cursor: state.session_cursor ?? undefined,
-      limit: getMatterSyncSessionsLimit(),
-    });
-    diagnostics.sessionsReturned += sessionPage.results.length;
-    recordMatterPageDiagnostics(diagnostics, sessionPage);
-    const sessionCounts = await importMatterSessionPage(sessionPage, affectedDates, checkpoint, diagnostics);
-    counts.sessions += sessionCounts.sessions;
-    counts.items += sessionCounts.items;
-    counts.tags += sessionCounts.tags;
-    counts.annotations += sessionCounts.annotations;
-
-    if (matterPageHasMore(sessionPage)) {
-      state.session_cursor = sessionPage.next_cursor;
-      return true;
-    }
-
-    state.session_cursor = null;
-    state.active_phase = "complete";
-  }
-
-  return false;
+function requireNextCursor(cursor: string | null): string {
+  if (!cursor?.trim()) throw new Error("Matter reported more pages without an opaque next cursor.");
+  return cursor;
 }
 
 async function importMatterItemPage(
@@ -598,105 +604,7 @@ async function getOptionalMatterItem(itemId: string): Promise<Awaited<ReturnType
   }
 }
 
-function startBatchState(
-  storedState: SyncState | null,
-  legacyCheckpoint: string | null,
-  mode: MatterSyncMode,
-  recentActivitySince: string | null
-): MutableMatterSyncState {
-  const completedCheckpoint = storedState?.completed_checkpoint_timestamp ?? legacyCheckpoint;
-  const storedPhase = storedState ? normalizePhase(storedState.active_phase, mode) : "complete";
-  const modeChanged = storedState?.sync_mode && storedState.sync_mode !== mode;
-  const canResumeMode = isRecentActivityMode(mode) ? storedPhase === "sessions" : storedPhase === "items";
 
-  if (storedState && storedPhase !== "complete" && !modeChanged && canResumeMode) {
-    return {
-      completed_checkpoint_timestamp: completedCheckpoint,
-      active_since_timestamp: storedState.active_since_timestamp ?? getModeCheckpoint(storedState, legacyCheckpoint, mode, recentActivitySince),
-      active_phase: storedPhase,
-      item_cursor: storedState.item_cursor,
-      tag_cursor: storedState.tag_cursor,
-      session_cursor: storedState.session_cursor,
-      next_checkpoint_timestamp: storedState.next_checkpoint_timestamp ?? storedState.active_since_timestamp ?? getModeCheckpoint(storedState, legacyCheckpoint, mode, recentActivitySince),
-      rate_limited_until: storedState.rate_limited_until,
-      sync_mode: mode,
-      recent_activity_checkpoint: storedState.recent_activity_checkpoint,
-      backfill_items_cursor: storedState.backfill_items_cursor,
-    };
-  }
-
-  const activeSince = getModeCheckpoint(storedState, legacyCheckpoint, mode, recentActivitySince);
-
-  return {
-    completed_checkpoint_timestamp: completedCheckpoint,
-    active_since_timestamp: activeSince,
-    active_phase: getMatterSyncInitialPhase(mode),
-    item_cursor: mode === "backfill_library" ? null : storedState?.item_cursor ?? null,
-    tag_cursor: null,
-    session_cursor: null,
-    next_checkpoint_timestamp: activeSince,
-    rate_limited_until: storedState?.rate_limited_until ?? null,
-    sync_mode: mode,
-    recent_activity_checkpoint: storedState?.recent_activity_checkpoint ?? null,
-    backfill_items_cursor: mode === "backfill_library" ? storedState?.backfill_items_cursor ?? null : storedState?.backfill_items_cursor ?? null,
-  };
-}
-
-function getModeCheckpoint(
-  storedState: SyncState | null,
-  legacyCheckpoint: string | null,
-  mode: MatterSyncMode,
-  recentActivitySince: string | null
-): string | null {
-  if (isRecentActivityMode(mode)) {
-    return recentActivitySince;
-  }
-
-  return storedState?.completed_checkpoint_timestamp ?? legacyCheckpoint;
-}
-
-function buildPersistedSyncState(
-  state: MutableMatterSyncState,
-  nextCheckpoint: string | null,
-  hasMore: boolean,
-  mode: MatterSyncMode
-): TablesInsert<"sync_state"> {
-  const base = {
-    id: "matter" as const,
-    completed_checkpoint_timestamp: state.completed_checkpoint_timestamp,
-    active_since_timestamp: state.active_since_timestamp,
-    active_phase: state.active_phase,
-    item_cursor: state.item_cursor,
-    tag_cursor: state.tag_cursor,
-    session_cursor: state.session_cursor,
-    next_checkpoint_timestamp: nextCheckpoint,
-    rate_limited_until: null,
-    sync_mode: mode,
-    recent_activity_checkpoint: state.recent_activity_checkpoint,
-    backfill_items_cursor: state.backfill_items_cursor,
-  };
-
-  if (!hasMore && state.active_phase === "complete") {
-    return {
-      ...base,
-      completed_checkpoint_timestamp: mode === "backfill_library" ? nextCheckpoint : state.completed_checkpoint_timestamp,
-      active_since_timestamp: null,
-      active_phase: "complete",
-      item_cursor: null,
-      tag_cursor: null,
-      session_cursor: null,
-      next_checkpoint_timestamp: null,
-      recent_activity_checkpoint: isRecentActivityMode(mode) ? nextCheckpoint : state.recent_activity_checkpoint,
-      backfill_items_cursor: mode === "backfill_library" ? null : state.backfill_items_cursor,
-    };
-  }
-
-  return base;
-}
-
-function buildRateLimitedSyncState(storedState: SyncState | null, rateLimitedUntil: string): TablesInsert<"sync_state"> {
-  return buildRateLimitedMatterSyncState(storedState, rateLimitedUntil);
-}
 
 function getRateLimitedUntil(error: unknown): string | null {
   if (!(error instanceof MatterRateLimitError)) {
@@ -709,14 +617,6 @@ function getRateLimitedUntil(error: unknown): string | null {
   }
 
   return new Date(Date.now() + retryAfterSeconds * 1_000).toISOString();
-}
-
-function normalizePhase(phase: string, mode: MatterSyncMode = "backfill_library"): MatterSyncPhase {
-  if (phase === "items" || phase === "tags" || phase === "sessions" || phase === "complete") {
-    return phase;
-  }
-
-  return getMatterSyncInitialPhase(mode);
 }
 
 async function upsertInBatches<Row>(rows: Row[], upsert: (batch: Row[]) => Promise<unknown>) {
@@ -840,17 +740,6 @@ async function getMatterItemById(itemId: string, cache: Map<string, MatterItemRo
   const item = data ? { id: data.id, word_count: data.word_count, progress: data.progress } : null;
   cache.set(itemId, item);
   return item;
-}
-
-async function listOptionalMatterTagsPage(params: Parameters<typeof listMatterTags>[0]): Promise<MatterListResponse<MatterTag> | null> {
-  try {
-    return await listMatterTags(params);
-  } catch (error) {
-    if (isOptionalMatterEndpointError(error)) {
-      return null;
-    }
-    throw error;
-  }
 }
 
 async function* iterateOptionalMatterAnnotations(itemId: string) {

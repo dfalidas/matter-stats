@@ -20,6 +20,7 @@
     "../app/dashboard/actions.ts",
     "../lib/matter-normalizers.ts",
     "../lib/matter-sync-progress.ts",
+    "../lib/matter-sync.ts",
     "../lib/metrics-service.ts",
     "../lib/reading-personality.ts",
     "../lib/supabase-queries.ts",
