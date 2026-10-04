@@ -61,6 +61,14 @@ All application/data routes above except `/login` require an app session.
 | `MATTER_SYNC_ITEMS_LIMIT` | Optional | Positive per-request item page limit; defaults to `25`. |
 | `MATTER_SYNC_SESSIONS_LIMIT` | Optional | Positive per-request session page limit; defaults to `25`. |
 
+## Matter sync stream cycles
+
+Matter pagination is persisted independently in `public.matter_sync_streams` for `recent_sessions` (`GET /reading_sessions`) and `library_items` (`GET /items`). Manual and scheduled activity syncs are only different triggers for the same `recent_sessions` stream. Each active cycle pins its endpoint, exact documented filters/lower bound, page limit, opaque cursor, start time, and cycle generation; later invocations resume that contract even across a year boundary or environment limit change. Cycle generation identifies a logical cycle and is not the Task 12 lease/fencing generation.
+
+The first sessions cycle uses the explicitly selected coverage lower bound. A genuinely exhausted cycle promotes its captured start time to the completed watermark, including when the final page is empty. Partial and failed cycles do not promote it. Later cycles replay from seven days before that watermark using inclusive `since`; this is an application overlap policy for idempotent upserts, not a Matter late-arrival or cursor-snapshot guarantee. Imported minimum/maximum timestamps do not establish historical completeness. Library enumeration uses only documented parameters and remains independent of session import.
+
+The legacy singleton did not persist its page limit, so a complete active request contract cannot be reconstructed. Migration creates both streams with a `legacy_recoverable_restart` marker, no cursor, and no claimed completed watermark. Existing imported domain rows are preserved.
+
 ## Database and release order
 
 Apply every file in `supabase/migrations` in timestamp order. The login schema specifically requires:
@@ -68,6 +76,7 @@ Apply every file in `supabase/migrations` in timestamp order. The login schema s
 1. `20260929000000_harden_rls_and_auth.sql` creates `public.app_sessions` and `public.app_login_attempts`, enables RLS on the application table inventory, removes browser-role table access, and grants the service role.
 2. `20260929010000_atomic_login_limiter.sql` creates the function `public.record_app_login_attempt(p_client_key_hash text, p_succeeded boolean, p_limit integer default 5, p_window_seconds integer default 900) returns boolean`, revokes browser-role execution, and grants execution to `service_role`.
 3. Only after both migrations succeed should application code that calls that RPC be deployed.
+4. `20261004000000_add_independent_sync_stream_cycles.sql` adds the protected stream-cycle rows and must precede Task 11 runtime code.
 
 The SQL expresses the intended RLS and grant policy, and the TypeScript implements service-role-only access. That is not evidence that production has applied the migrations. Fresh and upgrade migration runs, Data API denial for `anon`/`authenticated`, service-role allowance, and the RPC's behavior under real concurrent database calls must be verified separately in an isolated Supabase environment. Unit-test mocks do not establish those properties.
 

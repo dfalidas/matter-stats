@@ -25,8 +25,9 @@ Apply every SQL file in `supabase/migrations` in filename/timestamp order:
 8. `20260519090000_allow_nullable_reading_session_item_id.sql`
 9. `20260929000000_harden_rls_and_auth.sql`
 10. `20260929010000_atomic_login_limiter.sql`
+11. `20261004000000_add_independent_sync_stream_cycles.sql`
 
-The final two migrations must both succeed **before** deploying code that performs login. The first creates `public.app_sessions` and `public.app_login_attempts` and declares the table RLS/grant policy. The second defines:
+The two `20260929` migrations must both succeed **before** deploying code that performs login. The first creates `public.app_sessions` and `public.app_login_attempts` and declares the table RLS/grant policy. The second defines:
 
 ```sql
 public.record_app_login_attempt(
@@ -38,6 +39,8 @@ public.record_app_login_attempt(
 ```
 
 The application invokes that RPC through `service_role`. Applying only the first migration leaves login without its required function.
+
+The Task 11 migration must succeed before deploying the independent-stream runtime. It adds `public.matter_sync_streams`, enables RLS, revokes browser roles, and grants only `service_role`. Because the singleton lacked a persisted page limit, migration performs a recoverable restart: it copies no legacy cursor, infers no watermark, and changes no imported domain data.
 
 For an existing project, follow [the security release runbook](security-release-runbook.md) and verify both an upgrade path and a fresh migration chain in disposable environments before production. SQL text demonstrates intended controls, not deployed controls: retain separate evidence for applied migrations, browser-role Data API denial, service-role allowance, and 20-request RPC concurrency.
 
@@ -109,7 +112,7 @@ Observed Matter sessions may have a null item link. That supports time and sessi
 
 Changing `APP_ACCESS_PASSWORD` should be paired with incrementing `APP_CREDENTIAL_VERSION` so previously issued database-backed sessions fail validation. Rotate Matter, cron, and Supabase credentials according to their providers' procedures and only with operational approval. A configuration change requires redeployment.
 
-For a documentation-only release, rollback is simply reverting the documentation commit. For runtime/database releases, follow the security runbook: do not disable RLS as a routine rollback, and do not drop authentication tables or history without an approved backup/destructive-change plan.
+For Task 11 runtime rollback, deploy the prior application first; it continues using retained `sync_state`. The additive `matter_sync_streams` table may remain. Dropping it discards only cycle/retry metadata (not imported Matter data) and requires an approved destructive migration. Do not disable RLS or delete imported rows as rollback.
 
 ## Open work and external verification
 

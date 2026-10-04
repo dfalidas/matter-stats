@@ -236,7 +236,7 @@ function parseMatterSyncLimit(rawValue: string | undefined, fallback: number): n
   }
 
   const parsed = Number.parseInt(rawValue, 10);
-  if (!Number.isFinite(parsed) || parsed < 1) {
+  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 100) {
     return fallback;
   }
 

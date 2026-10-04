@@ -301,6 +301,40 @@ export type Database = {
         };
         Relationships: [];
       };
+      matter_sync_streams: {
+        Row: {
+          stream: string;
+          endpoint: string;
+          filters: Json;
+          page_limit: number;
+          cursor: string | null;
+          cycle_started_at: string | null;
+          cycle_generation: number;
+          completed_watermark: string | null;
+          retry_at: string | null;
+          cycle_active: boolean;
+          transition_status: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          stream: string;
+          endpoint: string;
+          filters?: Json;
+          page_limit: number;
+          cursor?: string | null;
+          cycle_started_at?: string | null;
+          cycle_generation?: number;
+          completed_watermark?: string | null;
+          retry_at?: string | null;
+          cycle_active?: boolean;
+          transition_status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["matter_sync_streams"]["Insert"]>;
+        Relationships: [];
+      };
       sync_runs: {
         Row: {
           id: string;
@@ -397,4 +431,5 @@ export type ItemTag = Tables<"item_tags">;
 export type Annotation = Tables<"annotations">;
 export type DailyStat = Tables<"daily_stats">;
 export type SyncState = Tables<"sync_state">;
+export type MatterSyncStream = Tables<"matter_sync_streams">;
 export type SyncRun = Tables<"sync_runs">;

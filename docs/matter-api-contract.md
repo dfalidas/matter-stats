@@ -1,6 +1,6 @@
 # Matter API v1 contract and capability matrix
 
-**Reviewed:** 2026-09-29 from the official documentation links below. Documentation network access from this execution environment returned an authorization error, so the supplied 2026-09-29 review is recorded here and is **not** claimed as a fresh live/API verification.
+**Reviewed:** 2026-10-04 against the official documentation links below. This is a documentation review, not a live account/API contract test.
 
 Base URL: `https://api.getmatter.com/public/v1/`. Authentication is a server-side Bearer token for Matter Pro. The account has one active Matter token; generating another immediately invalidates the previous token. Unknown response fields are ignored while required fields are validated.
 
@@ -24,9 +24,11 @@ The common page envelope is `results`, `has_more`, `next_cursor`; limit is 1–1
 |---|---|
 | Documented | Session identity/date/duration; item/library metadata; endpoint-specific pagination; annotations and tags |
 | Observed only / legacy | Historical payloads may contain item-like shapes or alternate timestamp aliases; preserve raw legacy links but do not promote them to a guarantee |
-| Application policy | Legacy `started_at` aliases occurrence; nullable `item_id`; fixed WPM estimates; future 7-day overlap; endpoint validation and sanitization |
+| Application policy | Legacy `started_at` aliases occurrence; nullable `item_id`; fixed WPM estimates; seven-day incremental overlap; endpoint validation and sanitization |
 | Unavailable | Documented session→item identity, factual start/end interval, measured word delta, session `updated_since`/`until`/`order`, retention/cursor TTL/late-update bound, deletion feeds, dated completion events |
 
 Missing item linkage is expected, must not trigger enrichment retries, and does not remove valid reading duration. Runtime attribution requires documented provenance. Archive, extraction completion and current progress are not a dated reading-completion event.
+
+The seven-day incremental overlap is an application replay policy over the documented inclusive session `since` boundary; it is not an upstream guarantee about late arrivals, cursor snapshots, or retention. Active cycles persist and reuse their exact endpoint parameters and limit. The adapter does not send session `until`, `order`, or `updated_since` parameters.
 
 Official sources: [overview](https://docs.getmatter.com/api), [sessions](https://docs.getmatter.com/api/reading-sessions/list), [items](https://docs.getmatter.com/api/items/list), [item detail](https://docs.getmatter.com/api/items/get), [item update](https://docs.getmatter.com/api/items/update), [pagination](https://docs.getmatter.com/api/pagination), [rate limits](https://docs.getmatter.com/api/rate-limits), [authentication](https://docs.getmatter.com/api/authentication), [errors](https://docs.getmatter.com/api/errors), [versioning](https://docs.getmatter.com/api/versioning), [annotations](https://docs.getmatter.com/api/annotations/list), [tags](https://docs.getmatter.com/api/tags/list).
