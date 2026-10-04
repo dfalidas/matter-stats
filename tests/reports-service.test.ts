@@ -9,8 +9,8 @@ class Q {
   private lim:number|null=null;
   private window:[number,number]|null=null;
   constructor(private table:string, private rows:Record<string, unknown>[]){}
-  select(){return this;} lt(c:string,v:string){this.filters[`lt_${c}`]=v;return this;} gte(c:string,v:string){this.filters[`gte_${c}`]=v;return this;}
-  gt(c:string,v:number){this.filters[`gt_${c}`]=v;return this;} not(c:string){this.filters[`not_${c}`]=true;return this;}
+  select(){return this;} lt(c:string,v:string){this.filters[`lt:${c}`]=v;return this;} gte(c:string,v:string){this.filters[`gte:${c}`]=v;return this;}
+  gt(c:string,v:number){this.filters[`gt:${c}`]=v;return this;} not(c:string){this.filters[`not:${c}`]=true;return this;}
   order(col:string,opt:{ascending?:boolean}){this.sort={col,asc:opt.ascending??true};return this;} limit(n:number){this.lim=n;return this;}
   range(from:number,to:number){this.window=[from,to];return this;}
   maybeSingle(){const data=this.result()[0]??null; return Promise.resolve({data,error:null});}
@@ -21,7 +21,7 @@ class Q {
   ){return Promise.resolve({data:this.result(),error:null}).then(onf,onr);}
   private result(){let out=[...this.rows];
     for (const [k,v] of Object.entries(this.filters)) {
-      const [op,col]=k.split('_');
+      const [op,col]=k.split(':');
       if (!col) continue;
       if(op==='lt') out=out.filter((r)=>r[col]!==null && String(r[col]) < String(v));
       if(op==='gte') out=out.filter((r)=>r[col]!==null && String(r[col]) >= String(v));
@@ -57,6 +57,17 @@ test('weekly report renders populated historical week with null item_id sessions
   assert.equal(report.metrics.range.startDate,'2026-05-04');
   assert.ok(report.metrics.totals.sessionsCount >= 0);
   assert.ok(report.timeline.length >= 0);
+});
+
+test('report forwards its request-scoped now and exposes a separate selected-date streak', async()=>{
+  const sessions: Session[] = [
+    {id:'s26',item_id:null,started_at:'2026-09-26T10:00:00Z',ended_at:null,duration_seconds:60,words_estimated:225,matter_items:null},
+    {id:'s27',item_id:null,started_at:'2026-09-27T10:00:00Z',ended_at:null,duration_seconds:60,words_estimated:225,matter_items:null},
+    {id:'s28',item_id:null,started_at:'2026-09-28T10:00:00Z',ended_at:null,duration_seconds:60,words_estimated:225,matter_items:null},
+  ];
+  const report=await getReadingReport(client([],sessions),'daily',{reference:'2026-09-28',now:new Date('2026-09-30T12:00:00Z')});
+  assert.equal(report.metrics.currentStreakDays,0);
+  assert.deepEqual(report.metrics.historicalStreak,{asOfDate:'2026-09-28',days:3});
 });
 
 test('validates URL-persisted report references by period',()=>{

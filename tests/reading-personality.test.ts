@@ -32,6 +32,7 @@ function metrics(overrides: Partial<ReadingMetrics>): ReadingMetrics {
       averageSessionLengthSeconds: 600,
     },
     currentStreakDays: 0,
+    historicalStreak: null,
     bestStreakDays: 0,
     topSources: [],
     topAuthors: [],
