@@ -63,11 +63,13 @@ test("R6 target (W5): yesterday's streak survives an empty today, while empty to
   assert.equal(on30.currentStreakDays, 0);
 });
 
-test("R7 characterization: item word_count×progress is currently copied to every session", () => {
-  const normalized = normalizeReadingSession({ id: "s-1", date: "2026-09-29T10:00:00Z", seconds_read: 60 }, { item: { word_count: 1_000, progress: 1 } });
-  assert.equal(normalized?.words_estimated, 1_000);
+test("R7 target (W5): three 60-second sessions estimate 675 words at 225 WPM, not 3,000 item words", () => {
+  const estimates = ["s-1", "s-2", "s-3"].map((id) =>
+    normalizeReadingSession({ id, date: "2026-09-29T10:00:00Z", seconds_read: 60 }, { item: { word_count: 1_000, progress: 1 } })?.words_estimated,
+  );
+  assert.deepEqual(estimates, [225, 225, 225]);
+  assert.equal(estimates.reduce((total, words) => total + (words ?? 0), 0), 675);
 });
-test.todo("R7 target (W5): three 60-second sessions estimate 675 words at 225 WPM, not 3,000 item words");
 
 test("R8: the default timezone is Europe/Athens", () => {
   const previous = process.env.APP_TIMEZONE;

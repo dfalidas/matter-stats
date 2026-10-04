@@ -1,7 +1,8 @@
 import type { MatterAnnotation, MatterItem, MatterReadingSession, MatterTag } from "./matter-api";
 import type { Database } from "./supabase-types";
+import { DEFAULT_READING_WPM, estimateWordsFromSeconds } from "./reading-estimates";
 
-export const DEFAULT_READING_SPEED_WORDS_PER_MINUTE = 225;
+export const DEFAULT_READING_SPEED_WORDS_PER_MINUTE = DEFAULT_READING_WPM;
 
 export type MatterItemRow = Database["public"]["Tables"]["matter_items"]["Insert"];
 export type ReadingSessionRow = Database["public"]["Tables"]["reading_sessions"]["Insert"];
@@ -50,7 +51,6 @@ export type SafeReadingSessionShapeDiagnostics = {
 
 export type NormalizeReadingSessionOptions = {
   item?: Pick<MatterItemRow, "word_count" | "progress"> | NormalizableMatterItem | null;
-  readingSpeedWordsPerMinute?: number;
 };
 
 export type NormalizedItemTags = {
@@ -84,8 +84,9 @@ export function normalizeMatterItem(item: NormalizableMatterItem, syncedAt?: str
 
 export function normalizeReadingSession(
   session: ReadingSessionWithOptionalApiFields,
-  options: NormalizeReadingSessionOptions = {}
+  _options: NormalizeReadingSessionOptions = {}
 ): ReadingSessionRow | null {
+  void _options; // Retain the options parameter for compatibility; item metadata never affects session estimates.
   const sessionId = firstPresentText(textFromUnknown(session.id));
   const itemId = extractMatterReadingSessionItemId(session);
   const durationSeconds = normalizeNonNegativeInteger(
@@ -105,11 +106,7 @@ export function normalizeReadingSession(
     ended_at: endedAt,
     duration_seconds: durationSeconds,
     source_device: firstPresentText(session.source_device, session.sourceDevice, session.device),
-    words_estimated: estimateWordsRead({
-      durationSeconds,
-      item: options.item ?? extractEmbeddedMatterItem(session),
-      readingSpeedWordsPerMinute: options.readingSpeedWordsPerMinute,
-    }),
+    words_estimated: estimateWordsFromSeconds(durationSeconds),
   };
 }
 
@@ -271,31 +268,6 @@ function estimateReadingTimeMinutes(wordCount: number | null): number | null {
   return Math.ceil(wordCount / DEFAULT_READING_SPEED_WORDS_PER_MINUTE);
 }
 
-function estimateWordsRead({
-  durationSeconds,
-  item,
-  readingSpeedWordsPerMinute = DEFAULT_READING_SPEED_WORDS_PER_MINUTE,
-}: {
-  durationSeconds: number | null;
-  item?: NormalizeReadingSessionOptions["item"];
-  readingSpeedWordsPerMinute?: number;
-}): number | null {
-  const wordCount = normalizeNonNegativeInteger(item?.word_count);
-  const progress = normalizeProgress(getItemProgress(item));
-
-  if (wordCount !== null && progress !== null) {
-    // Prefer Matter item facts when both are present: words read is the deterministic product of word_count and progress.
-    return Math.round(wordCount * progress);
-  }
-
-  if (durationSeconds === null) {
-    return null;
-  }
-
-  // If word_count/progress is unavailable, use elapsed time and a fixed WPM so estimates do not vary by environment.
-  return Math.round((durationSeconds / 60) * readingSpeedWordsPerMinute);
-}
-
 function normalizeSessionEndTimestamp(endedAt: string | null | undefined, startedAt: string | null, durationSeconds: number | null): string | null {
   const explicitEndedAt = normalizeIsoTimestamp(endedAt);
   if (explicitEndedAt) {
@@ -323,21 +295,6 @@ function normalizeProgress(progress: number | null | undefined, status?: string 
   return status === "archive" ? 1 : null;
 }
 
-function getItemProgress(item: NormalizeReadingSessionOptions["item"]): number | null | undefined {
-  if (!item) {
-    return undefined;
-  }
-
-  if ("progress" in item) {
-    return item.progress;
-  }
-
-  if ("reading_progress" in item) {
-    return item.reading_progress;
-  }
-
-  return undefined;
-}
 
 function normalizeNonNegativeInteger(value: number | null | undefined): number | null {
   if (typeof value !== "number" || !Number.isFinite(value)) {

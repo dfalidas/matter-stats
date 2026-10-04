@@ -5,6 +5,7 @@ import {
   type MetricsPeriodPreset,
 } from "./metrics-service";
 import type { MatterStatsSupabaseClient } from "./supabase-queries";
+import { estimateWordsFromSeconds } from "./reading-estimates";
 
 export const SOURCE_RANKING_SORT_KEYS = ["reading-time", "articles", "words", "highlights"] as const;
 
@@ -206,7 +207,7 @@ function bucketSourceSessions(sessions: SourceSession[]): Map<string, SourceAccu
 
     const bucket = getOrCreateBucket(buckets, source);
     bucket.readingTimeSeconds += positiveInteger(session.duration_seconds);
-    bucket.wordsRead += positiveInteger(session.words_estimated);
+    bucket.wordsRead += estimateWordsFromSeconds(positiveInteger(session.duration_seconds));
     bucket.itemIds.add(session.item_id);
   }
 

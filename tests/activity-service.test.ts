@@ -76,3 +76,12 @@ test("Athens month boundaries follow DST offsets", async () => {
   ]), "2026-03", "2026-03-31", 1, new Date("2026-04-02T00:00:00Z"));
   assert.equal(result.dayTotal.sessions, 1);
 });
+
+test("sums one-second estimates before pagination for calendar and selected-day totals", async () => {
+  const rows = Array.from({ length: 21 }, (_, index) => ({ id: `tiny-${String(index).padStart(2, "0")}`, started_at: "2026-09-10T10:00:00.000Z", duration_seconds: 1 }));
+  const result = await getActivityMonth(client(rows), "2026-09", "2026-09-10", 2, new Date("2026-10-01T00:00:00Z"));
+  assert.equal(result.days[0]?.estimatedWords, 84);
+  assert.equal(result.dayTotal.estimatedWords, 84);
+  assert.equal(result.sessions.length, 1);
+  assert.equal(result.sessions[0]?.estimatedWords, 4);
+});

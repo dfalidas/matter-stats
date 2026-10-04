@@ -135,7 +135,7 @@ test("keeps support for prior reading session item link shapes", () => {
   assert.equal(extractMatterReadingSessionItemId({ object: "reading_session", item_id: "item_5" }), "item_5");
 });
 
-test("normalizes reading session words from word count and progress when available", () => {
+test("normalizes reading session words from duration despite item metadata", () => {
   const row = normalizeReadingSession(
     {
       object: "reading_session",
@@ -147,7 +147,7 @@ test("normalizes reading session words from word count and progress when availab
     { item: { id: "item_1", word_count: 1_000, reading_progress: 0.4 } }
   );
 
-  assert.equal(row?.words_estimated, 400);
+  assert.equal(row?.words_estimated, 225);
 });
 
 test("missing foreign keys are skipped instead of throwing", () => {
@@ -237,7 +237,7 @@ test("normalizes sparse Matter item responses without inventing missing fields",
   });
 });
 
-test("normalizes reading sessions with API aliases, explicit end times, and custom reading speeds", () => {
+test("normalizes reading sessions with API aliases and explicit end times", () => {
   assert.deepEqual(
     normalizeReadingSession(
       {
@@ -249,8 +249,7 @@ test("normalizes reading sessions with API aliases, explicit end times, and cust
         duration_seconds: 61.2,
         source_device: " ",
         device: "iPad",
-      },
-      { readingSpeedWordsPerMinute: 300 }
+      }
     ),
     {
       id: "session_4",
@@ -259,7 +258,7 @@ test("normalizes reading sessions with API aliases, explicit end times, and cust
       ended_at: "2026-05-14T10:10:00.000Z",
       duration_seconds: 61,
       source_device: "iPad",
-      words_estimated: 305,
+      words_estimated: 229,
     }
   );
 });
@@ -292,7 +291,7 @@ test("normalizes reading session fixtures from snake_case, camelCase, embedded i
   assert.equal(camel?.item_id, "itm_2");
   assert.equal(camel?.duration_seconds, 120);
   assert.equal(embedded?.item_id, "itm_3");
-  assert.equal(embedded?.words_estimated, 250);
+  assert.equal(embedded?.words_estimated, 225);
   assert.equal(stringItem?.item_id, "itm_4");
 });
 
