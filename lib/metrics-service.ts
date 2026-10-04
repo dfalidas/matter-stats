@@ -1,6 +1,6 @@
 import type { MatterStatsSupabaseClient } from "@/lib/supabase-queries";
 
-import { estimateWordsFromSeconds } from "./reading-estimates";
+import { estimateWordsFromSeconds, sumSessionWordEstimates } from "./reading-estimates";
 
 export const DEFAULT_APP_TIMEZONE = "Europe/Athens";
 
@@ -468,7 +468,7 @@ async function fetchTagsByItemId(client: MatterStatsSupabaseClient, itemIds: str
 
 function summarizeSessions(sessions: MetricsSession[]): MetricTotals {
   const totalReadingTimeSeconds = sessions.reduce((total, session) => total + positiveInteger(session.duration_seconds), 0);
-  const wordsRead = estimateWordsFromSeconds(totalReadingTimeSeconds);
+  const wordsRead = sumSessionWordEstimates(sessions);
   const articlesRead = new Set(sessions.map((session) => session.item_id).filter(isNonEmptyString)).size;
   const sessionsCount = sessions.length;
 
@@ -528,7 +528,7 @@ function addToBucket(buckets: Map<string, MetricsAccumulator>, name: string, ses
   };
 
   existing.readingTimeSeconds += positiveInteger(session.duration_seconds);
-  existing.wordsRead = estimateWordsFromSeconds(existing.readingTimeSeconds);
+  existing.wordsRead += estimateWordsFromSeconds(positiveInteger(session.duration_seconds));
   if (isNonEmptyString(session.item_id)) {
     existing.itemIds.add(session.item_id);
   }
@@ -563,7 +563,7 @@ function buildRecentReads(sessions: MetricsSession[], limit: number): RecentRead
 
     if (existing) {
       existing.readingTimeSeconds += positiveInteger(session.duration_seconds);
-      existing.wordsRead = estimateWordsFromSeconds(existing.readingTimeSeconds);
+      existing.wordsRead += estimateWordsFromSeconds(positiveInteger(session.duration_seconds));
       if (readAt && (!existing.readAt || readAt > existing.readAt)) {
         existing.readAt = readAt;
       }

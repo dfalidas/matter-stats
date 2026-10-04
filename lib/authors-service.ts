@@ -5,6 +5,7 @@ import {
   type MetricsPeriodPreset,
 } from "./metrics-service";
 import type { MatterStatsSupabaseClient } from "./supabase-queries";
+import { estimateWordsFromSeconds } from "./reading-estimates";
 
 export const UNKNOWN_AUTHOR_LABEL = "Unknown author";
 export const UNKNOWN_SOURCE_LABEL = "Unknown source";
@@ -167,7 +168,7 @@ function bucketAuthorSessions(sessions: AuthorSession[]): Map<string, AuthorAccu
     const author = normalizeAuthorName(item?.author);
     const source = normalizeAuthorSource(item?.source);
     const readingTimeSeconds = positiveInteger(session.duration_seconds);
-    const wordsRead = positiveInteger(session.words_estimated);
+    const wordsRead = estimateWordsFromSeconds(positiveInteger(session.duration_seconds));
     const bucket = getOrCreateAuthorBucket(buckets, author);
     const sourceBucket = getOrCreateSourceBucket(bucket.sources, source);
 

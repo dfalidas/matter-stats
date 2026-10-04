@@ -133,12 +133,12 @@ function YearInReadingContent({ year, report }: { year: number; report: ReadingR
 
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(210px,1fr))]">
         <MetricCard
-          label="Words Read"
+          label="Estimated words"
           value={formatInteger(metrics.totals.wordsRead)}
-          helper={`${formatDuration(metrics.totals.totalReadingTimeSeconds)} of focused reading`}
+          helper="Estimated from reading time at 225 words/min."
           icon={BookOpen}
           accent="red"
-          tooltip="Estimated words read from synced Matter reading sessions in the current year."
+          tooltip={`Estimated from ${formatDuration(metrics.totals.totalReadingTimeSeconds)} of synced reading time.`}
         />
         <MetricCard
           label="Articles Read"
@@ -149,12 +149,12 @@ function YearInReadingContent({ year, report }: { year: number; report: ReadingR
           tooltip="Unique Matter items with reading activity during the current year."
         />
         <MetricCard
-          label="Equivalent Books"
+          label="Estimated book equivalent"
           value={formatBooks(booksEquivalent)}
-          helper={`Using ${formatInteger(WORDS_PER_BOOK)} words per book`}
+          helper={`Derived from estimated words using a ${formatInteger(WORDS_PER_BOOK)}-word book benchmark`}
           icon={LibraryBig}
           accent="violet"
-          tooltip="Book-equivalent estimate based on an 80,000-word default assumption."
+          tooltip="Approximate book equivalent derived from the estimated word total."
         />
       </div>
 
@@ -162,19 +162,19 @@ function YearInReadingContent({ year, report }: { year: number; report: ReadingR
         <SpotlightCard
           title="Top Publication"
           value={topPublication?.name ?? "Not enough data yet"}
-          helper={topPublication ? `${formatInteger(topPublication.wordsRead)} words • ${formatInteger(topPublication.articlesRead)} articles` : "Publications appear after reads sync with source metadata."}
+          helper={topPublication ? `${formatInteger(topPublication.wordsRead)} estimated words • ${formatInteger(topPublication.articlesRead)} articles` : "Publications appear after reads sync with source metadata."}
           icon={Newspaper}
         />
         <SpotlightCard
           title="Top Author"
           value={topAuthor?.name ?? "Not enough data yet"}
-          helper={topAuthor ? `${formatInteger(topAuthor.wordsRead)} words • ${formatInteger(topAuthor.articlesRead)} articles` : "Authors appear after synced items include bylines."}
+          helper={topAuthor ? `${formatInteger(topAuthor.wordsRead)} estimated words • ${formatInteger(topAuthor.articlesRead)} articles` : "Authors appear after synced items include bylines."}
           icon={PenLine}
         />
         <SpotlightCard
           title="Longest Read"
           value={longestRead?.title ?? "Not enough data yet"}
-          helper={longestRead ? `${formatInteger(longestRead.wordsRead)} words • ${formatDuration(longestRead.readingTimeSeconds)}` : "Longform reads appear once sessions are synced."}
+          helper={longestRead ? `${formatInteger(longestRead.wordsRead)} estimated words • ${formatDuration(longestRead.readingTimeSeconds)}` : "Longform reads appear once sessions are synced."}
           icon={Trophy}
         />
       </div>
@@ -182,7 +182,7 @@ function YearInReadingContent({ year, report }: { year: number; report: ReadingR
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)]">
         <ChartCard
           title="Reading Journey"
-          description="Words read by month across the current year."
+          description="Estimated words by month across the current year."
           badge={year}
           action={<BarChart3 className="h-5 w-5 text-dashboard-muted" aria-hidden />}
           contentClassName="h-80"
@@ -196,7 +196,7 @@ function YearInReadingContent({ year, report }: { year: number; report: ReadingR
                 <RechartsTooltip
                   cursor={{ fill: "hsl(var(--accent-red) / 0.08)" }}
                   contentStyle={{ background: "hsl(var(--dashboard-card))", border: "1px solid hsl(var(--dashboard-border))", borderRadius: "16px", color: "hsl(var(--dashboard-text))" }}
-                  formatter={(value, name) => [name === "words" ? `${formatInteger(Number(value))} words` : value, "Words read"]}
+                  formatter={(value, name) => [name === "words" ? `${formatInteger(Number(value))} estimated words` : value, "Estimated words"]}
                   labelFormatter={(label) => `${label} ${year}`}
                 />
                 <Bar dataKey="words" fill="hsl(var(--accent-red))" radius={[10, 10, 4, 4]} />
@@ -226,7 +226,7 @@ function YearInReadingContent({ year, report }: { year: number; report: ReadingR
                 id: tag.name,
                 label: tag.name,
                 value: Math.max(1, Math.round(tag.wordsRead / 1000)),
-                helper: `${formatInteger(tag.wordsRead)} words • ${formatInteger(tag.articlesRead)} articles`,
+                helper: `${formatInteger(tag.wordsRead)} estimated words • ${formatInteger(tag.articlesRead)} articles`,
                 accent: "blue",
               }))}
               maxValue={Math.max(...metrics.topTags.slice(0, 5).map((tag) => Math.max(1, Math.round(tag.wordsRead / 1000))), 1)}
@@ -238,9 +238,9 @@ function YearInReadingContent({ year, report }: { year: number; report: ReadingR
 
         <ChartCard title="Milestones" description="Your biggest current-year reading moments." action={<Medal className="h-5 w-5 text-dashboard-muted" aria-hidden />}>
           <div className="space-y-3">
-            <MilestoneRow label="Most Active Month" value={mostActiveMonth ? mostActiveMonth.label : "Not yet"} helper={mostActiveMonth ? `${formatInteger(mostActiveMonth.words)} words` : "Read in more months to unlock this."} icon={CalendarDays} />
+            <MilestoneRow label="Most Active Month" value={mostActiveMonth ? mostActiveMonth.label : "Not yet"} helper={mostActiveMonth ? `${formatInteger(mostActiveMonth.words)} estimated words` : "Read in more months to unlock this."} icon={CalendarDays} />
             <MilestoneRow label="Best Streak" value={`${formatInteger(metrics.bestStreakDays)} ${pluralize("day", metrics.bestStreakDays)}`} helper={metrics.bestStreakDays > 0 ? "Longest reading streak this year" : "Start a streak with your next read."} icon={Flame} />
-            <MilestoneRow label="Most Productive Day" value={mostProductiveDay ? formatDateLabel(mostProductiveDay.date) : "Not yet"} helper={mostProductiveDay ? `${formatInteger(mostProductiveDay.wordsRead)} words` : "Daily highs appear after reading sessions sync."} icon={Award} />
+            <MilestoneRow label="Most Productive Day" value={mostProductiveDay ? formatDateLabel(mostProductiveDay.date) : "Not yet"} helper={mostProductiveDay ? `${formatInteger(mostProductiveDay.wordsRead)} estimated words` : "Daily highs appear after reading sessions sync."} icon={Award} />
           </div>
         </ChartCard>
 
@@ -271,7 +271,7 @@ function YearInReadingContent({ year, report }: { year: number; report: ReadingR
                 key={read.itemId}
                 title={read.title ?? "Untitled read"}
                 source={read.source ?? read.author ?? "Matter"}
-                meta={`${formatInteger(read.wordsRead)} words • ${formatDuration(read.readingTimeSeconds)}`}
+                meta={`${formatInteger(read.wordsRead)} estimated words • ${formatDuration(read.readingTimeSeconds)}`}
                 status={read.estimatedReadingTimeMinutes ? `${read.estimatedReadingTimeMinutes} min read` : "Longform"}
                 href={read.url ?? undefined}
               />
@@ -389,7 +389,7 @@ function getHeroSentence(metrics: ReadingMetrics, booksEquivalent: number, isLow
     return "No current-year reading sessions have synced yet. Once Matter activity appears, this page becomes your annual recap.";
   }
 
-  const base = `You read ${formatInteger(metrics.totals.wordsRead)} words across ${formatInteger(metrics.totals.articlesRead)} ${pluralize("article", metrics.totals.articlesRead)} — about ${formatBooks(booksEquivalent)} using an ${formatInteger(WORDS_PER_BOOK)}-word book benchmark.`;
+  const base = `Your estimated reading volume was ${formatInteger(metrics.totals.wordsRead)} words across ${formatInteger(metrics.totals.articlesRead)} ${pluralize("article", metrics.totals.articlesRead)} — approximately ${formatBooks(booksEquivalent)} based on an ${formatInteger(WORDS_PER_BOOK)}-word book benchmark.`;
   return isLowData ? `${base} It is still early, so every new synced read will reshape the recap.` : base;
 }
 

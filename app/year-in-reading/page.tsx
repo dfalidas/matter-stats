@@ -29,7 +29,7 @@ export default async function YearInReadingPage() {
     <PageShell
       eyebrow="Year in Reading"
       title={`Your ${year} in Reading`}
-      description="A cinematic annual recap of your Matter reading: words, articles, publications, authors, tags, topics, streaks, milestones, and momentum."
+      description="A cinematic annual recap of your Matter reading: estimated words, articles, publications, authors, tags, topics, streaks, milestones, and momentum."
     >
       <YearInReadingOverview year={year} recapResult={recapResult} />
     </PageShell>

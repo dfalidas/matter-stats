@@ -21,7 +21,7 @@ export default async function AuthorsPage({ searchParams }: AuthorsPageProps) {
     <PageShell
       eyebrow="Authors"
       title="Author insights"
-      description="Rank authors by reading time, article count, words read, and the publications where you spend the most time with their work."
+      description="Rank authors by reading time, article count, estimated words, and the publications where you spend the most time with their work. Estimated from reading time at 225 words/min."
     >
       {rankingResult.ok ? (
         <AuthorsRanking period={period} ranking={rankingResult.ranking} />

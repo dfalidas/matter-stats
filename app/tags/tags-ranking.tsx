@@ -30,7 +30,7 @@ const periodLabels: Record<MetricsPeriodPreset, string> = {
 const sortLabels: Record<TagRankingSortKey, string> = {
   "reading-time": "Reading time",
   articles: "Articles",
-  words: "Words read",
+  words: "Estimated words",
   highlights: "Highlights",
 };
 
@@ -72,7 +72,7 @@ export function TagsRanking({ period, ranking }: TagsRankingProps) {
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Reading time" value={formatDuration(ranking.totals.readingTimeSeconds)} icon={Clock} />
         <StatCard label="Articles" value={formatInteger(ranking.totals.articlesRead)} icon={Newspaper} />
-        <StatCard label="Words read" value={formatInteger(ranking.totals.wordsRead)} icon={BookOpen} />
+        <StatCard label="Estimated words" value={formatInteger(ranking.totals.wordsRead)} icon={BookOpen} />
         <StatCard label="Highlights" value={formatInteger(ranking.totals.highlights)} icon={Highlighter} />
       </section>
 
@@ -173,7 +173,7 @@ export function TagsRanking({ period, ranking }: TagsRankingProps) {
                   <TableHead className="min-w-[220px]">Tag</TableHead>
                   <TableHead className="text-right">Reading time</TableHead>
                   <TableHead className="text-right">Articles</TableHead>
-                  <TableHead className="text-right">Words read</TableHead>
+                  <TableHead className="text-right">Estimated words</TableHead>
                   <TableHead className="text-right">Highlights</TableHead>
                   <TableHead className="min-w-[180px] text-right">Share of tagged reading</TableHead>
                 </TableRow>

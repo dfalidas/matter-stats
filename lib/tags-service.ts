@@ -5,6 +5,7 @@ import {
   type MetricsPeriodPreset,
 } from "./metrics-service";
 import type { MatterStatsSupabaseClient } from "./supabase-queries";
+import { estimateWordsFromSeconds } from "./reading-estimates";
 
 export const TAG_RANKING_SORT_KEYS = ["reading-time", "articles", "words", "highlights"] as const;
 
@@ -141,7 +142,7 @@ export async function getTagRanking(
       readingTimeSeconds: totalTaggedReadingTimeSeconds,
       wordsRead: sessions.reduce((total, session) => {
         const tagsForItem = tagsByItemId.get(session.item_id) ?? [];
-        return tagsForItem.length > 0 ? total + positiveInteger(session.words_estimated) : total;
+        return tagsForItem.length > 0 ? total + estimateWordsFromSeconds(positiveInteger(session.duration_seconds)) : total;
       }, 0),
       articlesRead: taggedItemIds.size,
       highlights: annotations.filter((annotation) => (tagsByItemId.get(annotation.item_id) ?? []).length > 0).length,
@@ -265,7 +266,7 @@ function bucketTagSessions(sessions: TagSession[], tagsByItemId: Map<string, Tag
   for (const session of sessions) {
     const tags = tagsByItemId.get(session.item_id) ?? [];
     const readingTimeSeconds = positiveInteger(session.duration_seconds);
-    const wordsRead = positiveInteger(session.words_estimated);
+    const wordsRead = estimateWordsFromSeconds(positiveInteger(session.duration_seconds));
 
     for (const tag of tags) {
       const bucket = getOrCreateTagBucket(buckets, tag);

@@ -21,7 +21,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
     <PageShell
       eyebrow="Sources"
       title="Source analytics"
-      description="Rank publications and source domains by reading time, words, articles, highlights, and share of your attention."
+      description="Rank publications and source domains by reading time, estimated words, articles, highlights, and share of your attention. Estimated from reading time at 225 words/min."
     >
       {rankingResult.ok ? (
         <SourcesRanking period={period} ranking={rankingResult.ranking} />

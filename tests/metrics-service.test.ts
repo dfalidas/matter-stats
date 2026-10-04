@@ -531,3 +531,26 @@ test("streak dates use Athens midnight and local calendar arithmetic across DST 
   assert.equal(boundaries.currentStreakDays, 2);
   assert.deepEqual(boundaries.historicalStreak, { asOfDate: "2026-10-26", days: 2 });
 });
+
+test("rounds each tiny session before totals, rankings, heatmap, and grouped recent reads", async () => {
+  const item = { id: "same", title: "Same", url: null, source: "Source", author: "Author" };
+  const sessions: TestSession[] = [0, 1, 2].map((index) => ({
+    id: `tiny_${index}`,
+    item_id: "same",
+    started_at: `2026-10-04T10:00:0${index}.000Z`,
+    ended_at: null,
+    duration_seconds: 1,
+    words_estimated: index === 0 ? 999_999 : null,
+    matter_items: item,
+  }));
+  sessions.push(unlinkedSession("unlinked-zero", "2026-10-04T11:00:00.000Z", 0, 700));
+  const metrics = await getReadingMetrics(createClient({ sessions, tags: [{ item_id: "same", matter_tags: { id: "tag", name: "Tag" } }] }), {
+    preset: "today", now: "2026-10-04T12:00:00Z", timezone: "UTC",
+  });
+  assert.equal(metrics.totals.wordsRead, 12);
+  assert.equal(metrics.topSources[0]?.wordsRead, 12);
+  assert.equal(metrics.topAuthors[0]?.wordsRead, 12);
+  assert.equal(metrics.topTags[0]?.wordsRead, 12);
+  assert.equal(metrics.recentReads.find((read) => read.itemId === "same")?.wordsRead, 12);
+  assert.equal(metrics.heatmap[0]?.wordsRead, 12);
+});

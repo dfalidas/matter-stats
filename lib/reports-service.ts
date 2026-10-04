@@ -217,7 +217,7 @@ function buildLongformReads(sessions: ReportSessionRow[], limit: number): Longfo
 
     if (existing) {
       existing.readingTimeSeconds += positiveInteger(session.duration_seconds);
-      existing.wordsRead = estimateWordsFromSeconds(existing.readingTimeSeconds);
+      existing.wordsRead += estimateWordsFromSeconds(positiveInteger(session.duration_seconds));
       existing.sessionsCount += 1;
       continue;
     }
