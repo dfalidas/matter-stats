@@ -1,0 +1,102 @@
+export const DEFAULT_APP_TIMEZONE = "Europe/Athens";
+
+export function isValidTimezone(timezone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-GB", { timeZone: timezone }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function getAppTimezone(configured = process.env.APP_TIMEZONE): string {
+  const timezone = configured?.trim();
+  return timezone && isValidTimezone(timezone) ? timezone : DEFAULT_APP_TIMEZONE;
+}
+
+export function normalizeTimezone(timezone?: string): string {
+  const value = timezone?.trim() || getAppTimezone();
+  return isValidTimezone(value) ? value : DEFAULT_APP_TIMEZONE;
+}
+
+function dateTimeParts(date: Date, timezone: string) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+  return {
+    year: Number(values.get("year")), month: Number(values.get("month")), day: Number(values.get("day")),
+    hour: Number(values.get("hour")), minute: Number(values.get("minute")), second: Number(values.get("second")),
+  };
+}
+
+export function getLocalDateParts(date: Date, timezone: string) {
+  const { year, month, day } = dateTimeParts(date, timezone);
+  return { year, month, day };
+}
+
+function timezoneOffsetMs(date: Date, timezone: string): number {
+  const parts = dateTimeParts(date, timezone);
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - date.getTime();
+}
+
+/** Convert a local calendar midnight to its UTC instant. */
+export function localDateToUtc(year: number, month: number, day: number, timezone: string): Date {
+  const utcGuess = new Date(Date.UTC(year, month - 1, day));
+  const firstPass = new Date(utcGuess.getTime() - timezoneOffsetMs(utcGuess, timezone));
+  return new Date(utcGuess.getTime() - timezoneOffsetMs(firstPass, timezone));
+}
+
+/** Convert an absolute timestamp to a YYYY-MM-DD key in the analytics timezone. */
+export function timestampToCalendarDate(date: Date | string, timezone = getAppTimezone()): string {
+  const timestamp = date instanceof Date ? date : new Date(date);
+  if (!Number.isFinite(timestamp.getTime())) throw new Error(`Invalid timestamp: ${String(date)}`);
+  const { year, month, day } = getLocalDateParts(timestamp, timezone);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+export function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const normalized = new Date(Date.UTC(year, month - 1, day));
+  return normalized.getUTCFullYear() === year && normalized.getUTCMonth() === month - 1 && normalized.getUTCDate() === day;
+}
+
+/** Calendar-key arithmetic deliberately uses UTC so it is independent of process timezone and DST. */
+export function addCalendarDays(value: string, days: number): string {
+  if (!isCalendarDate(value)) throw new Error(`Invalid calendar date: ${value}`);
+  const [year, month, day] = value.split("-").map(Number);
+  const result = new Date(Date.UTC(year, month - 1, day + days));
+  return result.toISOString().slice(0, 10);
+}
+
+export function calendarDateToUtc(value: string, timezone = getAppTimezone()): Date {
+  if (!isCalendarDate(value)) throw new Error(`Invalid calendar date: ${value}`);
+  const [year, month, day] = value.split("-").map(Number);
+  return localDateToUtc(year, month, day, timezone);
+}
+
+export function calendarDayBounds(value: string, timezone = getAppTimezone()) {
+  return { start: calendarDateToUtc(value, timezone), end: calendarDateToUtc(addCalendarDays(value, 1), timezone) };
+}
+
+export function addLocalDays(date: Date, days: number, timezone: string): Date {
+  return calendarDateToUtc(addCalendarDays(timestampToCalendarDate(date, timezone), days), timezone);
+}
+
+export function formatCalendarDate(value: string, options: Intl.DateTimeFormatOptions, locale = "en-GB"): string {
+  if (!isCalendarDate(value)) throw new Error(`Invalid calendar date: ${value}`);
+  return new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" }).format(new Date(`${value}T12:00:00.000Z`));
+}
+
+export function calendarYear(value: string): number {
+  if (!isCalendarDate(value)) throw new Error(`Invalid calendar date: ${value}`);
+  return Number(value.slice(0, 4));
+}

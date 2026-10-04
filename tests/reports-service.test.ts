@@ -51,6 +51,19 @@ test('weekly report resolves latest week with data fallback from reading session
   assert.equal(report.metrics.range.startDate,'2026-05-11');
 });
 
+test('latest weekly report evidence uses session local date rather than stale UTC daily rollups', async()=>{
+  const oldTimezone=process.env.APP_TIMEZONE;
+  process.env.APP_TIMEZONE='Europe/Athens';
+  try {
+    const sessions: Session[]=[{id:'monday-local',item_id:null,started_at:'2026-09-27T21:00:00Z',ended_at:null,duration_seconds:60,words_estimated:225,matter_items:null}];
+    const report=await getReadingReport(client([{date:'2026-09-27',reading_time_seconds:60}],sessions),'weekly',{reference:'2026-09-28',now:new Date('2026-09-28T12:00:00Z')});
+    assert.equal(report.latestWeekWithDataStartDate,'2026-09-28');
+    assert.equal(report.metrics.heatmap.find((day)=>day.date==='2026-09-28')?.sessionsCount,1);
+  } finally {
+    if(oldTimezone===undefined) delete process.env.APP_TIMEZONE; else process.env.APP_TIMEZONE=oldTimezone;
+  }
+});
+
 test('weekly report renders populated historical week with null item_id sessions', async()=>{
   const c=client([{date:'2026-05-08',reading_time_seconds:1200}],[{id:'s1',item_id:null,started_at:'2026-05-07T10:00:00Z',ended_at:null,duration_seconds:600,words_estimated:200,matter_items:null}]);
   const report=await getReadingReport(c,'weekly',{weekStartDate:'2026-05-04'});
@@ -98,7 +111,7 @@ test('weekly report retains captured default now while awaiting its latest-week 
   let advanced=false;
   try {
     const report=await getReadingReport(client([],midnightSessions,(table)=>{
-      if(table==='daily_stats'&&!advanced){advanced=true;t.mock.timers.tick(1);}
+      if(table==='reading_sessions'&&!advanced){advanced=true;t.mock.timers.tick(1);}
     }),'weekly');
     assert.equal(advanced,true);
     assert.equal(report.metrics.range.startDate,'2026-09-28');
@@ -130,6 +143,20 @@ test('resolves historical week, month, and year at Athens local boundaries',()=>
     const year=resolveReportRange('yearly','2026');
     assert.equal(year.start.toISOString(),'2025-12-31T22:00:00.000Z');
     assert.equal(year.end.toISOString(),'2026-12-31T22:00:00.000Z');
+  } finally {
+    if(oldTimezone===undefined) delete process.env.APP_TIMEZONE; else process.env.APP_TIMEZONE=oldTimezone;
+  }
+});
+
+test('yearly report keeps its local 2026 reference and month data despite a 2025 UTC start', async()=>{
+  const oldTimezone=process.env.APP_TIMEZONE;
+  process.env.APP_TIMEZONE='Europe/Athens';
+  try {
+    const sessions: Session[]=[{id:'jan',item_id:null,started_at:'2025-12-31T22:30:00Z',ended_at:null,duration_seconds:60,words_estimated:225,matter_items:null}];
+    const report=await getReadingReport(client([],sessions),'yearly',{reference:'2026',now:new Date('2026-06-01T00:00:00Z')});
+    assert.equal(report.metrics.range.startDate,'2026-01-01');
+    assert.equal(report.metrics.range.start?.getUTCFullYear(),2025);
+    assert.equal(report.metrics.heatmap.find((day)=>day.date==='2026-01-01')?.sessionsCount,1);
   } finally {
     if(oldTimezone===undefined) delete process.env.APP_TIMEZONE; else process.env.APP_TIMEZONE=oldTimezone;
   }

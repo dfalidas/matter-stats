@@ -40,6 +40,7 @@ import { Button } from "@/components/ui/button";
 import type { ReadingHeatmapDay, ReadingMetrics } from "@/lib/metrics-service";
 import { getDeterministicReadingPersonality, type ReadingPersonalityLabel } from "@/lib/reading-personality";
 import type { ReadingReport } from "@/lib/reports-service";
+import { formatCalendarDate } from "@/lib/calendar";
 
 const WORDS_PER_BOOK = 80_000;
 
@@ -326,12 +327,12 @@ function buildMonthData(heatmap: ReadingHeatmapDay[], year: number): MonthPoint[
   }));
 
   for (const day of heatmap) {
-    const date = new Date(`${day.date}T00:00:00.000Z`);
-    if (date.getUTCFullYear() !== year) {
+    const [dateYear, dateMonth] = day.date.split("-").map(Number);
+    if (dateYear !== year) {
       continue;
     }
 
-    const month = months[date.getUTCMonth()];
+    const month = months[dateMonth - 1];
     month.words += day.wordsRead;
     month.articles += day.articlesRead;
     month.minutes += Math.round(day.readingTimeSeconds / 60);
@@ -421,7 +422,7 @@ function formatDuration(seconds: number): string {
 }
 
 function formatDateLabel(date: string): string {
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${date}T00:00:00.000Z`));
+  return formatCalendarDate(date, { month: "short", day: "numeric" }, "en");
 }
 
 function pluralize(noun: string, count: number): string {

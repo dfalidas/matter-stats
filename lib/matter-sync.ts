@@ -27,6 +27,7 @@ import {
   upsertReadingSessions,
 } from "@/lib/supabase-admin";
 import { recalculateDailyStats } from "@/lib/daily-stats";
+import { getAppTimezone, timestampToCalendarDate } from "@/lib/calendar";
 import type { Json, SyncState, TablesInsert } from "@/lib/supabase-types";
 import {
   createPlaceholderMatterItem,
@@ -905,7 +906,7 @@ function addDateFromTimestamp(dates: Set<string>, timestamp: string | null | und
 
   const date = new Date(timestamp);
   if (Number.isFinite(date.getTime())) {
-    dates.add(date.toISOString().slice(0, 10));
+    dates.add(timestampToCalendarDate(date, getAppTimezone()));
   }
 }
 

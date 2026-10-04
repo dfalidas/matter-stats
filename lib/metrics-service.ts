@@ -1,8 +1,17 @@
 import type { MatterStatsSupabaseClient } from "@/lib/supabase-queries";
 
 import { estimateWordsFromSeconds, sumSessionWordEstimates } from "./reading-estimates";
+import {
+  addLocalDays,
+  getAppTimezone,
+  getLocalDateParts,
+  localDateToUtc,
+  normalizeTimezone,
+  timestampToCalendarDate,
+} from "./calendar";
 
-export const DEFAULT_APP_TIMEZONE = "Europe/Athens";
+export { addLocalDays, localDateToUtc, timestampToCalendarDate as formatDateInTimezone } from "./calendar";
+export { DEFAULT_APP_TIMEZONE } from "./calendar";
 
 export const METRICS_PERIOD_PRESETS = ["today", "week", "month", "year", "all-time"] as const;
 
@@ -128,8 +137,7 @@ type MetricsAccumulator = {
 };
 
 export function getDefaultMetricsTimezone(): string {
-  const configuredTimezone = process.env.APP_TIMEZONE?.trim();
-  return configuredTimezone && isValidTimezone(configuredTimezone) ? configuredTimezone : DEFAULT_APP_TIMEZONE;
+  return getAppTimezone();
 }
 
 export function resolveMetricsDateRange(options: GetReadingMetricsOptions = {}): MetricsDateRange {
@@ -143,8 +151,8 @@ export function resolveMetricsDateRange(options: GetReadingMetricsOptions = {}):
     return {
       start,
       end,
-      startDate: start ? formatDateInTimezone(start, timezone) : null,
-      endDate: formatDateInTimezone(end, timezone),
+      startDate: start ? timestampToCalendarDate(start, timezone) : null,
+      endDate: timestampToCalendarDate(end, timezone),
       timezone,
       preset: "custom",
     };
@@ -192,8 +200,8 @@ export function resolveMetricsDateRange(options: GetReadingMetricsOptions = {}):
   return {
     start,
     end,
-    startDate: start ? formatDateInTimezone(start, timezone) : null,
-    endDate: formatDateInTimezone(end, timezone),
+    startDate: start ? timestampToCalendarDate(start, timezone) : null,
+    endDate: timestampToCalendarDate(end, timezone),
     timezone,
     preset,
   };
@@ -211,8 +219,8 @@ export function getPreviousEquivalentRange(range: MetricsDateRange): MetricsDate
     return {
       start: previousStart,
       end: range.start,
-      startDate: formatDateInTimezone(previousStart, range.timezone),
-      endDate: formatDateInTimezone(range.start, range.timezone),
+      startDate: timestampToCalendarDate(previousStart, range.timezone),
+      endDate: timestampToCalendarDate(range.start, range.timezone),
       timezone: range.timezone,
       preset: "custom",
     };
@@ -225,8 +233,8 @@ export function getPreviousEquivalentRange(range: MetricsDateRange): MetricsDate
     return {
       start: previousStart,
       end: range.start,
-      startDate: formatDateInTimezone(previousStart, range.timezone),
-      endDate: formatDateInTimezone(range.start, range.timezone),
+      startDate: timestampToCalendarDate(previousStart, range.timezone),
+      endDate: timestampToCalendarDate(range.start, range.timezone),
       timezone: range.timezone,
       preset: "custom",
     };
@@ -238,8 +246,8 @@ export function getPreviousEquivalentRange(range: MetricsDateRange): MetricsDate
   return {
     start: previousStart,
     end: range.start,
-    startDate: formatDateInTimezone(previousStart, range.timezone),
-    endDate: formatDateInTimezone(range.start, range.timezone),
+    startDate: timestampToCalendarDate(previousStart, range.timezone),
+    endDate: timestampToCalendarDate(range.start, range.timezone),
     timezone: range.timezone,
     preset: "custom",
   };
@@ -280,7 +288,7 @@ export async function getReadingMetrics(
   return {
     range,
     totals,
-    currentStreakDays: calculateStreakAsOf(currentStreakSessions, formatDateInTimezone(now, range.timezone), range.timezone, true),
+    currentStreakDays: calculateStreakAsOf(currentStreakSessions, timestampToCalendarDate(now, range.timezone), range.timezone, true),
     historicalStreak: historicalStreakDate
       ? { asOfDate: historicalStreakDate, days: calculateStreakAsOf(historicalStreakSessions, historicalStreakDate, range.timezone, true) }
       : null,
@@ -313,84 +321,19 @@ function localDateFromString(value: string, timezone: string): Date {
   return localDateToUtc(year, month, day, timezone);
 }
 
-function normalizeTimezone(timezone?: string): string {
-  const value = timezone?.trim() || getDefaultMetricsTimezone();
-  return isValidTimezone(value) ? value : DEFAULT_APP_TIMEZONE;
-}
-
-function isValidTimezone(timezone: string): boolean {
-  try {
-    new Intl.DateTimeFormat("en-GB", { timeZone: timezone }).format(new Date());
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function normalizeDateInput(value: Date | string): Date {
   const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    throw new Error(`Invalid metrics date: ${String(value)}`);
-  }
-
+  if (Number.isNaN(date.getTime())) throw new Error(`Invalid metrics date: ${String(value)}`);
   return date;
 }
 
-function getDateTimeParts(date: Date, timezone: string) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-
-  const lookup = new Map(parts.map((part) => [part.type, part.value]));
-
-  return {
-    year: Number(lookup.get("year")),
-    month: Number(lookup.get("month")),
-    day: Number(lookup.get("day")),
-    hour: Number(lookup.get("hour")),
-    minute: Number(lookup.get("minute")),
-    second: Number(lookup.get("second")),
-  };
-}
-
-function getLocalDateParts(date: Date, timezone: string) {
-  const { year, month, day } = getDateTimeParts(date, timezone);
-  return { year, month, day };
-}
-
-function getTimezoneOffsetMs(date: Date, timezone: string): number {
-  const parts = getDateTimeParts(date, timezone);
-  const utcFromLocalParts = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
-  return utcFromLocalParts - date.getTime();
-}
-
-export function localDateToUtc(year: number, month: number, day: number, timezone: string): Date {
-  const utcGuess = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-  const firstPass = new Date(utcGuess.getTime() - getTimezoneOffsetMs(utcGuess, timezone));
-  return new Date(utcGuess.getTime() - getTimezoneOffsetMs(firstPass, timezone));
-}
-
-export function formatDateInTimezone(date: Date, timezone: string): string {
-  const { year, month, day } = getLocalDateParts(date, timezone);
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-export function addLocalDays(date: Date, days: number, timezone: string): Date {
-  const local = getLocalDateParts(date, timezone);
-  return localDateToUtc(local.year, local.month, local.day + days, timezone);
-}
-
 function startOfNextLocalDay(date: Date, timezone: string): Date {
-  const local = getLocalDateParts(date, timezone);
-  return localDateToUtc(local.year, local.month, local.day + 1, timezone);
+  return addLocalDays(localDateToUtc(
+    getLocalDateParts(date, timezone).year,
+    getLocalDateParts(date, timezone).month,
+    getLocalDateParts(date, timezone).day,
+    timezone,
+  ), 1, timezone);
 }
 
 function getLocalWeekday(year: number, month: number, day: number): number {
@@ -595,7 +538,7 @@ function buildHeatmap(sessions: MetricsSession[], range: MetricsDateRange, timez
       continue;
     }
 
-    const date = formatDateInTimezone(new Date(session.started_at), timezone);
+    const date = timestampToCalendarDate(new Date(session.started_at), timezone);
     addToBucket(byDate, date, session);
   }
 
@@ -607,7 +550,7 @@ function buildHeatmap(sessions: MetricsSession[], range: MetricsDateRange, timez
   const heatmap: ReadingHeatmapDay[] = [];
 
   for (let index = 0; index < days; index += 1) {
-    const date = formatDateInTimezone(addLocalDays(range.start, index, timezone), timezone);
+    const date = timestampToCalendarDate(addLocalDays(range.start, index, timezone), timezone);
     const accumulator = byDate.get(date);
     heatmap.push({
       date,
@@ -644,11 +587,11 @@ function calculateStreakAsOf(
   if (!activeDates.has(asOfDate)) {
     if (!allowYesterdayFallback) return 0;
     cursor = addLocalDays(cursor, -1, timezone);
-    if (!activeDates.has(formatDateInTimezone(cursor, timezone))) return 0;
+    if (!activeDates.has(timestampToCalendarDate(cursor, timezone))) return 0;
   }
   let streak = 0;
 
-  while (activeDates.has(formatDateInTimezone(cursor, timezone))) {
+  while (activeDates.has(timestampToCalendarDate(cursor, timezone))) {
     streak += 1;
     cursor = addLocalDays(cursor, -1, timezone);
   }
@@ -680,7 +623,7 @@ function getActiveDates(sessions: MetricsSession[], timezone: string): Set<strin
   return new Set(
     sessions
       .filter((session) => positiveInteger(session.duration_seconds) > 0)
-      .map((session) => (session.started_at ? formatDateInTimezone(new Date(session.started_at), timezone) : null))
+      .map((session) => (session.started_at ? timestampToCalendarDate(new Date(session.started_at), timezone) : null))
       .filter(isNonEmptyString)
   );
 }

@@ -4,6 +4,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { AwaitedActivity } from "./view-types";
+import { formatCalendarDate } from "@/lib/calendar";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -65,7 +66,7 @@ export function ActivityView({ data }: { data: AwaitedActivity }) {
       </div>
       <section className="mt-10 border-t pt-7">
         <h2 className="text-2xl font-semibold">
-          {new Date(`${data.selectedDay}T12:00:00Z`).toLocaleDateString("en-GB", {
+          {formatCalendarDate(data.selectedDay, {
             weekday: "long",
             day: "numeric",
             month: "long",

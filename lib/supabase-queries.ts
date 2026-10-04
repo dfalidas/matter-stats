@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database, DailyStat, MatterItem, SyncRun } from "@/lib/supabase-types";
 import { formatDateInTimezone, getDefaultMetricsTimezone } from "@/lib/metrics-service";
+import { addCalendarDays } from "@/lib/calendar";
 
 export type MatterStatsSupabaseClient = SupabaseClient<Database>;
 
@@ -33,15 +34,14 @@ export async function getDashboardSummary(client: MatterStatsSupabaseClient, now
   };
 }
 
-export async function getReadingTrend(client: MatterStatsSupabaseClient, days = 30): Promise<DailyStat[]> {
-  const since = new Date();
-  since.setUTCHours(0, 0, 0, 0);
-  since.setUTCDate(since.getUTCDate() - Math.max(days - 1, 0));
+export async function getReadingTrend(client: MatterStatsSupabaseClient, days = 30, now = new Date()): Promise<DailyStat[]> {
+  const today = formatDateInTimezone(now, getDefaultMetricsTimezone());
+  const since = addCalendarDays(today, -Math.max(days - 1, 0));
 
   const { data, error } = await client
     .from("daily_stats")
     .select("*")
-    .gte("date", since.toISOString().slice(0, 10))
+    .gte("date", since)
     .order("date", { ascending: true });
 
   if (error) {
@@ -85,7 +85,7 @@ function countCurrentStreak(stats: Pick<DailyStat, "date" | "reading_time_second
   const timezone = getDefaultMetricsTimezone();
   let cursor = formatDateInTimezone(now, timezone);
   if (!activeDates.has(cursor)) {
-    cursor = shiftCalendarDate(cursor, -1);
+    cursor = addCalendarDays(cursor, -1);
     if (!activeDates.has(cursor)) return 0;
   }
 
@@ -93,13 +93,8 @@ function countCurrentStreak(stats: Pick<DailyStat, "date" | "reading_time_second
 
   while (activeDates.has(cursor)) {
     streak += 1;
-    cursor = shiftCalendarDate(cursor, -1);
+    cursor = addCalendarDays(cursor, -1);
   }
 
   return streak;
-}
-
-function shiftCalendarDate(value: string, days: number): string {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }

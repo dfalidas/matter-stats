@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient, upsertDailyStats } from "./supabase-admin";
 import type { TablesInsert } from "./supabase-types";
 import { buildDailyStat, type DailyStatsSession } from "./daily-stat-builder";
+import { addCalendarDays, calendarDayBounds, getAppTimezone, isCalendarDate } from "./calendar";
 export { buildDailyStat } from "./daily-stat-builder";
 
 const RECALCULATION_BATCH_SIZE = 100;
@@ -33,7 +34,9 @@ export async function calculateDailyStat(date: string): Promise<TablesInsert<"da
   }
 
   const client = getSupabaseAdminClient();
-  const { start, end } = getUtcDayBounds(date);
+  const bounds = calendarDayBounds(date, getAppTimezone());
+  const start = bounds.start.toISOString();
+  const end = bounds.end.toISOString();
 
   const [{ data: sessions, error: sessionsError }, { count: highlightsCount, error: annotationsError }] = await Promise.all([
     client
@@ -73,33 +76,15 @@ function getDateRange(startDate: string, endDate: string): string[] {
   }
 
   const dates: string[] = [];
-  const cursor = new Date(`${startDate}T00:00:00.000Z`);
-  const end = new Date(`${endDate}T00:00:00.000Z`);
-
-  while (cursor <= end) {
-    dates.push(cursor.toISOString().slice(0, 10));
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  let cursor = startDate;
+  while (cursor <= endDate) {
+    dates.push(cursor);
+    cursor = addCalendarDays(cursor, 1);
   }
 
   return dates;
 }
 
-function getUtcDayBounds(date: string) {
-  const startDate = new Date(`${date}T00:00:00.000Z`);
-  const endDate = new Date(startDate.getTime());
-  endDate.setUTCDate(endDate.getUTCDate() + 1);
-
-  return {
-    start: startDate.toISOString(),
-    end: endDate.toISOString(),
-  };
-}
-
 function isValidDateString(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  return isCalendarDate(value);
 }
