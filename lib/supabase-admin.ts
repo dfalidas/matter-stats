@@ -172,6 +172,32 @@ export async function upsertMatterSyncState(syncState: TablesInsert<"sync_state"
   return data;
 }
 
+export async function getMatterSyncStream(stream: "recent_sessions" | "library_items") {
+  const { data, error } = await getSupabaseAdminClient()
+    .from("matter_sync_streams")
+    .select("*")
+    .eq("stream", stream)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function getMatterSyncStreams() {
+  const { data, error } = await getSupabaseAdminClient().from("matter_sync_streams").select("*");
+  if (error) throw error;
+  return data;
+}
+
+export async function upsertMatterSyncStream(state: TablesInsert<"matter_sync_streams">) {
+  const { data, error } = await getSupabaseAdminClient()
+    .from("matter_sync_streams")
+    .upsert(state, { onConflict: "stream" })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function createSyncRun(syncRun: TablesInsert<"sync_runs">) {
   const { data, error } = await getSupabaseAdminClient().from("sync_runs").insert(syncRun).select().single();
 
