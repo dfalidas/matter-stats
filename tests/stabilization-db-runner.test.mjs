@@ -3,7 +3,12 @@ import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { catalogSql, verifyCatalog } from "../scripts/stabilization-db-runner.mjs";
+import { catalogSql, INVENTORIED_TABLES, verifyCatalog } from "../scripts/stabilization-db-runner.mjs";
+
+test("catalog inventory includes independent sync streams", () => {
+  assert.ok(INVENTORIED_TABLES.includes("matter_sync_streams"));
+  assert.match(catalogSql(), /'matter_sync_streams'/);
+});
 
 async function fixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "db-runner-"));

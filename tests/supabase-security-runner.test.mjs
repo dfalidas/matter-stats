@@ -1,6 +1,103 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { attemptTrackedWrite, cleanupTrackedWrites, verifyLimiterGroups } from "./integration/supabase-security-runner.mjs";
+import { attemptTrackedWrite, cleanupTrackedWrites, createMatterSyncStreamFixture, createTrackedFixtureWrite, isMigrationSeededStream, restoreMigrationSeed, verifyLimiterGroups } from "./integration/supabase-security-runner.mjs";
+
+test("recognizes only the exact fresh/upgrade migration stream seed", () => {
+  const seed = {
+    stream: "recent_sessions", endpoint: "/reading_sessions", filters: {}, page_limit: 25,
+    cursor: null, cycle_started_at: null, cycle_generation: 0, completed_watermark: null,
+    cycle_active: false, transition_status: "legacy_recoverable_restart", coverage_window: "current_year",
+  };
+  assert.equal(isMigrationSeededStream(seed, "recent_sessions"), true);
+  assert.equal(isMigrationSeededStream({ ...seed, completed_watermark: "2026-01-01T00:00:00Z" }, "recent_sessions"), false);
+  assert.equal(isMigrationSeededStream({ ...seed, filters: { since: "test-owned" } }, "recent_sessions"), false);
+});
+
+test("independently created stream fixtures have unique ownership markers", () => {
+  const one = createMatterSyncStreamFixture({ prefix: "security-run-one", timestamp: "2099-01-02T03:04:05.000Z" });
+  const two = createMatterSyncStreamFixture({ prefix: "security-run-two", timestamp: "2099-01-02T03:04:05.000Z" });
+  assert.notEqual(one.ownership.cursor, two.ownership.cursor);
+  assert.equal(one.row.cursor, one.ownership.cursor);
+  assert.equal(two.row.cursor, two.ownership.cursor);
+});
+
+test("equivalent timestamp serialization does not prevent owned stream cleanup", async () => {
+  const fixture = createMatterSyncStreamFixture({ prefix: "security-owned", timestamp: "2099-01-02T03:04:05.000Z" });
+  let stored = { ...fixture.row, cycle_started_at: "2099-01-02T03:04:05+00:00" };
+  const attempt = createTrackedFixtureWrite(fixture, fixture.row, "owned stream", fixture.selector);
+  const failures = await cleanupTrackedWrites([attempt], {
+    inspect: async () => ({ data: stored, error: null }),
+    remove: async () => { stored = null; return { error: null }; },
+  });
+  assert.deepEqual(failures, []);
+  assert.equal(stored, null);
+});
+
+test("committed stream INSERT with a lost response is tracked and cleaned", async () => {
+  const fixture = createMatterSyncStreamFixture({ prefix: "security-ambiguous", timestamp: "2099-01-02T03:04:05.000Z" });
+  const attempts = [];
+  let stored = null;
+  const attempt = createTrackedFixtureWrite(fixture, fixture.row, "ambiguous stream", fixture.selector);
+  const response = await attemptTrackedWrite(attempts, attempt, async () => {
+    stored = { ...fixture.row, cycle_started_at: "2099-01-02T03:04:05+00:00" };
+    return { data: null, error: { code: "FETCH_ERROR", message: "response lost" } };
+  });
+  assert.equal(response.error.code, "FETCH_ERROR");
+  const failures = await cleanupTrackedWrites(attempts, {
+    inspect: async () => ({ data: stored, error: null }),
+    remove: async () => { stored = null; return { error: null }; },
+  });
+  assert.deepEqual(failures, []);
+  assert.equal(stored, null);
+});
+
+test("migration seed is restored after a failed fixture run", async () => {
+  const seed = {
+    stream: "recent_sessions", endpoint: "/reading_sessions", filters: {}, page_limit: 25,
+    cursor: null, cycle_started_at: null, cycle_generation: 0, completed_watermark: null,
+    cycle_active: false, transition_status: "legacy_recoverable_restart", coverage_window: "current_year",
+  };
+  const fixture = createMatterSyncStreamFixture({ prefix: "security-failed", timestamp: "2099-01-02T03:04:05.000Z" });
+  let stored = { ...fixture.row };
+  const attempts = [createTrackedFixtureWrite(fixture, fixture.row, "failed stream", fixture.selector)];
+  try {
+    throw new Error("controlled verification failure");
+  } catch (error) {
+    assert.match(error.message, /controlled/);
+  } finally {
+    assert.deepEqual(await cleanupTrackedWrites(attempts, {
+      inspect: async () => ({ data: stored, error: null }),
+      remove: async () => { stored = null; return { error: null }; },
+    }), []);
+    await restoreMigrationSeed(seed, {
+      inspect: async () => ({ data: stored, error: null }),
+      insert: async (row) => { stored = row; return { error: null }; },
+    });
+  }
+  assert.equal(isMigrationSeededStream(stored, "recent_sessions"), true);
+});
+
+test("another run's stream is neither deleted nor overwritten", async () => {
+  const fixture = createMatterSyncStreamFixture({ prefix: "security-this-run", timestamp: "2099-01-02T03:04:05.000Z" });
+  const other = createMatterSyncStreamFixture({ prefix: "security-other-run", timestamp: "2099-01-02T03:04:05.000Z" });
+  let stored = { ...other.row };
+  const failures = await cleanupTrackedWrites([
+    createTrackedFixtureWrite(fixture, fixture.row, "this run", fixture.selector),
+  ], {
+    inspect: async () => ({ data: stored, error: null }),
+    remove: async () => { stored = null; return { error: null }; },
+  });
+  assert.equal(failures.length, 1);
+  assert.match(failures[0].message, /ownership could not be established/);
+  assert.equal(stored.cursor, other.ownership.cursor);
+
+  const seed = { stream: "recent_sessions" };
+  await assert.rejects(restoreMigrationSeed(seed, {
+    inspect: async () => ({ data: stored, error: null }),
+    insert: async (row) => { stored = row; return { error: null }; },
+  }), /refusing to overwrite/);
+  assert.equal(stored.cursor, other.ownership.cursor);
+});
 
 const validResponses = () => Array.from({ length: 20 }, (_, index) => Promise.resolve({ data: index < 5, error: null }));
 

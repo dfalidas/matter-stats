@@ -7,15 +7,15 @@ import { getDefaultMetricsTimezone, getReadingMetrics } from "../lib/metrics-ser
 import { calendarDayBounds, calendarYear, timestampToCalendarDate } from "../lib/calendar.js";
 import { resolveReportRange } from "../lib/reports-service.js";
 
-/** W0 characterization tests remain green; adjacent TODOs are W4/W5 gates. */
-test("R3 characterization: current sync is one bounded page and defaults to the current year", () => {
+/** Target TODOs stay until their complete multi-page/lease/query requirements land. */
+test("R3 characterization: each Task 11 invocation remains one bounded page", () => {
   const limits = getMatterSyncSessionsLimit({});
   assert.equal(limits, 25);
   assert.equal(getRecentActivityWindowStart(new Date("2026-09-29T00:00:00Z"), "current_year"), "2026-01-01T00:00:00.000Z");
 });
 test.todo("R3 target (W4): a 5,000-session stream resumes across pages/invocations without an annual reset");
 
-test("R4 characterization: trigger modes still select phases in shared sync state", () => {
+test("R4 characterization: public trigger modes still map to their endpoint streams", () => {
   assert.equal(getMatterSyncInitialPhase("recent_activity_manual"), "sessions");
   assert.equal(getMatterSyncInitialPhase("recent_activity_scheduled"), "sessions");
   assert.equal(getMatterSyncInitialPhase("backfill_library"), "items");

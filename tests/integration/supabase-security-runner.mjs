@@ -3,6 +3,60 @@ export async function attemptTrackedWrite(attempts, attempt, write) {
   return await write();
 }
 
+export function createMatterSyncStreamFixture({ prefix, timestamp }) {
+  const ownershipCursor = `${prefix}-stream-cursor`;
+  return {
+    table: "matter_sync_streams",
+    row: {
+      stream: "recent_sessions", endpoint: "/reading_sessions", filters: { since: timestamp },
+      page_limit: 25, cursor: ownershipCursor, cycle_started_at: timestamp,
+      cycle_active: true, transition_status: "native", coverage_window: "current_year",
+    },
+    deniedRow: { stream: "recent_sessions", endpoint: "/reading_sessions", filters: {}, page_limit: 25 },
+    selector: { stream: "recent_sessions" },
+    update: { cycle_generation: 1 }, field: "cycle_generation", expected: 1,
+    delayedInsert: true,
+    ownership: { cursor: ownershipCursor },
+  };
+}
+
+export function createTrackedFixtureWrite(fixture, row, label, selector) {
+  const ownership = fixture.ownership ?? selector;
+  return {
+    label,
+    fixture,
+    selector,
+    owns: (stored) => Object.entries(ownership).every(([column, value]) => stored[column] === value),
+  };
+}
+
+export function isMigrationSeededStream(row, stream) {
+  const expectedFilters = stream === "recent_sessions" ? {} : { status: "all", order: "updated" };
+  return row?.stream === stream
+    && row.endpoint === (stream === "recent_sessions" ? "/reading_sessions" : "/items")
+    && JSON.stringify(row.filters) === JSON.stringify(expectedFilters)
+    && row.page_limit === 25
+    && row.cursor === null
+    && row.cycle_started_at === null
+    && row.cycle_generation === 0
+    && row.completed_watermark === null
+    && row.cycle_active === false
+    && row.transition_status === "legacy_recoverable_restart"
+    && (stream !== "recent_sessions" || row.coverage_window === "current_year");
+}
+
+export async function restoreMigrationSeed(seed, { inspect, insert }) {
+  const collision = await inspect();
+  if (collision?.error) throw collision.error;
+  if (collision?.data != null) throw new Error("refusing to overwrite stream while restoring migration seed");
+  const inserted = await insert(seed);
+  if (inserted?.error) throw inserted.error;
+  const restored = await inspect();
+  if (restored?.error) throw restored.error;
+  if (!isMigrationSeededStream(restored?.data, seed.stream)) throw new Error("migration seed restoration readback failed");
+  return { error: null };
+}
+
 export async function cleanupTrackedWrites(attempts, { inspect, remove }) {
   const failures = [];
   for (const attempt of [...attempts].reverse()) {

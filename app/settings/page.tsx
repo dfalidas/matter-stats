@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DEFAULT_READING_SPEED_WORDS_PER_MINUTE } from "@/lib/matter-normalizers";
 import { getDefaultMetricsTimezone } from "@/lib/metrics-service";
-import type { SyncRun, SyncState } from "@/lib/supabase-types";
+import type { MatterSyncStream, SyncRun } from "@/lib/supabase-types";
 import { sanitizeSyncRunErrorMessage, type SyncRunLogEntry } from "@/lib/sync-run-log";
 import { logout } from "@/lib/auth-actions";
 
@@ -43,7 +43,7 @@ type SettingsSyncData = {
   latestSuccessfulRun: Pick<SyncRun, "finished_at" | "started_at"> | null;
   latestErrorRun: Pick<SyncRun, "finished_at" | "started_at" | "error_message"> | null;
   recentRuns: SyncRunLogEntry[];
-  syncState: SyncState | null;
+  syncState: MatterSyncStream | null;
   databaseStatus: MatterConnectionStatus;
   dataCoverageCounts: DataCoverageCounts;
 };
@@ -141,8 +141,8 @@ export default async function SettingsPage() {
                 <DiagnosticField label="First session shape" value={formatSessionShape(latestRun?.matter_first_session_shape)} />
                 <DiagnosticField label="Matter has_more" value={formatBoolean(latestRun?.matter_has_more)} />
                 <DiagnosticField label="Matter next_cursor" value={formatBoolean(latestRun?.matter_next_cursor_present)} />
-                <DiagnosticField label="Session cursor/checkpoint" value={syncData.syncState?.session_cursor ?? syncData.syncState?.recent_activity_checkpoint ?? "None"} />
-                <DiagnosticField label="Rate limited until" value={formatTimestamp(syncData.syncState?.rate_limited_until)} />
+                <DiagnosticField label="Session cursor/checkpoint" value={syncData.syncState?.cursor ?? syncData.syncState?.completed_watermark ?? "None"} />
+                <DiagnosticField label="Rate limited until" value={formatTimestamp(syncData.syncState?.retry_at)} />
                 <DiagnosticField label="Matter requests" value={formatInteger(latestRun?.matter_requests_count ?? 0)} />
               </dl>
               <p className="mt-3 text-xs text-dashboard-muted">Only safe counters, booleans, mode labels, and cursor/checkpoint metadata are shown. The Matter API token is never stored or rendered.</p>
@@ -429,7 +429,7 @@ async function getSettingsSyncData(): Promise<SettingsSyncData> {
         .select("id, started_at, finished_at, status, items_synced, sessions_synced, error_message, sync_mode")
         .order("started_at", { ascending: false })
         .limit(8),
-      client.from("sync_state").select("*").eq("id", "matter").maybeSingle(),
+      client.from("matter_sync_streams").select("*").eq("stream", "recent_sessions").maybeSingle(),
       client.from("reading_sessions").select("id", { count: "exact", head: true }),
       client.from("reading_sessions").select("id", { count: "exact", head: true }).is("item_id", null),
       client.from("matter_items").select("id", { count: "exact", head: true }),
