@@ -8,6 +8,7 @@ import path from "node:path";
 export const INVENTORIED_TABLES = [
   "matter_items", "reading_sessions", "matter_tags", "item_tags", "annotations",
   "daily_stats", "sync_runs", "sync_state", "app_sessions", "app_login_attempts",
+  "matter_sync_streams",
 ];
 
 export function catalogSql(tables = INVENTORIED_TABLES) {
