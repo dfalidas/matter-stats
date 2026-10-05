@@ -3,6 +3,7 @@ import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { serverEnv } from "@/lib/env";
+import { leaseRpcArgs, MatterSyncLeaseLostError, type MatterSyncLease } from "./matter-sync-lease-context";
 import type { Database, TablesInsert, TablesUpdate } from "@/lib/supabase-types";
 
 export type SupabaseAdminClient = SupabaseClient<Database>;
@@ -24,106 +25,62 @@ export function getSupabaseAdminClient(): SupabaseAdminClient {
   return supabaseAdminClient;
 }
 
-export async function upsertMatterItems(items: TablesInsert<"matter_items">[]) {
-  if (items.length === 0) {
-    return [];
-  }
-
-  const { data, error } = await getSupabaseAdminClient()
-    .from("matter_items")
-    .upsert(items, { onConflict: "id" })
-    .select();
-
-  if (error) {
-    throw error;
-  }
-
+export async function upsertMatterItems(rows: TablesInsert<"matter_items">[], lease: MatterSyncLease) {
+  const args = leaseRpcArgs(lease);
+  if (rows.length === 0) return [];
+  const { data, error } = await getSupabaseAdminClient().rpc("sync_upsert_matter_items", { ...args, p_rows: rows });
+  if (error?.code === "55000") throw new MatterSyncLeaseLostError();
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error("Missing fenced mutation response");
   return data;
 }
 
-export async function upsertReadingSessions(sessions: TablesInsert<"reading_sessions">[]) {
-  if (sessions.length === 0) {
-    return [];
-  }
-
-  const { data, error } = await getSupabaseAdminClient()
-    .from("reading_sessions")
-    .upsert(sessions, { onConflict: "id" })
-    .select();
-
-  if (error) {
-    throw error;
-  }
-
+export async function upsertReadingSessions(rows: TablesInsert<"reading_sessions">[], lease: MatterSyncLease) {
+  const args = leaseRpcArgs(lease);
+  if (rows.length === 0) return [];
+  const { data, error } = await getSupabaseAdminClient().rpc("sync_upsert_reading_sessions", { ...args, p_rows: rows });
+  if (error?.code === "55000") throw new MatterSyncLeaseLostError();
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error("Missing fenced mutation response");
   return data;
 }
 
-export async function upsertMatterTags(tags: TablesInsert<"matter_tags">[]) {
-  if (tags.length === 0) {
-    return [];
-  }
-
-  const { data, error } = await getSupabaseAdminClient()
-    .from("matter_tags")
-    .upsert(tags, { onConflict: "id" })
-    .select();
-
-  if (error) {
-    throw error;
-  }
-
+export async function upsertMatterTags(rows: TablesInsert<"matter_tags">[], lease: MatterSyncLease) {
+  const args = leaseRpcArgs(lease);
+  if (rows.length === 0) return [];
+  const { data, error } = await getSupabaseAdminClient().rpc("sync_upsert_matter_tags", { ...args, p_rows: rows });
+  if (error?.code === "55000") throw new MatterSyncLeaseLostError();
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error("Missing fenced mutation response");
   return data;
 }
 
-export async function upsertItemTags(itemTags: TablesInsert<"item_tags">[]) {
-  if (itemTags.length === 0) {
-    return [];
-  }
-
-  const { data, error } = await getSupabaseAdminClient()
-    .from("item_tags")
-    .upsert(itemTags, { onConflict: "item_id,tag_id" })
-    .select();
-
-  if (error) {
-    throw error;
-  }
-
+export async function upsertAnnotations(rows: TablesInsert<"annotations">[], lease: MatterSyncLease) {
+  const args = leaseRpcArgs(lease);
+  if (rows.length === 0) return [];
+  const { data, error } = await getSupabaseAdminClient().rpc("sync_upsert_annotations", { ...args, p_rows: rows });
+  if (error?.code === "55000") throw new MatterSyncLeaseLostError();
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error("Missing fenced mutation response");
   return data;
 }
 
-export async function upsertAnnotations(annotations: TablesInsert<"annotations">[]) {
-  if (annotations.length === 0) {
-    return [];
-  }
-
-  const { data, error } = await getSupabaseAdminClient()
-    .from("annotations")
-    .upsert(annotations, { onConflict: "id" })
-    .select();
-
-  if (error) {
-    throw error;
-  }
-
+export async function upsertDailyStats(rows: TablesInsert<"daily_stats">[], lease: MatterSyncLease) {
+  const args = leaseRpcArgs(lease);
+  if (rows.length === 0) return [];
+  const { data, error } = await getSupabaseAdminClient().rpc("sync_upsert_daily_stats", { ...args, p_rows: rows });
+  if (error?.code === "55000") throw new MatterSyncLeaseLostError();
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error("Missing fenced mutation response");
   return data;
 }
 
-export async function upsertDailyStats(stats: TablesInsert<"daily_stats">[]) {
-  if (stats.length === 0) {
-    return [];
-  }
-
-  const { data, error } = await getSupabaseAdminClient()
-    .from("daily_stats")
-    .upsert(stats, { onConflict: "date" })
-    .select();
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
+export async function replaceMatterItemTags(itemIds: string[], rows: TablesInsert<"item_tags">[], lease: MatterSyncLease) {
+  const { error } = await getSupabaseAdminClient().rpc("sync_replace_item_tags", {
+    ...leaseRpcArgs(lease), p_item_ids: itemIds, p_rows: rows,
+  });
+  if (error?.code === "55000") throw new MatterSyncLeaseLostError();
+  if (error) throw error;
 }
 
 export async function getLatestSuccessfulSyncCheckpoint(): Promise<string | null> {
@@ -158,20 +115,6 @@ export async function getMatterSyncState() {
   return data;
 }
 
-export async function upsertMatterSyncState(syncState: TablesInsert<"sync_state">) {
-  const { data, error } = await getSupabaseAdminClient()
-    .from("sync_state")
-    .upsert({ ...syncState, id: "matter" }, { onConflict: "id" })
-    .select()
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
-}
-
 export async function getMatterSyncStream(stream: "recent_sessions" | "library_items") {
   const { data, error } = await getSupabaseAdminClient()
     .from("matter_sync_streams")
@@ -188,32 +131,28 @@ export async function getMatterSyncStreams() {
   return data;
 }
 
-export async function upsertMatterSyncStream(state: TablesInsert<"matter_sync_streams">) {
-  const { data, error } = await getSupabaseAdminClient()
-    .from("matter_sync_streams")
-    .upsert(state, { onConflict: "stream" })
-    .select()
-    .single();
+export async function upsertMatterSyncStream(state: TablesInsert<"matter_sync_streams">, lease: MatterSyncLease) {
+  const { data, error } = await getSupabaseAdminClient().rpc("sync_upsert_stream", { ...leaseRpcArgs(lease), p_state: state });
+  if (error?.code === "55000") throw new MatterSyncLeaseLostError();
   if (error) throw error;
+  if (!data) throw new Error("Missing fenced stream response");
   return data;
 }
 
-export async function createSyncRun(syncRun: TablesInsert<"sync_runs">) {
-  const { data, error } = await getSupabaseAdminClient().from("sync_runs").insert(syncRun).select().single();
-
-  if (error) {
-    throw error;
-  }
-
+export async function createSyncRun(syncRun: TablesInsert<"sync_runs">, lease: MatterSyncLease) {
+  const { data, error } = await getSupabaseAdminClient().rpc("sync_create_run", {
+    ...leaseRpcArgs(lease), p_started_at: syncRun.started_at ?? new Date().toISOString(), p_sync_mode: syncRun.sync_mode ?? "recent_activity_manual",
+  });
+  if (error?.code === "55000") throw new MatterSyncLeaseLostError();
+  if (error) throw error;
+  if (!data) throw new Error("Missing fenced run response");
   return data;
 }
 
-export async function updateSyncRun(id: string, syncRun: TablesUpdate<"sync_runs">) {
-  const { data, error } = await getSupabaseAdminClient().from("sync_runs").update(syncRun).eq("id", id).select().single();
-
-  if (error) {
-    throw error;
-  }
-
+export async function updateSyncRun(id: string, syncRun: TablesUpdate<"sync_runs">, lease: MatterSyncLease) {
+  const { data, error } = await getSupabaseAdminClient().rpc("sync_update_run", { ...leaseRpcArgs(lease), p_id: id, p_patch: syncRun });
+  if (error?.code === "55000") throw new MatterSyncLeaseLostError();
+  if (error) throw error;
+  if (!data) throw new Error("Missing fenced run response");
   return data;
 }

@@ -1,13 +1,8 @@
-import { isMatterRateLimitActive } from "./matter-sync-progress";
+import type { MatterSyncResult } from "./matter-sync";
 
 export type CronSyncDeps = {
   cronSecret: string | undefined;
-  syncRecentActivity: () => Promise<{ ok: boolean; message: string; syncRunId?: string; sessionsSynced?: number }>;
-
-  getAvailability: () => Promise<{ rateLimitedUntil: string | null; message: string | null }>;
-  createRun: (values: { status: "running"; started_at: string; sync_mode: string }) => Promise<{ id: string }>;
-  updateRun: (id: string, values: Record<string, unknown>) => Promise<{ id: string }>;
-  now: () => Date;
+  syncRecentActivity: () => Promise<MatterSyncResult>;
 };
 
 function getProvidedSecret(request: Request): string | null {
@@ -26,30 +21,20 @@ export async function handleRecentActivityCron(request: Request, deps: CronSyncD
 
   const syncMode = "recent_activity_scheduled";
 
-  const availability = await deps.getAvailability();
-  if (isMatterRateLimitActive(availability.rateLimitedUntil, deps.now())) {
-    const startedAt = deps.now().toISOString();
-    const run = await deps.createRun({ status: "running", started_at: startedAt, sync_mode: syncMode });
-    await deps.updateRun(run.id, {
-      status: "success",
-      finished_at: deps.now().toISOString(),
-      sync_mode: syncMode,
-      error_message: `Skipped scheduled sync due to active Matter rate limit until ${availability.rateLimitedUntil}.`,
-      checkpoint_timestamp: null,
-    });
+  // All account checks and writes belong to the leased runtime, after auth.
+  const result = await deps.syncRecentActivity();
+  if (result.skippedReason) {
     return Response.json({
       ok: true,
       status: "skipped",
       sync_mode: syncMode,
       sessions_synced: 0,
       matter_sessions_returned: 0,
-      skipped_reason: "rate_limited",
-      rate_limited_until: availability.rateLimitedUntil,
+      skipped_reason: result.skippedReason,
+      rate_limited_until: result.rateLimitedUntil ?? null,
     });
   }
 
-  const result = await deps.syncRecentActivity();
-  if (result.syncRunId) await deps.updateRun(result.syncRunId, { sync_mode: "recent_activity_scheduled" });
   return Response.json(
     {
       ok: result.ok,

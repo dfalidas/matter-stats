@@ -211,10 +211,10 @@ test("imports linked matter_items before upserting reading_sessions", () => {
   const source = readFileSync("lib/matter-sync.ts", "utf8");
   const sessionImportStart = source.indexOf("async function importMatterSessionPage");
   const linkedImportIndex = source.indexOf("await importLinkedMatterItems", sessionImportStart);
-  const sessionUpsertIndex = source.indexOf("await upsertInBatches(sessionRows, upsertReadingSessions)", sessionImportStart);
+  const sessionUpsertIndex = source.indexOf("await upsertInBatches(sessionRows, upsertReadingSessions, lease)", sessionImportStart);
   const linkedImportStart = source.indexOf("async function importLinkedMatterItems");
-  const placeholderUpsertIndex = source.indexOf("await upsertInBatches(placeholderRows, upsertMatterItems)", linkedImportStart);
-  const metadataFetchIndex = source.indexOf("await getOptionalMatterItem(itemId)", linkedImportStart);
+  const placeholderUpsertIndex = source.indexOf("await upsertInBatches(placeholderRows, upsertMatterItems, lease)", linkedImportStart);
+  const metadataFetchIndex = source.indexOf("await getOptionalMatterItem(itemId, lease)", linkedImportStart);
 
   assert.notEqual(sessionImportStart, -1);
   assert.ok(linkedImportIndex > sessionImportStart);

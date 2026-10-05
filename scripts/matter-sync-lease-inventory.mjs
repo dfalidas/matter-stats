@@ -1,0 +1,16 @@
+export const LEASE_FUNCTION_SIGNATURES = [
+  "acquire_matter_sync_lease(text,uuid,integer)",
+  "assert_matter_sync_lease(text,uuid,bigint)",
+  "renew_matter_sync_lease(text,uuid,bigint,integer)",
+  "release_matter_sync_lease(text,uuid,bigint)",
+  "validate_matter_sync_batch(jsonb,integer)",
+  "sync_upsert_matter_items(text,uuid,bigint,jsonb)",
+  "sync_upsert_reading_sessions(text,uuid,bigint,jsonb)",
+  "sync_upsert_matter_tags(text,uuid,bigint,jsonb)",
+  "sync_upsert_annotations(text,uuid,bigint,jsonb)",
+  "sync_upsert_daily_stats(text,uuid,bigint,jsonb)",
+  "sync_replace_item_tags(text,uuid,bigint,text[],jsonb)",
+  "sync_upsert_stream(text,uuid,bigint,jsonb)",
+  "sync_create_run(text,uuid,bigint,timestamp with time zone,text)",
+  "sync_update_run(text,uuid,bigint,uuid,jsonb)",
+];

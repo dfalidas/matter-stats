@@ -187,3 +187,75 @@ Existing deterministic cookies become invalid, so one fresh login is expected. R
 ## Rollback
 
 Prefer rolling code forward. Code rollback requires restoring compatibility with the old cookie and should only happen after security review; do not disable RLS as a routine rollback. The additive auth tables may remain unused. Dropping them loses revocation/limiter history and is a separately approved destructive action. Restore from backup only if migration integrity fails.
+
+## Task 12 / E2 / W4 / R4 verification and release gate
+
+Ownership and the complete production mutation inventory are in
+[architecture.md](architecture.md#account-lease-and-fencing-task-12--e2--w4--r4).
+Rollout/rollback must follow [deployment.md](deployment.md#task-12-rollout-and-rollback-compatibility),
+including blocking and draining every old unfenced sync writer. Applying an
+additive lease migration alone does not protect against old table writes.
+
+The full `DISPOSABLE_DB_ACK=yes npm run test:stabilization-db` entry point now
+runs `tests/integration/matter-sync-lease.mjs` on both disposable fresh and upgrade
+stacks, after the existing security suite. It compiles and loads the production
+sync/import/enrichment/recalculation paths. Only Matter HTTP is synthetic; SQL,
+Data API grants, auth-role clients, RPC writes and concurrency are real. It uses
+only local orchestrator-generated URLs/keys and a validated, runner-owned Docker
+project ID, never application credentials or an arbitrary SQL host. Generation
+is never deleted/reset during fixtures or cleanup. All domain fixture collisions
+are rejected, stream seeds are recognized before modification, cleanup releases
+only owned generations, restores seeds under a new valid lease, removes only
+claimed synthetic rows and deletes its disposable Auth user. The entire stacks
+are ultimately stopped by the existing owner-scoped orchestrator.
+
+Required real assertions include:
+
+- 24 parallel Data API acquisitions and 12 parallel SQL transactions each admit
+  exactly one owner; 24 concurrent production manual/scheduled/library contenders
+  behind a paused request make no Matter calls or protected writes.
+- Valid renewal preserves generation; wrong owner/generation, expired renewal,
+  invalid/NULL TTL and stale release fail. Release/expiry recovery increments it.
+- After an application-level lease check, a deterministic SQL expiry fixture lets
+  B acquire a newer generation. Every production mutation RPC rejects A,
+  including item-tag deletion, rollups, both streams, retry state and successful
+  completion, with unchanged database snapshots.
+- A real protected RPC transaction retains the lease row lock through commit;
+  the SQL barrier confirms takeover waits using `pg_stat_activity`, then the old
+  generation cannot write. No Matter request occurs while that fixture holds a
+  SQL transaction.
+- Delayed Matter success and 429 responses after takeover cannot import results,
+  advance state, overwrite cooldown or complete/release the successor's lease.
+  Cancellation runs compare-and-release; crashed fixtures recover via expiry.
+- Both browser roles receive exact `42501` object-specific grant denials for the
+  lease table and all 14 function signatures (including helpers). Real service
+  controls execute each operation. Invalid payload, missing-function/cache,
+  auth and transport errors fail verification; they are never counted as grant
+  denial. Service-role DELETE on the durable lease is deliberately denied.
+- Upgrade first applies Task 11, stores synthetic active contracts with nonzero
+  generations, cursors, watermarks and cooldowns, then applies Task 12 and checks
+  every stream column remains identical. Existing legacy-domain preservation and
+  the Task 11 resume/window/cooldown regressions remain required.
+
+The catalog inventories RLS, effective browser table/column privileges, PUBLIC
+ACLs, service SELECT/UPDATE with no lease INSERT/DELETE/TRUNCATE, exact RPC/helper
+signatures, invoker execution and empty search paths. The read-only audit also
+includes the stream and lease inventories. The table's direct UPDATE permission
+is trusted administrative/service access; production sync writes use the fixed
+RPCs. No SECURITY DEFINER privilege escalation or arbitrary mutation API exists.
+
+Run `npm ci`, route type generation, typecheck, lint, tests, build, audit:ci and
+`git diff --check`. Run both real disposable paths before declaring R4 database
+verification passed or enabling sync in a release. If Docker/CLI/subprocess
+prerequisites are unavailable, record **BLOCKED** with the exact failing layer;
+unit tests and SQL inspection do not substitute for execution evidence. This
+Task 12 implementation adds no full-page commit guarantee (Task 13), continuation,
+backfill/shared quota (Tasks 14–15), production repair, deployment or merge.
+
+Official mechanisms reviewed for this change: [Supabase database functions](https://supabase.com/docs/guides/database/functions),
+[PostgreSQL row locks](https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS),
+[database wall-clock time](https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT),
+[function privileges](https://www.postgresql.org/docs/current/sql-createfunction.html),
+and [PostgREST request transactions](https://docs.postgrest.org/en/stable/references/transactions.html).
+The Supabase changelog index was unavailable; the official changelog page and the
+current functions/grants documentation were inspected instead.

@@ -4,6 +4,16 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { catalogSql, INVENTORIED_TABLES, verifyCatalog } from "../scripts/stabilization-db-runner.mjs";
+import { LEASE_FUNCTION_SIGNATURES } from "../scripts/matter-sync-lease-inventory.mjs";
+
+test("catalog covers the durable lease and every exact RPC/helper signature", () => {
+  const sql = catalogSql();
+  assert.ok(INVENTORIED_TABLES.includes("matter_sync_leases"));
+  for (const signature of LEASE_FUNCTION_SIGNATURES) assert.ok(sql.includes(`public.${signature}`));
+  assert.match(sql, /security|prosecdef/);
+  assert.match(sql, /a.grantee = 0/);
+  assert.match(sql, /service_role can reset durable lease/);
+});
 
 test("catalog inventory includes independent sync streams", () => {
   assert.ok(INVENTORIED_TABLES.includes("matter_sync_streams"));
