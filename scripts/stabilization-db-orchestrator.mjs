@@ -181,16 +181,24 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   }
   const status = parseStatusEnv(cli(["status", "--workdir", workdir, "-o", "env"], { env: sanitizedEnvironment() }));
   const versions = await catalog(projectId, path.join(workdir, "supabase/migrations"));
+  let leaseEvidence;
   const runIntegration = () => {
     command(process.execPath, [path.join(repoRoot, "node_modules/typescript/bin/tsc"), "-p", "tests/tsconfig.json"], { env: sanitizedEnvironment() });
     const env = integrationEnvironment(status, projectId);
     command(process.execPath, [path.join(repoRoot, "tests/integration/supabase-security.mjs")], { env });
-    return command(process.execPath, [path.join(repoRoot, "tests/integration/matter-sync-lease.mjs")], { env });
+    const output = command(process.execPath, [path.join(repoRoot, "tests/integration/matter-sync-lease.mjs")], { env });
+    const report = JSON.parse(output.trim().split(/\r?\n/).at(-1));
+    assert.equal(report.status, "passed");
+    assert.equal(report.realSqlAndDataApi, true);
+    assert.equal(report.syntheticMatterOnly, true);
+    assert.ok(Array.isArray(report.checks) && report.checks.every((check) => typeof check === "string"));
+    // Copy only the integration report's known, credential-free evidence fields.
+    leaseEvidence = { checks: report.checks, realSqlAndDataApi: true, syntheticMatterOnly: true };
   };
   if (upgrade) {
     await removeOwnedLegacySingleton({ query: (sql) => Promise.resolve(containerPsql(projectId, sql)), ownershipMarker, runIntegration });
   } else runIntegration();
-  return { name, catalog: "passed", dataApi: "passed", accountLeaseSqlAndRuntime: "passed", preservation, streamPreservation, migrationHistory: versions };
+  return { name, catalog: "passed", dataApi: "passed", accountLeaseSqlAndRuntime: "passed", leaseEvidence, preservation, streamPreservation, migrationHistory: versions };
 }
 
 export async function runStabilizationDatabases({ evidenceRoot = path.join(repoRoot, "artifacts/stabilization-db"), hasDocker = dockerAvailable } = {}) {
