@@ -14,6 +14,18 @@ test("recognizes only the exact fresh/upgrade migration stream seed", () => {
   assert.equal(isMigrationSeededStream({ ...seed, filters: { since: "test-owned" } }, "recent_sessions"), false);
 });
 
+test("library migration seed filters compare structurally across JSONB key ordering", () => {
+  const seed = {
+    stream: "library_items", endpoint: "/items", filters: { order: "updated", status: "all" }, page_limit: 25,
+    cursor: null, cycle_started_at: null, cycle_generation: 0, completed_watermark: null,
+    cycle_active: false, transition_status: "legacy_recoverable_restart", coverage_window: null,
+  };
+  assert.equal(isMigrationSeededStream(seed, "library_items"), true);
+  for (const filters of [{ status: "all" }, { order: "updated", status: "unread" }, { order: "updated", status: "all", since: "unowned" }]) {
+    assert.equal(isMigrationSeededStream({ ...seed, filters }, "library_items"), false);
+  }
+});
+
 test("independently created stream fixtures have unique ownership markers", () => {
   const one = createMatterSyncStreamFixture({ prefix: "security-run-one", timestamp: "2099-01-02T03:04:05.000Z" });
   const two = createMatterSyncStreamFixture({ prefix: "security-run-two", timestamp: "2099-01-02T03:04:05.000Z" });

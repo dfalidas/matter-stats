@@ -220,11 +220,13 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
   ];
   const started = [];
   const cleanup = [];
+  const results = [];
+  let activePath = "configuration";
   let evidence;
   try {
     for (const stack of stacks) await configureStack(stack.workdir, stack);
-    const results = [];
     for (const stack of stacks) {
+      activePath = stack.name;
       started.push(stack);
       results.push(await verifyPath({ ...stack, upgrade: stack.name === "upgrade" }));
     }
@@ -235,7 +237,11 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
     await writeFile(path.join(evidenceDir, "failure.json"), `${JSON.stringify({
       status: "failed",
       gitSha: sha,
-      message: String(error?.message ?? error).replaceAll(root, "<temporary-root>"),
+      failedPath: activePath,
+      paths: results,
+      // Subprocess stderr can contain generated local credentials. Keep it in
+      // the job diagnostic, never copy arbitrary error text into an artifact.
+      message: "Disposable verification failed; see the workflow job log.",
       cleanup: "pending",
     }, null, 2)}\n`);
     throw error;
@@ -245,8 +251,8 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
         assertDisposableDirectory(stack.workdir);
         cli(["stop", "--workdir", stack.workdir, "--no-backup"], { env: sanitizedEnvironment() });
         cleanup.push({ path: stack.name, status: "stopped" });
-      } catch (error) {
-        cleanup.push({ path: stack.name, status: "failed", error: error.message.replace(root, "<temporary-root>") });
+      } catch {
+        cleanup.push({ path: stack.name, status: "failed", error: "Disposable stack cleanup failed; see the workflow job log." });
       }
     }
     await rm(root, { recursive: true, force: true });

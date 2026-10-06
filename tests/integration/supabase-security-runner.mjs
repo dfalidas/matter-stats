@@ -43,7 +43,7 @@ export function isMigrationSeededStream(row, stream) {
   const expectedFilters = stream === "recent_sessions" ? {} : { status: "all", order: "updated" };
   return row?.stream === stream
     && row.endpoint === (stream === "recent_sessions" ? "/reading_sessions" : "/items")
-    && JSON.stringify(row.filters) === JSON.stringify(expectedFilters)
+    && isDeepStrictEqual(row.filters, expectedFilters)
     && row.page_limit === 25
     && row.cursor === null
     && row.cycle_started_at === null
@@ -120,3 +120,4 @@ export async function verifyLimiterGroups(groups) {
     throw new AggregateError(failures, `Limiter verification failed for ${failures.length} group(s): ${details}`);
   }
 }
+import { isDeepStrictEqual } from "node:util";

@@ -5,6 +5,61 @@ Scope: **Task 12 / E2 / W4 / R4 only**. Base main was checked through GitHub on
 It matched the supplied baseline; there were no later main changes to reconcile.
 Branch: `codex/task-12-account-lease-fencing`. Final SHA is the PR head commit.
 
+## GitHub verification gate (2026-10-06)
+
+PR: [#74](https://github.com/dfalidas/matter-stats/pull/74).
+The original head `74a981dc3f8fd46973dff5f0c11039e0ef8b5cb9` passed
+[regular CI](https://github.com/dfalidas/matter-stats/actions/runs/37350032265/job/111898264467):
+226 tests, 223 passed, 0 failed/cancelled/skipped, 3 pre-existing TODO;
+production audit then contained zero vulnerabilities. That run did not execute
+the disposable databases.
+
+The new PR-only **Fresh and upgrade database verification** job uses a
+GitHub-hosted Ubuntu runner with Docker, checks out the exact PR head with
+checkout credentials disabled, installs Node.js 22 and the lockfile, and runs:
+
+```sh
+DISPOSABLE_DB_ACK=yes npm run test
+```
+
+The acknowledgement adds the existing CLI **2.48.3** disposable runner after the
+unit suite. Without it, `npm run test` remains database-free. An invalid
+acknowledgement fails closed; a blocked runner exits nonzero. Both fresh and
+upgrade paths use only owned OS-temporary local Supabase stacks, sanitized child
+environments and synthetic fixtures. No production secrets, external database
+connection or real Matter request is configured. SQL/Data API concurrency,
+stale-worker fencing, security and actual runtime import/rollup paths are the
+existing integration suites, rather than replacement mocks.
+
+The always-run artifact step retains only JSON under
+`artifacts/stabilization-db/<tested-sha>/`, including a known-field `ci.json`
+even when setup or the test step fails. Runner reports record migration history,
+path results, lease acceptance checks, legacy/Task 11 preservation and owned
+stack cleanup. Arbitrary subprocess error text is excluded from failure/cleanup
+JSON; detailed failures remain in the job log. Missing evidence fails upload.
+
+| Tested PR head | Regular CI | Database gate |
+| --- | --- | --- |
+| `11c37541e5d92e6a5f10830c39c7493d13d75253` | [Run 37438130816, verify](https://github.com/dfalidas/matter-stats/actions/runs/37438130816/job/112184910717): install, typegen, typecheck, lint, 223 passed / 3 TODO, build passed; audit failed. | [Database job](https://github.com/dfalidas/matter-stats/actions/runs/37438130816/job/112184911017): failed at the fresh lease fixture's JSON key-order comparison; catalog and existing security suite had completed. No fresh/upgrade pass claimed. |
+
+That first real execution exposed a fixture comparison bug: JSONB returned
+library filter keys in PostgreSQL's order, whereas the fixture used
+`JSON.stringify` equality. The fixture now requires strict structural equality
+and still rejects missing, changed or extra filters; a regression covers these
+cases. The
+[failure artifact](https://github.com/dfalidas/matter-stats/actions/runs/37438130816/artifacts/11399629751)
+was retained, including owned-stack cleanup evidence.
+
+The new audit report has one high production finding in `source-map-js`,
+[GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q).
+The full report has 11 entries: 8 high, 3 moderate, 0 low/critical.
+[Retained reports](https://github.com/dfalidas/matter-stats/actions/runs/37438130816/artifacts/11400560063)
+were inspected. The existing zero-production-findings policy and dependency
+files are unchanged; dependency remediation is outside this verification-only
+follow-up.
+
+## Original local execution (historical)
+
 | Check | Actual local result |
 | --- | --- |
 | Lockfile install | Passed: `npm ci --no-audit --fetch-retries=0`, after an offline attempt lacked a cached package. No dependency/lockfile changes. |

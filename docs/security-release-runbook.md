@@ -5,8 +5,8 @@
 `.github/workflows/ci.yml` runs on pull requests targeting `main` and pushes to
 `main`. It installs the lockfile with `npm ci`, generates Next.js route types,
 and runs typechecking, linting, unit tests, the production build, and dependency
-audits on Node.js 22 LTS. The workflow does not require application secrets and
-must not contact Matter or Supabase. Equivalent local commands are:
+audits on Node.js 22 LTS. The regular verification job does not require
+application secrets or contact Matter or Supabase. Equivalent local commands are:
 
 ```sh
 npm ci
@@ -17,6 +17,17 @@ npm run test
 npm run build
 npm run audit:ci
 ```
+
+Pull requests also run **Fresh and upgrade database verification** on a
+GitHub-hosted Ubuntu runner with Docker. This job checks out the exact PR head,
+uses Node.js 22 and `npm ci`, and executes `DISPOSABLE_DB_ACK=yes npm run test`.
+That explicit acknowledgement adds the existing pinned Supabase CLI 2.48.3
+fresh/upgrade runner after the unit suite; ordinary `npm run test` stays
+database-free. Only runner-owned temporary local stacks and synthetic fixtures
+are permitted, with no application secrets or external database connections.
+Failed or blocked verification fails the job. JSON evidence, including the
+known-field CI outcome, is retained from `artifacts/stabilization-db/` even on
+failure. The existing `test:stabilization-db` entry point remains available.
 
 The audit command retains the unmodified full and production JSON reports in
 `audit-results/`. Production must have zero findings. The full graph permits
