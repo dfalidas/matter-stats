@@ -8,6 +8,11 @@ Branch: `codex/task-12-account-lease-fencing`. Final SHA is the PR head commit.
 ## GitHub verification gate (2026-10-06)
 
 PR: [#74](https://github.com/dfalidas/matter-stats/pull/74).
+**The real database gate passed** on
+`eab1e2e8c2186d641c01d7fc46d44d9b6ae52032`.
+Both fresh and upgrade paths, their security/runtime suites and cleanup passed.
+Regular CI remains failed only at the unchanged audit policy, as detailed below.
+
 The original head `74a981dc3f8fd46973dff5f0c11039e0ef8b5cb9` passed
 [regular CI](https://github.com/dfalidas/matter-stats/actions/runs/37350032265/job/111898264467):
 226 tests, 223 passed, 0 failed/cancelled/skipped, 3 pre-existing TODO;
@@ -42,6 +47,32 @@ JSON; detailed failures remain in the job log. Missing evidence fails upload.
 | --- | --- | --- |
 | `11c37541e5d92e6a5f10830c39c7493d13d75253` | [Run 37438130816, verify](https://github.com/dfalidas/matter-stats/actions/runs/37438130816/job/112184910717): install, typegen, typecheck, lint, 223 passed / 3 TODO, build passed; audit failed. | [Database job](https://github.com/dfalidas/matter-stats/actions/runs/37438130816/job/112184911017): failed at the fresh lease fixture's JSON key-order comparison; catalog and existing security suite had completed. No fresh/upgrade pass claimed. |
 | `b3c988b6b20627a92dbdadc0457a8298bd4730b5` | [Run 37439204083, verify](https://github.com/dfalidas/matter-stats/actions/runs/37439204083/job/112188468118): install, typegen, typecheck, lint, 224 passed / 3 TODO, build passed; audit failed. | [Database job](https://github.com/dfalidas/matter-stats/actions/runs/37439204083/job/112188468444): failed on the existing sync_mode constraint; no fresh/upgrade pass. |
+| `eab1e2e8c2186d641c01d7fc46d44d9b6ae52032` | [Run 37440216876, verify](https://github.com/dfalidas/matter-stats/actions/runs/37440216876/job/112191851946): install, typegen, typecheck, lint, 224 passed / 3 TODO, build passed; audit failed. | [Database job](https://github.com/dfalidas/matter-stats/actions/runs/37440216876/job/112191852376): **passed**, both fresh and upgrade, including cleanup. |
+
+The successful
+[JSON artifact](https://github.com/dfalidas/matter-stats/actions/runs/37440216876/artifacts/11401815008)
+was downloaded and inspected, rather than relying solely on the green job.
+`ci.json`, `results.json` and `cleanup.json` all identify the exact SHA above;
+the CLI is 2.48.3. Each path verified all 13 migration versions and passed the
+catalog, Data API security and real account-lease SQL/runtime suites. Each
+contains seven completed acceptance groups (14 across the two paths): 24
+concurrent Data API acquisitions, browser grant denials with service controls,
+renewal/TTL/expiry/stale-write/compare-release checks, 12 concurrent SQL
+acquisitions, takeover serialization across an actual protected SQL transaction,
+production trigger/import/enrichment/tag deletion/rollup/independent-stream
+checks, and delayed success/429 plus cancellation checks. These are group
+counts, not raw assertion counts.
+
+The upgrade additionally passed exact legacy-row and Task 11 active
+contract/generation/watermark/cooldown preservation. Both owned stacks were
+stopped, the temporary directory was removed, and cleanup is `passed`. The
+artifact contains no JWT or Supabase secret-key material. Real paths:
+**2 passed, 0 failed/blocked/skipped**; unit suite:
+**227 tests, 224 passed, 0 failed/cancelled/skipped, 3 pre-existing TODO**.
+Those unit TODO placeholders do not stand in for the real suites, which ran
+completely. The historical local execution restrictions below no longer block
+the real database gate. The subsequent evidence update changes documentation
+only; this table records the completed implementation verification SHA.
 
 That first real execution exposed a fixture comparison bug: JSONB returned
 library filter keys in PostgreSQL's order, whereas the fixture used
