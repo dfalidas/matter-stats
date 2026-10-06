@@ -18,6 +18,7 @@ type MatterFetchOptions = Omit<RequestInit, "body" | "headers"> & {
   headers?: HeadersInit;
   query?: Record<string, QueryValue>;
   maxRateLimitRetries?: number;
+  beforeRequest?: () => Promise<void>;
 };
 
 export type MatterObjectType =
@@ -210,10 +211,11 @@ export class MatterRateLimitError extends MatterApiError {
 }
 
 export async function matterFetch<T>(path: string, options: MatterFetchOptions = {}): Promise<T> {
-  const { maxRateLimitRetries = DEFAULT_MAX_RATE_LIMIT_RETRIES, ...fetchOptions } = options;
+  const { maxRateLimitRetries = DEFAULT_MAX_RATE_LIMIT_RETRIES, beforeRequest, ...fetchOptions } = options;
 
   for (let attempt = 0; attempt <= maxRateLimitRetries; attempt += 1) {
     await paceMatterRequest();
+    await beforeRequest?.();
 
     const response = await fetch(buildMatterUrl(path, fetchOptions.query), {
       ...fetchOptions,
@@ -285,22 +287,24 @@ export function logMatterApiError(error: unknown, context: string): void {
   });
 }
 
-export async function getMatterAccount(): Promise<MatterAccount> {
-  return matterFetch<MatterAccount>("/me");
+export async function getMatterAccount(beforeRequest?: () => Promise<void>): Promise<MatterAccount> {
+  return matterFetch<MatterAccount>("/me", { beforeRequest });
 }
 
-export async function listMatterItems(params: ListMatterItemsParams = {}): Promise<MatterListResponse<MatterItem>> {
-  return matterFetch<MatterListResponse<MatterItem>>("/items", { query: toMatterItemsQuery(params) });
+export async function listMatterItems(params: ListMatterItemsParams = {}, beforeRequest?: () => Promise<void>): Promise<MatterListResponse<MatterItem>> {
+  return matterFetch<MatterListResponse<MatterItem>>("/items", { query: toMatterItemsQuery(params), beforeRequest });
 }
 
-export async function getMatterItem(itemId: string): Promise<MatterItem> {
-  return matterFetch<MatterItem>(`/items/${encodeURIComponent(itemId)}`);
+export async function getMatterItem(itemId: string, beforeRequest?: () => Promise<void>): Promise<MatterItem> {
+  return matterFetch<MatterItem>(`/items/${encodeURIComponent(itemId)}`, { beforeRequest });
 }
 
 export async function listMatterReadingSessions(
-  params: ListMatterReadingSessionsParams = {}
+  params: ListMatterReadingSessionsParams = {},
+  beforeRequest?: () => Promise<void>
 ): Promise<MatterListResponse<MatterReadingSession>> {
   return matterFetch<MatterListResponse<MatterReadingSession>>("/reading_sessions", {
+    beforeRequest,
     query: {
       limit: params.limit,
       cursor: params.cursor,
@@ -321,9 +325,11 @@ export async function listMatterTags(params: ListMatterTagsParams = {}): Promise
 
 export async function listMatterAnnotations(
   itemId: string,
-  params: ListMatterAnnotationsParams = {}
+  params: ListMatterAnnotationsParams = {},
+  beforeRequest?: () => Promise<void>
 ): Promise<MatterListResponse<MatterAnnotation>> {
   return matterFetch<MatterListResponse<MatterAnnotation>>(`/items/${encodeURIComponent(itemId)}/annotations`, {
+    beforeRequest,
     query: {
       limit: params.limit,
       cursor: params.cursor,

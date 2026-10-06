@@ -4,14 +4,16 @@ select c.relname as object_name, c.relkind, c.relrowsecurity as rls_enabled
 from pg_class c join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public' and c.relname in (
   'matter_items','reading_sessions','matter_tags','item_tags','annotations',
-  'daily_stats','sync_runs','sync_state','app_sessions','app_login_attempts'
+  'daily_stats','sync_runs','sync_state','app_sessions','app_login_attempts',
+  'matter_sync_streams','matter_sync_leases'
 ) order by c.relname;
 
 select table_name, grantee, privilege_type
 from information_schema.role_table_grants
 where table_schema = 'public' and table_name in (
   'matter_items','reading_sessions','matter_tags','item_tags','annotations',
-  'daily_stats','sync_runs','sync_state','app_sessions','app_login_attempts'
+  'daily_stats','sync_runs','sync_state','app_sessions','app_login_attempts',
+  'matter_sync_streams','matter_sync_leases'
 ) order by table_name, grantee, privilege_type;
 
 select schemaname, tablename, policyname, roles, cmd, qual, with_check
@@ -35,3 +37,11 @@ from public.reading_sessions;
 
 select * from public.sync_runs order by started_at desc limit 1;
 select * from public.sync_state where id = 'matter';
+
+-- Include exact identities and PUBLIC ACLs for every helper and RPC.
+select p.oid::regprocedure as signature, p.prosecdef as security_definer,
+  p.proconfig as settings, p.proacl as grants
+from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+where n.nspname='public' and (p.proname like '%matter_sync_lease'
+  or p.proname='validate_matter_sync_batch' or p.proname like 'sync_%')
+order by signature::text;

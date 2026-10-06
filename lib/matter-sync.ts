@@ -3,7 +3,8 @@ import "server-only";
 import {
   getMatterAccount,
   getMatterItem,
-  iterateMatterAnnotations,
+  listMatterAnnotations,
+  paginateMatter,
   listMatterItems,
   listMatterReadingSessions,
   logMatterApiError,
@@ -19,12 +20,14 @@ import {
   getSupabaseAdminClient,
   updateSyncRun,
   upsertAnnotations,
-  upsertItemTags,
+  replaceMatterItemTags,
   upsertMatterItems,
   upsertMatterSyncStream,
   upsertMatterTags,
   upsertReadingSessions,
 } from "@/lib/supabase-admin";
+import { acquireMatterSyncLease, renewMatterSyncLease, releaseMatterSyncLease } from "@/lib/matter-sync-lease";
+import { leaseRpcArgs, MatterSyncLeaseLostError, type MatterSyncLease } from "@/lib/matter-sync-lease-context";
 import { recalculateDailyStats } from "@/lib/daily-stats";
 import { getAppTimezone, timestampToCalendarDate } from "@/lib/calendar";
 import type { Json, MatterSyncStream, TablesInsert } from "@/lib/supabase-types";
@@ -67,6 +70,7 @@ const OPTIONAL_MATTER_STATUSES = new Set([403, 404]);
 
 export type MatterSyncResult = {
   ok: boolean;
+  skippedReason?: "busy" | "rate_limited";
   message: string;
   syncRunId?: string;
   itemsSynced?: number;
@@ -94,6 +98,9 @@ type MatterSyncDiagnostics = {
 };
 
 export type MatterSyncRuntimeDeps = {
+  acquireLease: typeof acquireMatterSyncLease;
+  renewLease: typeof renewMatterSyncLease;
+  releaseLease: typeof releaseMatterSyncLease;
   now: () => Date;
   getStreams: typeof getMatterSyncStreams;
   getLegacyState: typeof getMatterSyncState;
@@ -109,7 +116,10 @@ export type MatterSyncRuntimeDeps = {
   importItems: typeof importMatterItemPage;
 };
 
-const productionSyncDeps: MatterSyncRuntimeDeps = {
+export const productionSyncDeps: MatterSyncRuntimeDeps = {
+  acquireLease: acquireMatterSyncLease,
+  renewLease: renewMatterSyncLease,
+  releaseLease: releaseMatterSyncLease,
   now: () => new Date(),
   getStreams: getMatterSyncStreams,
   getLegacyState: getMatterSyncState,
@@ -181,11 +191,17 @@ export async function syncMatterData(
   options: { recentActivityWindow?: MatterRecentActivityWindow } = {},
   deps: MatterSyncRuntimeDeps = productionSyncDeps
 ): Promise<MatterSyncResult> {
+  let lease: MatterSyncLease | null = null;
   let syncRunId: string | null = null;
   let storedState: MatterSyncStream | null = null;
   let activeCycle: ActiveMatterCycle | null = null;
+  // Trigger identities share the existing recent_activity database run label.
+  const runMode = isRecentActivityMode(mode) ? "recent_activity" : mode;
 
   try {
+    lease = await deps.acquireLease();
+    if (!lease) return { ok: false, skippedReason: "busy", message: "Matter sync is already running for this account. Try again shortly." };
+    leaseRpcArgs(lease);
     const invocationNow = deps.now();
     const stream = mode === "backfill_library" ? "library_items" : "recent_sessions";
     const rateLimitedUntil = await loadActiveMatterCooldown(deps, invocationNow);
@@ -193,6 +209,7 @@ export async function syncMatterData(
       return {
         ok: false,
         message: buildMatterRateLimitMessage(rateLimitedUntil),
+        skippedReason: "rate_limited",
         rateLimitedUntil,
       };
     }
@@ -207,7 +224,7 @@ export async function syncMatterData(
     }
 
     const startedAt = invocationNow.toISOString();
-    const syncRun = await deps.createRun({ status: "running", started_at: startedAt, sync_mode: mode });
+    const syncRun = await deps.createRun({ status: "running", started_at: startedAt, sync_mode: runMode }, lease);
     syncRunId = syncRun.id;
 
     const recentActivitySince = isRecentActivityMode(mode) ? getRecentActivityWindowStart(new Date(startedAt), options.recentActivityWindow) : null;
@@ -220,20 +237,24 @@ export async function syncMatterData(
       requestedWindow: requestedWindow ?? null,
     });
     // Persist the complete request contract before making any upstream call.
-    await deps.upsertStream(persistActiveMatterCycle(activeCycle, activeCycle.cursor));
-    await deps.getAccount();
+    await deps.upsertStream(persistActiveMatterCycle(activeCycle, activeCycle.cursor), lease);
+    await deps.renewLease(lease);
+    await deps.getAccount(() => deps.renewLease(lease!));
+    await deps.renewLease(lease);
     const counts = createEmptyMatterBatchCounts();
     const diagnostics = createEmptyMatterSyncDiagnostics();
     const affectedDates = new Set<string>();
     const checkpoint: SyncCheckpoint = { next: null };
-    const nextCursor = await importNextMatterBatch({ cycle: activeCycle, counts, affectedDates, checkpoint, diagnostics, deps });
+    const nextCursor = await importNextMatterBatch({ cycle: activeCycle, counts, affectedDates, checkpoint, diagnostics, deps, lease });
     const hasMore = nextCursor !== undefined;
     const persistedState = hasMore
       ? persistActiveMatterCycle(activeCycle, nextCursor ?? null)
       : completeMatterCycle(activeCycle);
 
-    await deps.recalculate({ affectedDates });
+    await deps.renewLease(lease);
+    await deps.recalculate({ affectedDates }, lease);
 
+    await deps.upsertStream(persistedState, lease);
     const finishedRun = await deps.updateRun(syncRunId, {
       status: "success",
       finished_at: new Date().toISOString(),
@@ -241,7 +262,7 @@ export async function syncMatterData(
       sessions_synced: counts.sessions,
       annotations_synced: counts.annotations,
       tags_synced: counts.tags,
-      sync_mode: mode,
+      sync_mode: runMode,
       matter_requests_count: diagnostics.requestCount,
       matter_sessions_returned: diagnostics.sessionsReturned,
       matter_items_returned: diagnostics.itemsReturned,
@@ -252,9 +273,7 @@ export async function syncMatterData(
       matter_next_cursor_present: diagnostics.lastNextCursorPresent,
       error_message: null,
       checkpoint_timestamp: persistedState.completed_watermark ?? null,
-    });
-
-    await deps.upsertStream(persistedState);
+    }, lease);
 
     return {
       ok: true,
@@ -274,25 +293,25 @@ export async function syncMatterData(
     const rateLimitedUntil = getRateLimitedUntil(error);
     const sanitizedError = sanitizeSyncError(error);
 
-    if (rateLimitedUntil) {
+    if (rateLimitedUntil && lease) {
       try {
         if (activeCycle) {
-          await deps.upsertStream(persistActiveMatterCycle(activeCycle, activeCycle.cursor, rateLimitedUntil));
+          await deps.upsertStream(persistActiveMatterCycle(activeCycle, activeCycle.cursor, rateLimitedUntil), lease);
         }
       } catch (stateError) {
         console.error("Matter sync rate-limit state update failed", { error: sanitizeLogError(stateError) });
       }
     }
 
-    if (syncRunId) {
+    if (syncRunId && lease) {
       try {
         await deps.updateRun(syncRunId, {
           status: "error",
           finished_at: new Date().toISOString(),
           error_message: sanitizedError,
-          sync_mode: mode,
+          sync_mode: runMode,
           checkpoint_timestamp: null,
-        });
+        }, lease);
       } catch (updateError) {
         console.error("Matter sync run error update failed", { syncRunId, error: sanitizeLogError(updateError) });
       }
@@ -311,9 +330,14 @@ export async function syncMatterData(
 
     return {
       ok: false,
-      message: `Matter sync failed safely. ${sanitizedError} No sync checkpoint was advanced; click Sync again after fixing the issue.`,
+      message: `Matter sync failed safely. ${sanitizedError} Earlier committed work remains; retry resumes or replays the stored cycle.`,
       syncRunId: syncRunId ?? undefined,
     };
+  } finally {
+    if (lease) {
+      try { await deps.releaseLease(lease); }
+      catch (error) { console.error("Matter sync lease release failed", { error: sanitizeLogError(error) }); }
+    }
   }
 }
 
@@ -324,6 +348,7 @@ async function importNextMatterBatch({
   checkpoint,
   diagnostics,
   deps,
+  lease,
 }: {
   cycle: ActiveMatterCycle;
   counts: MatterBatchCounts;
@@ -331,7 +356,9 @@ async function importNextMatterBatch({
   checkpoint: SyncCheckpoint;
   diagnostics: MatterSyncDiagnostics;
   deps: MatterSyncRuntimeDeps;
+  lease: MatterSyncLease;
 }): Promise<string | null | undefined> {
+  await deps.renewLease(lease);
   diagnostics.requestCount += 1;
 
   if (cycle.stream === "library_items") {
@@ -341,10 +368,11 @@ async function importNextMatterBatch({
       updatedSince: cycle.filters.updated_since,
       cursor: cycle.cursor ?? undefined,
       limit: cycle.pageLimit,
-    });
+    }, () => deps.renewLease(lease));
+    await deps.renewLease(lease);
     diagnostics.itemsReturned += itemPage.results.length;
     recordMatterPageDiagnostics(diagnostics, itemPage);
-    const imported = await deps.importItems(itemPage, affectedDates, checkpoint);
+    const imported = await deps.importItems(itemPage, affectedDates, checkpoint, lease);
     counts.items += imported.itemCount;
     counts.tags += imported.tagCount;
     counts.annotations += imported.annotationCount;
@@ -355,10 +383,11 @@ async function importNextMatterBatch({
     since: cycle.filters.since,
     cursor: cycle.cursor ?? undefined,
     limit: cycle.pageLimit,
-  });
+  }, () => deps.renewLease(lease));
+  await deps.renewLease(lease);
   diagnostics.sessionsReturned += sessionPage.results.length;
   recordMatterPageDiagnostics(diagnostics, sessionPage);
-  const imported = await deps.importSessions(sessionPage, affectedDates, checkpoint, diagnostics);
+  const imported = await deps.importSessions(sessionPage, affectedDates, checkpoint, diagnostics, lease);
   counts.sessions += imported.sessions;
   counts.items += imported.items;
   counts.tags += imported.tags;
@@ -374,7 +403,8 @@ function requireNextCursor(cursor: string | null): string {
 async function importMatterItemPage(
   itemPage: MatterListResponse<NormalizableMatterItem>,
   affectedDates: Set<string>,
-  checkpoint: SyncCheckpoint
+  checkpoint: SyncCheckpoint,
+  lease: MatterSyncLease
 ): Promise<{ itemCount: number; tagCount: number; annotationCount: number }> {
   const syncedAt = new Date().toISOString();
   const itemRows: MatterItemRow[] = [];
@@ -401,13 +431,13 @@ async function importMatterItemPage(
     affectedDates.add(affectedDate);
   }
 
-  await upsertInBatches([...tagRowsById.values()], upsertMatterTags);
-  await upsertInBatches(itemRows, upsertMatterItems);
-  await replaceItemTags([...itemIds], [...itemTagRowsByKey.values()]);
+  await upsertInBatches([...tagRowsById.values()], upsertMatterTags, lease);
+  await upsertInBatches(itemRows, upsertMatterItems, lease);
+  await replaceItemTags([...itemIds], [...itemTagRowsByKey.values()], lease);
 
   const annotationRows: TablesInsert<"annotations">[] = [];
   for (const itemId of itemIds) {
-    for await (const annotation of iterateOptionalMatterAnnotations(itemId)) {
+    for await (const annotation of iterateOptionalMatterAnnotations(itemId, lease)) {
       const annotationRow = normalizeAnnotation(annotation);
       if (!annotationRow) {
         continue;
@@ -423,7 +453,7 @@ async function importMatterItemPage(
     affectedDates.add(affectedDate);
   }
 
-  await upsertInBatches(annotationRows, upsertAnnotations);
+  await upsertInBatches(annotationRows, upsertAnnotations, lease);
 
   return {
     itemCount: itemRows.length,
@@ -436,13 +466,14 @@ async function importMatterSessionPage(
   sessionPage: Awaited<ReturnType<typeof listMatterReadingSessions>>,
   affectedDates: Set<string>,
   checkpoint: SyncCheckpoint,
-  diagnostics: MatterSyncDiagnostics
+  diagnostics: MatterSyncDiagnostics,
+  lease: MatterSyncLease
 ): Promise<{ sessions: number; items: number; tags: number; annotations: number }> {
   let firstSkippedSession: unknown = null;
 
   const embeddedItems = sessionPage.results.map(extractEmbeddedMatterItem).filter((item): item is NonNullable<typeof item> => item !== null);
   const linkedItemIds = collectLinkedMatterItemIds(sessionPage.results);
-  const linkedItemCounts = await importLinkedMatterItems(linkedItemIds, embeddedItems, affectedDates, checkpoint, diagnostics);
+  const linkedItemCounts = await importLinkedMatterItems(linkedItemIds, embeddedItems, affectedDates, checkpoint, diagnostics, lease);
   const sessionRows: TablesInsert<"reading_sessions">[] = [];
   const matterItemLookup = new Map<string, MatterItemRow | null>();
 
@@ -492,7 +523,7 @@ async function importMatterSessionPage(
   }
 
   try {
-    await upsertInBatches(sessionRows, upsertReadingSessions);
+    await upsertInBatches(sessionRows, upsertReadingSessions, lease);
   } catch (error) {
     diagnostics.firstSkipReason ??= "database_upsert_error";
     throw error;
@@ -543,7 +574,8 @@ async function importLinkedMatterItems(
   embeddedItems: Array<NonNullable<ReturnType<typeof extractEmbeddedMatterItem>>>,
   affectedDates: Set<string>,
   checkpoint: SyncCheckpoint,
-  diagnostics: MatterSyncDiagnostics
+  diagnostics: MatterSyncDiagnostics,
+  lease: MatterSyncLease
 ): Promise<{ itemCount: number; tagCount: number; annotationCount: number }> {
   if (itemIds.length === 0) {
     return { itemCount: 0, tagCount: 0, annotationCount: 0 };
@@ -551,7 +583,7 @@ async function importLinkedMatterItems(
 
   const syncedAt = new Date().toISOString();
   const placeholderRows = itemIds.map((itemId) => normalizeMatterItem(createPlaceholderMatterItem(itemId), syncedAt));
-  await upsertInBatches(placeholderRows, upsertMatterItems);
+  await upsertInBatches(placeholderRows, upsertMatterItems, lease);
 
   const embeddedItemsById = new Map(embeddedItems.map((item) => [item.id, item]));
   const results = [];
@@ -566,7 +598,7 @@ async function importLinkedMatterItems(
     }
 
     diagnostics.requestCount += 1;
-    const fetchedItem = await getOptionalMatterItem(itemId);
+    const fetchedItem = await getOptionalMatterItem(itemId, lease);
     if (fetchedItem) {
       results.push(fetchedItem);
       returnedItemObjects += 1;
@@ -582,7 +614,8 @@ async function importLinkedMatterItems(
       next_cursor: null,
     },
     affectedDates,
-    checkpoint
+    checkpoint,
+    lease
   );
 
   return {
@@ -592,9 +625,12 @@ async function importLinkedMatterItems(
   };
 }
 
-async function getOptionalMatterItem(itemId: string): Promise<Awaited<ReturnType<typeof getMatterItem>> | null> {
+async function getOptionalMatterItem(itemId: string, lease: MatterSyncLease): Promise<Awaited<ReturnType<typeof getMatterItem>> | null> {
+  await renewMatterSyncLease(lease);
   try {
-    return await getMatterItem(itemId);
+    const item = await getMatterItem(itemId, () => renewMatterSyncLease(lease));
+    await renewMatterSyncLease(lease);
+    return item;
   } catch (error) {
     if (isOptionalMatterEndpointError(error) || error instanceof MatterRateLimitError) {
       logMatterApiError(error, `get optional Matter item ${itemId}`);
@@ -619,27 +655,22 @@ function getRateLimitedUntil(error: unknown): string | null {
   return new Date(Date.now() + retryAfterSeconds * 1_000).toISOString();
 }
 
-async function upsertInBatches<Row>(rows: Row[], upsert: (batch: Row[]) => Promise<unknown>) {
+async function upsertInBatches<Row>(rows: Row[], upsert: (batch: Row[], lease: MatterSyncLease) => Promise<unknown>, lease: MatterSyncLease) {
+  leaseRpcArgs(lease);
   for (let index = 0; index < rows.length; index += UPSERT_BATCH_SIZE) {
-    await upsert(rows.slice(index, index + UPSERT_BATCH_SIZE));
+    await renewMatterSyncLease(lease);
+    await upsert(rows.slice(index, index + UPSERT_BATCH_SIZE), lease);
   }
 }
 
-async function replaceItemTags(itemIds: string[], itemTags: TablesInsert<"item_tags">[]) {
-  if (itemIds.length === 0) {
-    return;
-  }
-
-  const client = getSupabaseAdminClient();
+async function replaceItemTags(itemIds: string[], itemTags: TablesInsert<"item_tags">[], lease: MatterSyncLease) {
+  leaseRpcArgs(lease);
   for (let index = 0; index < itemIds.length; index += UPSERT_BATCH_SIZE) {
+    await renewMatterSyncLease(lease);
     const batch = itemIds.slice(index, index + UPSERT_BATCH_SIZE);
-    const { error } = await client.from("item_tags").delete().in("item_id", batch);
-    if (error) {
-      throw error;
-    }
+    const ids = new Set(batch);
+    await replaceMatterItemTags(batch, itemTags.filter((row) => ids.has(row.item_id)), lease);
   }
-
-  await upsertInBatches(itemTags, upsertItemTags);
 }
 
 async function getReadingSessionDatesForItems(itemIds: string[]): Promise<string[]> {
@@ -742,9 +773,14 @@ async function getMatterItemById(itemId: string, cache: Map<string, MatterItemRo
   return item;
 }
 
-async function* iterateOptionalMatterAnnotations(itemId: string) {
+async function* iterateOptionalMatterAnnotations(itemId: string, lease: MatterSyncLease) {
   try {
-    yield* iterateMatterAnnotations(itemId);
+    yield* paginateMatter(async (cursor) => {
+      await renewMatterSyncLease(lease);
+      const page = await listMatterAnnotations(itemId, { limit: 100, cursor }, () => renewMatterSyncLease(lease));
+      await renewMatterSyncLease(lease);
+      return page;
+    });
   } catch (error) {
     if (isOptionalMatterEndpointError(error)) {
       return;
@@ -758,6 +794,7 @@ function isOptionalMatterEndpointError(error: unknown): boolean {
 }
 
 function sanitizeSyncError(error: unknown): string {
+  if (error instanceof MatterSyncLeaseLostError) return error.message;
   if (error instanceof MatterApiError) {
     return `Matter API request failed during sync (status ${error.status}${error.code ? `, code ${error.code}` : ""}).`;
   }

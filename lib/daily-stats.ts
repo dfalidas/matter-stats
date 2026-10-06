@@ -1,3 +1,5 @@
+import { renewMatterSyncLease } from "./matter-sync-lease";
+import { leaseRpcArgs, type MatterSyncLease } from "./matter-sync-lease-context";
 import { getSupabaseAdminClient, upsertDailyStats } from "./supabase-admin";
 import type { TablesInsert } from "./supabase-types";
 import { buildDailyStat, type DailyStatsSession } from "./daily-stat-builder";
@@ -9,7 +11,8 @@ export type DailyStatsRecalculation = {
   affectedDates: Set<string>;
 };
 
-export async function recalculateDailyStats({ affectedDates }: DailyStatsRecalculation) {
+export async function recalculateDailyStats({ affectedDates }: DailyStatsRecalculation, lease: MatterSyncLease) {
+  leaseRpcArgs(lease);
   const dates = [...affectedDates].filter(isValidDateString).sort();
   if (dates.length === 0) {
     return;
@@ -17,15 +20,16 @@ export async function recalculateDailyStats({ affectedDates }: DailyStatsRecalcu
 
   const stats: TablesInsert<"daily_stats">[] = [];
   for (const date of dates) {
+    await renewMatterSyncLease(lease);
     stats.push(await calculateDailyStat(date));
   }
 
-  await upsertInBatches(stats, upsertDailyStats);
+  await upsertInBatches(stats, upsertDailyStats, lease);
 }
 
-export async function recalculateDailyStatsForDateRange(startDate: string, endDate: string) {
+export async function recalculateDailyStatsForDateRange(startDate: string, endDate: string, lease: MatterSyncLease) {
   const dates = getDateRange(startDate, endDate);
-  await recalculateDailyStats({ affectedDates: new Set(dates) });
+  await recalculateDailyStats({ affectedDates: new Set(dates) }, lease);
 }
 
 export async function calculateDailyStat(date: string): Promise<TablesInsert<"daily_stats">> {
@@ -61,9 +65,10 @@ export async function calculateDailyStat(date: string): Promise<TablesInsert<"da
   return buildDailyStat(date, (sessions ?? []) as unknown as DailyStatsSession[], highlightsCount ?? 0);
 }
 
-async function upsertInBatches<Row>(rows: Row[], upsert: (batch: Row[]) => Promise<unknown>) {
+async function upsertInBatches<Row>(rows: Row[], upsert: (batch: Row[], lease: MatterSyncLease) => Promise<unknown>, lease: MatterSyncLease) {
   for (let index = 0; index < rows.length; index += RECALCULATION_BATCH_SIZE) {
-    await upsert(rows.slice(index, index + RECALCULATION_BATCH_SIZE));
+    await renewMatterSyncLease(lease);
+    await upsert(rows.slice(index, index + RECALCULATION_BATCH_SIZE), lease);
   }
 }
 

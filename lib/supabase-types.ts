@@ -301,6 +301,12 @@ export type Database = {
         };
         Relationships: [];
       };
+      matter_sync_leases: {
+        Row: { account_scope: string; owner: string | null; expires_at: string | null; generation: number };
+        Insert: { account_scope: string; owner?: string | null; expires_at?: string | null; generation?: number };
+        Update: { owner?: string | null; expires_at?: string | null; generation?: number };
+        Relationships: [];
+      };
       matter_sync_streams: {
         Row: {
           stream: string;
@@ -412,6 +418,23 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      acquire_matter_sync_lease: {
+        Args: { p_account_scope: string; p_owner: string; p_ttl_seconds: number };
+        Returns: { generation: string; expires_at: string }[];
+      };
+      renew_matter_sync_lease: { Args: LeaseRpcArgs & { p_ttl_seconds: number }; Returns: boolean };
+      release_matter_sync_lease: { Args: LeaseRpcArgs; Returns: boolean };
+      assert_matter_sync_lease: { Args: LeaseRpcArgs; Returns: undefined };
+      validate_matter_sync_batch: { Args: { p_rows: Json; p_max_rows: number }; Returns: undefined };
+      sync_upsert_matter_items: { Args: LeaseRpcArgs & { p_rows: TablesInsert<"matter_items">[] }; Returns: MatterItem[] };
+      sync_upsert_reading_sessions: { Args: LeaseRpcArgs & { p_rows: TablesInsert<"reading_sessions">[] }; Returns: ReadingSession[] };
+      sync_upsert_matter_tags: { Args: LeaseRpcArgs & { p_rows: TablesInsert<"matter_tags">[] }; Returns: MatterTag[] };
+      sync_upsert_annotations: { Args: LeaseRpcArgs & { p_rows: TablesInsert<"annotations">[] }; Returns: Annotation[] };
+      sync_upsert_daily_stats: { Args: LeaseRpcArgs & { p_rows: TablesInsert<"daily_stats">[] }; Returns: DailyStat[] };
+      sync_replace_item_tags: { Args: LeaseRpcArgs & { p_item_ids: string[]; p_rows: TablesInsert<"item_tags">[] }; Returns: undefined };
+      sync_upsert_stream: { Args: LeaseRpcArgs & { p_state: TablesInsert<"matter_sync_streams"> }; Returns: MatterSyncStream };
+      sync_create_run: { Args: LeaseRpcArgs & { p_started_at: string; p_sync_mode: string }; Returns: SyncRun };
+      sync_update_run: { Args: LeaseRpcArgs & { p_id: string; p_patch: TablesUpdate<"sync_runs"> }; Returns: SyncRun };
       record_app_login_attempt: {
         Args: { p_client_key_hash: string; p_succeeded: boolean; p_limit?: number; p_window_seconds?: number };
         Returns: boolean;
@@ -435,3 +458,5 @@ export type DailyStat = Tables<"daily_stats">;
 export type SyncState = Tables<"sync_state">;
 export type MatterSyncStream = Tables<"matter_sync_streams">;
 export type SyncRun = Tables<"sync_runs">;
+
+export type LeaseRpcArgs = { p_account_scope: string; p_owner: string; p_generation: string };

@@ -1,0 +1,208 @@
+{
+  "nested": [
+    {
+      "selector": ".one.active, .two.active",
+      "declarations": [
+        [
+          "color",
+          "red",
+          false
+        ]
+      ]
+    },
+    {
+      "selector": ".one:hover > .child, .two:hover > .child",
+      "declarations": [
+        [
+          "color",
+          "blue",
+          false
+        ]
+      ]
+    },
+    {
+      "selector": ":is(.one, .other), :is(.two, .other)",
+      "declarations": [
+        [
+          "margin",
+          "0",
+          false
+        ]
+      ]
+    },
+    {
+      "selector": ".one + .one, .two + .two",
+      "declarations": [
+        [
+          "display",
+          "flex",
+          false
+        ]
+      ]
+    }
+  ],
+  "tailwind": [
+    {
+      "selector": ".btn, .link",
+      "declarations": [
+        [
+          "font-weight",
+          "700",
+          false
+        ]
+      ]
+    },
+    {
+      "selector": ".btn:hover, .link:hover",
+      "declarations": [
+        [
+          "text-decoration-line",
+          "underline",
+          false
+        ]
+      ]
+    },
+    {
+      "selector": ".nested:focus",
+      "declarations": [
+        [
+          "--tw-text-opacity",
+          "1",
+          false
+        ],
+        [
+          "color",
+          "rgb(239 68 68 / var(--tw-text-opacity, 1))",
+          false
+        ]
+      ]
+    },
+    {
+      "selector": ".before\\:content-\\[\\'\\2192\\'\\]::before",
+      "declarations": [
+        [
+          "--tw-content",
+          "'→'",
+          false
+        ],
+        [
+          "content",
+          "var(--tw-content)",
+          false
+        ]
+      ]
+    },
+    {
+      "selector": ".hover\\:bg-red-500:hover",
+      "declarations": [
+        [
+          "--tw-bg-opacity",
+          "1",
+          false
+        ],
+        [
+          "background-color",
+          "rgb(239 68 68 / var(--tw-bg-opacity, 1))",
+          false
+        ]
+      ]
+    },
+    {
+      "selector": ".group:hover .group-hover\\:block",
+      "declarations": [
+        [
+          "display",
+          "block",
+          false
+        ]
+      ]
+    },
+    {
+      "selector": ".peer:checked ~ .peer-checked\\:bg-blue-500",
+      "declarations": [
+        [
+          "--tw-bg-opacity",
+          "1",
+          false
+        ],
+        [
+          "background-color",
+          "rgb(59 130 246 / var(--tw-bg-opacity, 1))",
+          false
+        ]
+      ]
+    },
+    {
+      "selector": ".\\[\\&\\:nth-child\\(2\\)\\]\\:text-blue-500:nth-child(2)",
+      "declarations": [
+        [
+          "--tw-text-opacity",
+          "1",
+          false
+        ],
+        [
+          "color",
+          "rgb(59 130 246 / var(--tw-text-opacity, 1))",
+          false
+        ]
+      ]
+    }
+  ],
+  "prefix": [
+    {
+      "selector": ".shell .tw-w-\\[calc\\(100\\%-1rem\\)\\]",
+      "declarations": [
+        [
+          "width",
+          "calc(100% - 1rem)",
+          false
+        ]
+      ]
+    },
+    {
+      "selector": ".shell .tw-font-bold",
+      "declarations": [
+        [
+          "font-weight",
+          "700",
+          false
+        ]
+      ]
+    },
+    {
+      "selector": ".shell .hover\\:tw-text-blue-500:hover",
+      "declarations": [
+        [
+          "--tw-text-opacity",
+          "1",
+          false
+        ],
+        [
+          "color",
+          "rgb(59 130 246 / var(--tw-text-opacity, 1))",
+          false
+        ]
+      ]
+    },
+    {
+      "selector": ".shell .hocus\\:tw-block:hover",
+      "declarations": [
+        [
+          "display",
+          "block",
+          false
+        ]
+      ]
+    },
+    {
+      "selector": ".shell .hocus\\:tw-block:focus",
+      "declarations": [
+        [
+          "display",
+          "block",
+          false
+        ]
+      ]
+    }
+  ]
+}

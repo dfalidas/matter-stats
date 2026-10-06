@@ -6,11 +6,7 @@ import { handleRecentActivityCron, type CronSyncDeps } from "../lib/cron-sync";
 function createDeps(overrides: Partial<CronSyncDeps> = {}): CronSyncDeps {
   return {
     cronSecret: "expected",
-    getAvailability: async () => ({ rateLimitedUntil: null, message: null }),
     syncRecentActivity: async () => ({ ok: true, message: "done" }),
-    createRun: async () => ({ id: "run-1" }),
-    updateRun: async (id) => ({ id }),
-    now: () => new Date("2026-05-22T06:00:00.000Z"),
     ...overrides,
   };
 }
@@ -35,7 +31,6 @@ test("query-string secret or session cookie alone returns 401 before downstream 
   ]) {
     let calls = 0;
     const response = await handleRecentActivityCron(request, createDeps({
-      getAvailability: async () => { calls += 1; return { rateLimitedUntil: null, message: null }; },
       syncRecentActivity: async () => { calls += 1; return { ok: true, message: "done" }; },
     }));
     assert.equal(response.status, 401);
@@ -53,47 +48,23 @@ test("authorized cron request calls sync", async () => {
   assert.equal(called, 1);
 });
 
-test("rate-limited state causes safe skip", async () => {
-  let syncCalled = false;
-  let created = false;
-  const response = await handleRecentActivityCron(
-    new Request("https://example.com/api/cron/sync-recent-activity", { headers: { authorization: "Bearer expected" } }),
-    createDeps({
-      getAvailability: async () => ({ rateLimitedUntil: "2026-05-23T00:00:00.000Z", message: "limited" }),
-      syncRecentActivity: async () => ((syncCalled = true), { ok: true, message: "should not run" }),
-      createRun: async () => ((created = true), { id: "skip-run" }),
-    })
-  );
-  assert.equal(response.status, 200);
-  assert.equal(syncCalled, false);
-  assert.equal(created, true);
-});
-
-test("expired rate limit does not block scheduled sync", async () => {
-  let syncCalled = false;
-  let created = false;
-  const response = await handleRecentActivityCron(
-    new Request("https://example.com/api/cron/sync-recent-activity", { headers: { authorization: "Bearer expected" } }),
-    createDeps({
-      getAvailability: async () => ({ rateLimitedUntil: "2026-05-21T00:00:00.000Z", message: null }),
-      syncRecentActivity: async () => ((syncCalled = true), { ok: true, message: "synced", sessionsSynced: 2 }),
-      createRun: async () => ((created = true), { id: "skip-run" }),
-    })
-  );
-
-  assert.equal(response.status, 200);
-  assert.equal(syncCalled, true);
-  assert.equal(created, false);
-  assert.deepEqual(await response.json(), {
-    ok: true,
-    status: "success",
-    sync_mode: "recent_activity_scheduled",
-    sessions_synced: 2,
-    matter_sessions_returned: 2,
-    skipped_reason: null,
-    message: "synced",
+for (const skippedReason of ["rate_limited", "busy"] as const) {
+  test(`${skippedReason} is a controlled skip delegated to the leased runtime`, async () => {
+    let calls = 0;
+    const response = await handleRecentActivityCron(
+      new Request("https://example.com/api/cron/sync-recent-activity", { headers: { authorization: "Bearer expected" } }),
+      createDeps({ syncRecentActivity: async () => {
+        calls += 1;
+        return { ok: false, skippedReason, message: "skipped", rateLimitedUntil: skippedReason === "rate_limited" ? "2099-01-01T00:00:00Z" : null };
+      } })
+    );
+    assert.equal(response.status, 200);
+    assert.equal(calls, 1);
+    const result = await response.json();
+    assert.equal(result.status, "skipped");
+    assert.equal(result.skipped_reason, skippedReason);
   });
-});
+}
 
 test("cron does not call full-library backfill", async () => {
   let called = 0;

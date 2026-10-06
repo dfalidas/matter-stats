@@ -34,7 +34,11 @@ function harness({ sessions = [], items = [], now = [], legacyCooldown = null } 
   const calls = [];
   const importedSessionIds = new Set();
   let run = 0;
+  let generation = 0;
   const deps = {
+    acquireLease: async () => ({ accountScope: "matter", owner: crypto.randomUUID(), generation: String(++generation) }),
+    renewLease: async () => {},
+    releaseLease: async () => true,
     now: () => new Date(now.shift() ?? "2026-06-01T00:00:00.000Z"),
     getStreams: async () => [...states.values()],
     getLegacyState: async () => ({ rate_limited_until: legacyCooldown }),
@@ -62,6 +66,62 @@ function harness({ sessions = [], items = [], now = [], legacyCooldown = null } 
   return { deps, states, calls, importedSessionIds };
 }
 const page = (results, next = null) => ({ object: "list", results, has_more: next !== null, next_cursor: next });
+
+test("busy account lease denies all trigger modes before any reads, writes or Matter", async () => {
+  for (const mode of ["recent_activity_manual", "recent_activity_scheduled", "backfill_library"]) {
+    const touched = [];
+    const deps = new Proxy({ acquireLease: async () => null }, {
+      get: (target, key) => key in target ? target[key] : async () => { touched.push(key); throw new Error("unexpected work"); },
+    });
+    const result = await syncMatterData(mode, {}, deps);
+    assert.equal(result.skippedReason, "busy");
+    assert.deepEqual(touched, []);
+  }
+});
+
+test("lease infrastructure and invalid context fail closed before Matter or writes", async () => {
+  for (const acquireLease of [async () => { throw new Error("RPC unavailable"); }, async () => ({ accountScope: "matter", owner: "bad", generation: "1" })]) {
+    const h = harness();
+    h.deps.acquireLease = acquireLease;
+    assert.equal((await syncMatterData("backfill_library", {}, h.deps)).ok, false);
+    assert.deepEqual(h.calls, []);
+    assert.equal(h.states.get("library_items").cycle_generation, 0);
+  }
+});
+
+test("delayed upstream response cannot import or complete after renewal fails", async () => {
+  const h = harness();
+  const lease = { accountScope: "matter", owner: crypto.randomUUID(), generation: "7" };
+  let lost = false;
+  let imported = false;
+  let released;
+  const writeContexts = [];
+  h.deps.acquireLease = async () => lease;
+  h.deps.renewLease = async (ctx) => { assert.equal(ctx, lease); if (lost) throw new Error("lease lost"); };
+  h.deps.releaseLease = async (ctx) => { released = ctx; return false; };
+  h.deps.listSessions = async () => { lost = true; return page([{ id: "delayed" }]); };
+  h.deps.importSessions = async () => { imported = true; };
+  h.deps.updateRun = async (_id, _patch, ctx) => { writeContexts.push(ctx); throw new Error("database fence rejects old lease"); };
+  const result = await syncMatterData("recent_activity_scheduled", {}, h.deps);
+  assert.equal(result.ok, false);
+  assert.equal(imported, false);
+  assert.equal(released, lease);
+  assert.deepEqual(writeContexts, [lease]);
+  assert.equal(h.states.get("recent_sessions").completed_watermark, null);
+});
+
+test("exceptions including cancellation compare-release only their invocation context", async () => {
+  for (const name of ["Error", "AbortError"]) {
+    const h = harness();
+    const lease = { accountScope: "matter", owner: crypto.randomUUID(), generation: "3" };
+    const released = [];
+    h.deps.acquireLease = async () => lease;
+    h.deps.getAccount = async () => { throw Object.assign(new Error("cancelled"), { name }); };
+    h.deps.releaseLease = async (ctx) => { released.push(ctx); return true; };
+    assert.equal((await syncMatterData("backfill_library", {}, h.deps)).ok, false);
+    assert.deepEqual(released, [lease]);
+  }
+});
 
 test("production entrypoint resumes manual → scheduled → manual with pinned contract across New Year", async () => {
   const h = harness({ now: ["2026-12-31T23:59:00Z", "2027-01-01T00:01:00Z", "2027-01-02T00:00:00Z"], sessions: [page([{ id: "a" }], "c2"), page([{ id: "b" }], "c3"), page([], null)] });

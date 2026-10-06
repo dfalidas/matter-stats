@@ -128,13 +128,14 @@ async function catalog(projectId, migrationsDir) {
   });
 }
 
-function integrationEnvironment(status) {
+function integrationEnvironment(status, projectId) {
   assert.ok(status.API_URL && status.ANON_KEY && status.SERVICE_ROLE_KEY, "Supabase status omitted required local credentials");
   return sanitizedEnvironment({
     DISPOSABLE_DB_ACK: "yes",
     STABILIZATION_TEST_SUPABASE_URL: status.API_URL,
     STABILIZATION_TEST_SUPABASE_ANON_KEY: status.ANON_KEY,
     STABILIZATION_TEST_SUPABASE_SERVICE_ROLE_KEY: status.SERVICE_ROLE_KEY,
+    STABILIZATION_TEST_SQL_PROJECT: projectId,
   });
 }
 
@@ -144,23 +145,60 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   cli(["start", "--workdir", workdir], { env: sanitizedEnvironment() });
   if (!upgrade) cli(["db", "reset", "--local", "--workdir", workdir], { env: sanitizedEnvironment() });
   let preservation = null;
+  let streamPreservation = null;
   const ownershipMarker = `task05-${projectId}`;
   if (upgrade) {
     containerPsql(projectId, legacySeedSql(ownershipMarker));
     const before = containerPsql(projectId, preservationSql).trim();
-    await copyMigrations(workdir, (filename) => filename.slice(0, 14) > UPGRADE_BASELINE);
+    await copyMigrations(workdir, (filename) => filename.slice(0, 14) > UPGRADE_BASELINE && filename.slice(0, 14) < "20261005000000");
     cli(["migration", "up", "--local", "--workdir", workdir], { env: sanitizedEnvironment() });
+    const streamSnapshotSql = "select jsonb_agg(to_jsonb(s) order by stream)::text from public.matter_sync_streams s;";
+    const streamSeeds = JSON.parse(containerPsql(projectId, streamSnapshotSql));
+    containerPsql(projectId, `update public.matter_sync_streams set cycle_active=true,
+      cursor='${ownershipMarker}-' || stream, cycle_started_at='2026-10-01T00:00:00Z',
+      cycle_generation=41, page_limit=17, completed_watermark='2026-09-01T00:00:00Z',
+      retry_at='2099-01-01T00:00:00Z';`);
+    const streamsBeforeLease = containerPsql(projectId, streamSnapshotSql);
+    await copyMigrations(workdir, (filename) => filename.slice(0, 14) >= "20261005000000");
+    cli(["migration", "up", "--local", "--workdir", workdir], { env: sanitizedEnvironment() });
+    assert.deepEqual(JSON.parse(containerPsql(projectId, streamSnapshotSql)), JSON.parse(streamsBeforeLease), "lease migration changed Task 11 active contracts, generations, watermarks or cooldowns");
+    streamPreservation = "passed";
+    // Restore only the two synthetic contracts this path owns, after verifying
+    // preservation. No unrelated row is overwritten for integration fixtures.
+    for (const seed of streamSeeds) {
+      const restored = containerPsql(projectId, `update public.matter_sync_streams
+        set endpoint='${seed.endpoint}', filters='${JSON.stringify(seed.filters).replaceAll("'", "''")}'::jsonb,
+          page_limit=${seed.page_limit}, cursor=null, cycle_started_at=null,
+          cycle_generation=${seed.cycle_generation}, completed_watermark=null, retry_at=null,
+          cycle_active=false, transition_status='${seed.transition_status}',
+          coverage_window=${seed.coverage_window ? `'${seed.coverage_window}'` : "null"}
+        where stream='${seed.stream}' and cursor='${ownershipMarker}-${seed.stream}' returning stream;`);
+      assert.equal(restored.trim(), seed.stream, "synthetic stream ownership changed; refusing restoration");
+    }
     const after = containerPsql(projectId, preservationSql).trim();
     assertLegacyPreserved(JSON.parse(before), JSON.parse(after));
     preservation = "passed";
   }
   const status = parseStatusEnv(cli(["status", "--workdir", workdir, "-o", "env"], { env: sanitizedEnvironment() }));
   const versions = await catalog(projectId, path.join(workdir, "supabase/migrations"));
-  const runIntegration = () => command(process.execPath, [path.join(repoRoot, "tests/integration/supabase-security.mjs")], { env: integrationEnvironment(status) });
+  let leaseEvidence;
+  const runIntegration = () => {
+    command(process.execPath, [path.join(repoRoot, "node_modules/typescript/bin/tsc"), "-p", "tests/tsconfig.json"], { env: sanitizedEnvironment() });
+    const env = integrationEnvironment(status, projectId);
+    command(process.execPath, [path.join(repoRoot, "tests/integration/supabase-security.mjs")], { env });
+    const output = command(process.execPath, [path.join(repoRoot, "tests/integration/matter-sync-lease.mjs")], { env });
+    const report = JSON.parse(output.trim().split(/\r?\n/).at(-1));
+    assert.equal(report.status, "passed");
+    assert.equal(report.realSqlAndDataApi, true);
+    assert.equal(report.syntheticMatterOnly, true);
+    assert.ok(Array.isArray(report.checks) && report.checks.every((check) => typeof check === "string"));
+    // Copy only the integration report's known, credential-free evidence fields.
+    leaseEvidence = { checks: report.checks, realSqlAndDataApi: true, syntheticMatterOnly: true };
+  };
   if (upgrade) {
     await removeOwnedLegacySingleton({ query: (sql) => Promise.resolve(containerPsql(projectId, sql)), ownershipMarker, runIntegration });
   } else runIntegration();
-  return { name, catalog: "passed", dataApi: "passed", preservation, migrationHistory: versions };
+  return { name, catalog: "passed", dataApi: "passed", accountLeaseSqlAndRuntime: "passed", leaseEvidence, preservation, streamPreservation, migrationHistory: versions };
 }
 
 export async function runStabilizationDatabases({ evidenceRoot = path.join(repoRoot, "artifacts/stabilization-db"), hasDocker = dockerAvailable } = {}) {
@@ -182,11 +220,13 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
   ];
   const started = [];
   const cleanup = [];
+  const results = [];
+  let activePath = "configuration";
   let evidence;
   try {
     for (const stack of stacks) await configureStack(stack.workdir, stack);
-    const results = [];
     for (const stack of stacks) {
+      activePath = stack.name;
       started.push(stack);
       results.push(await verifyPath({ ...stack, upgrade: stack.name === "upgrade" }));
     }
@@ -197,7 +237,11 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
     await writeFile(path.join(evidenceDir, "failure.json"), `${JSON.stringify({
       status: "failed",
       gitSha: sha,
-      message: String(error?.message ?? error).replaceAll(root, "<temporary-root>"),
+      failedPath: activePath,
+      paths: results,
+      // Subprocess stderr can contain generated local credentials. Keep it in
+      // the job diagnostic, never copy arbitrary error text into an artifact.
+      message: "Disposable verification failed; see the workflow job log.",
       cleanup: "pending",
     }, null, 2)}\n`);
     throw error;
@@ -207,8 +251,8 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
         assertDisposableDirectory(stack.workdir);
         cli(["stop", "--workdir", stack.workdir, "--no-backup"], { env: sanitizedEnvironment() });
         cleanup.push({ path: stack.name, status: "stopped" });
-      } catch (error) {
-        cleanup.push({ path: stack.name, status: "failed", error: error.message.replace(root, "<temporary-root>") });
+      } catch {
+        cleanup.push({ path: stack.name, status: "failed", error: "Disposable stack cleanup failed; see the workflow job log." });
       }
     }
     await rm(root, { recursive: true, force: true });

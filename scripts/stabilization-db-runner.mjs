@@ -4,18 +4,19 @@ import { readdir } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { LEASE_FUNCTION_SIGNATURES } from "./matter-sync-lease-inventory.mjs";
 
 export const INVENTORIED_TABLES = [
   "matter_items", "reading_sessions", "matter_tags", "item_tags", "annotations",
   "daily_stats", "sync_runs", "sync_state", "app_sessions", "app_login_attempts",
-  "matter_sync_streams",
+  "matter_sync_streams", "matter_sync_leases",
 ];
 
 export function catalogSql(tables = INVENTORIED_TABLES) {
   const inventory = tables.map((table) => `'${table}'`).join(", ");
   return String.raw`
 DO $catalog$
-DECLARE table_name text; privilege_name text; browser_role text;
+DECLARE table_name text; privilege_name text; browser_role text; function_signature text;
 BEGIN
   FOREACH table_name IN ARRAY ARRAY[${inventory}] LOOP
     IF to_regclass(format('public.%I', table_name)) IS NULL THEN
@@ -25,10 +26,21 @@ BEGIN
       RAISE EXCEPTION 'RLS is disabled on public.%', table_name;
     END IF;
     FOREACH privilege_name IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE'] LOOP
+      IF table_name = 'matter_sync_leases' AND privilege_name IN ('INSERT', 'DELETE') THEN
+        IF has_table_privilege('service_role', 'public.matter_sync_leases', privilege_name) THEN
+          RAISE EXCEPTION 'service_role can reset durable lease via %', privilege_name;
+        END IF;
+        CONTINUE;
+      END IF;
       IF NOT has_table_privilege('service_role', format('public.%I', table_name), privilege_name) THEN
         RAISE EXCEPTION 'service_role lacks % on public.%', privilege_name, table_name;
       END IF;
     END LOOP;
+    IF EXISTS (SELECT 1 FROM pg_class c,
+        LATERAL aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) a
+        WHERE c.oid = to_regclass(format('public.%I', table_name)) AND a.grantee = 0) THEN
+      RAISE EXCEPTION 'PUBLIC retains table privilege on public.%', table_name;
+    END IF;
     IF has_table_privilege('anon', format('public.%I', table_name), 'SELECT,INSERT,UPDATE,DELETE')
        OR has_table_privilege('authenticated', format('public.%I', table_name), 'SELECT,INSERT,UPDATE,DELETE') THEN
       RAISE EXCEPTION 'browser role retains CRUD privilege on public.%', table_name;
@@ -40,6 +52,27 @@ BEGIN
         END IF;
       END LOOP;
     END LOOP;
+  END LOOP;
+  IF has_table_privilege('service_role', 'public.matter_sync_leases', 'TRUNCATE') THEN
+    RAISE EXCEPTION 'service_role can truncate durable lease';
+  END IF;
+  FOREACH function_signature IN ARRAY ARRAY[${LEASE_FUNCTION_SIGNATURES.map((signature) => `'public.${signature}'`).join(", ")}] LOOP
+    IF to_regprocedure(function_signature) IS NULL THEN
+      RAISE EXCEPTION 'missing lease function %', function_signature;
+    END IF;
+    IF NOT has_function_privilege('service_role', function_signature, 'EXECUTE')
+       OR has_function_privilege('anon', function_signature, 'EXECUTE')
+       OR has_function_privilege('authenticated', function_signature, 'EXECUTE') THEN
+      RAISE EXCEPTION 'invalid execution grants for %', function_signature;
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_proc p,
+        LATERAL aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+        WHERE p.oid = to_regprocedure(function_signature) AND a.grantee = 0) THEN
+      RAISE EXCEPTION 'PUBLIC retains EXECUTE on %', function_signature;
+    END IF;
+    IF (SELECT prosecdef OR NOT coalesce('search_path=""' = ANY(proconfig), false) FROM pg_proc WHERE oid = to_regprocedure(function_signature)) THEN
+      RAISE EXCEPTION 'lease function must be invoker with empty search_path: %', function_signature;
+    END IF;
   END LOOP;
   IF to_regprocedure('public.set_updated_at()') IS NULL
      OR to_regprocedure('public.record_app_login_attempt(text,boolean,integer,integer)') IS NULL THEN

@@ -27,6 +27,7 @@ Apply every SQL file in `supabase/migrations` in filename/timestamp order:
 10. `20260929010000_atomic_login_limiter.sql`
 11. `20261004000000_add_independent_sync_stream_cycles.sql`
 12. `20261004010000_preserve_sync_cooldown_and_window.sql`
+13. `20261005000000_matter_account_lease_fencing.sql`
 
 The two `20260929` migrations must both succeed **before** deploying code that performs login. The first creates `public.app_sessions` and `public.app_login_attempts` and declares the table RLS/grant policy. The second defines:
 
@@ -93,7 +94,7 @@ It calls `GET /api/cron/sync-recent-activity`. Authorization is exclusively:
 Authorization: Bearer <CRON_SECRET>
 ```
 
-A missing or incorrect Bearer value receives HTTP 401. There is no supported query-string secret. This endpoint performs bounded recent-activity sync and may skip work while the stored Matter rate limit is active. It does not guarantee full backfill, exhaustive continuation, or concurrent-invocation safety; those remain stabilization work.
+A missing or incorrect Bearer value receives HTTP 401. There is no supported query-string secret. This endpoint performs bounded recent-activity sync and may skip work while the stored Matter rate limit is active. The Task 12 runtime excludes concurrent sync invocations through the database account lease. Busy/cooldown invocations return HTTP 200 with `status=skipped` and no Matter calls or stream/run writes. Full backfill and exhaustive continuation remain separate work.
 
 ## 5. Verify the deployed release
 
@@ -113,8 +114,50 @@ Observed Matter sessions may have a null item link. That supports time and sessi
 
 Changing `APP_ACCESS_PASSWORD` should be paired with incrementing `APP_CREDENTIAL_VERSION` so previously issued database-backed sessions fail validation. Rotate Matter, cron, and Supabase credentials according to their providers' procedures and only with operational approval. A configuration change requires redeployment.
 
-For Task 11 runtime rollback, deploy the prior application first; it continues using retained `sync_state`. The additive `matter_sync_streams` table may remain. Dropping it discards only cycle/retry metadata (not imported Matter data) and requires an approved destructive migration. Do not disable RLS or delete imported rows as rollback.
+After Task 12, a rollback to any unfenced Task 11/earlier runtime requires the disable/drain sequence below; never simply run old and new sync versions together. The older runtime can use retained `sync_state`. The additive `matter_sync_streams` table may remain. Dropping it discards only cycle/retry metadata (not imported Matter data) and requires an approved destructive migration. Do not disable RLS or delete imported rows as rollback.
 
 ## Open work and external verification
 
 Security dependency patching, reliable sync continuation/concurrency, complete database queries, streak/word/timezone consistency, repair tooling, and CI are not completed by the interface redesign. Production compatibility, actual migration state, Data API permissions, RPC concurrency, cron delivery, live Matter payloads, stored-data correctness, and the deployed SHA remain externally verified facts, not repository guarantees.
+
+## Task 12 rollout and rollback compatibility
+
+The Task 12 additive migration preserves imported rows, durations/timestamps,
+stream request contracts/cursors, cycle generations, watermarks and cooldowns.
+It creates one `matter` lease row at generation 0 and 14 service-only RPCs/helpers.
+The runtime uses a fixed 120-second TTL; SQL allows validated 30–300 seconds.
+No environment variables, dependencies, authentication providers or cron cadence
+change. Do not delete/recreate/truncate the lease row or reset generation.
+
+For an authorized rollout, first disable sync ingress on **every** old deployment
+and invocation source: pause cron delivery at the hosting layer, restrict access
+to the cron URL, and block manual sync actions/old deployment URLs (including
+previews and local jobs) using deployment protection or an operational access
+block. This is a temporary operational stop, not a change to the daily schedule.
+Drain in-flight old executions and verify that none remain. If they cannot be
+reliably drained, keep ingress disabled and stop the old deployment/jobs. Merely
+waiting one lease TTL does not drain old code, which never acquired a lease.
+
+Apply all migrations in order, ending with
+`20261005000000_matter_account_lease_fencing.sql`. Verify the catalog and both
+fresh/upgrade disposable SQL/Data API/runtime suites, then deploy the reviewed
+fenced runtime with ingress still disabled. Confirm all sync writers use it
+before re-enabling manual actions and the existing `0 6 * * *` UTC cron. Keep old
+unfenced deployment URLs/jobs unable to sync. The migration alone leaves the
+service role's existing domain-table privileges intact and **does not fence old
+ordinary Supabase writes**. Its new lease/RPC objects protect cooperating Task 12
+writers; old code must not run concurrently.
+
+For code rollback, disable all sync ingress again, drain/stop the fenced runtime,
+and verify no worker remains. Unexpired fenced leases may be compare-released by
+their owner or allowed to expire. If rolling back to an unfenced version, ensure
+that no fenced writer can resume before enabling old sync ingress. Leave the
+additive migration, RLS and generation history in place. Prefer rolling forward;
+never disable RLS or delete rows to recover. Removing the migration would require
+a separately reviewed destructive change and is not a rollback step here.
+
+A failed lease RPC or a missing migration fails closed: no fallback table write
+or Matter request is made. A slow request may outlast the TTL and be discarded;
+an abandoned run may retain `running` status. Task 13's page/marker transaction,
+and Tasks 14–15 continuation/backfill/shared-quota work, remain separate release
+work. Neither a successful build nor mock tests establish real database fencing.

@@ -71,6 +71,89 @@ The first sessions cycle uses the explicitly selected coverage lower bound. A ge
 
 The legacy singleton did not persist its page limit, so a complete active request contract cannot be reconstructed. Migration creates both streams with a `legacy_recoverable_restart` marker, no cursor, and no claimed completed watermark. Existing imported domain rows are preserved.
 
+## Account lease and fencing (Task 12 / E2 / W4 / R4)
+
+All three triggers acquire the same `matter` account scope in
+`public.matter_sync_leases`, before reading/resuming a cycle, creating a run or
+calling Matter. The scope is a fixed single-account identifier, never the API
+token. Every invocation generates a UUID owner. An occupied, unexpired lease
+returns a controlled `busy` result with no upstream requests or protected writes;
+cron returns HTTP 200 with `status=skipped` and `skipped_reason=busy`. Active
+account cooldowns similarly skip inside the leased runtime without creating a
+run. Authentication remains before invocation: the manual action validates its
+app session and cron validates its Bearer secret before any lease operation.
+
+The durable row stores `owner`, `expires_at` and BIGINT `generation`. Acquisition
+locks that row and samples `clock_timestamp()` **after** lock acquisition. Only
+release/expiry permits a new owner; every acquisition increments generation.
+Renewal keeps generation and requires matching scope, owner and generation plus
+an unexpired lease. Release applies that same comparison, clears owner/expiry,
+and retains generation. An expired owner cannot revive or release the lease.
+`service_role` has SELECT/UPDATE but no INSERT/DELETE/TRUNCATE on this table, so
+it cannot delete/recreate the durable row. Administrative direct writes are a
+trusted boundary, not a lease-aware interface. Application contexts carry the
+BIGINT as decimal text to avoid JavaScript integer precision loss. Stream
+`cycle_generation` continues to identify cycles independently.
+
+The runtime TTL is **120 seconds**, with SQL input validation of **30–300
+seconds**, including explicit rejection of NULL. There is no new configuration
+variable. Renewal occurs before and after account/page/item/annotation requests,
+after Matter pacing and immediately before each actual HTTP fetch, before each
+100-row mutation batch, before each rollup calculation and each rollup batch.
+Annotation pagination has a guarded request for every page. Renewal failure or
+infrastructure failure stops the invocation; a response arriving after expiry
+cannot be imported. No background timer is required: a request taking longer
+than the TTL causes the invocation to stop at its response boundary. Catch and
+finally continue to use the original owner/generation; they cannot mutate state
+or release a successor's lease. Process crashes recover through expiry. A lost
+lease can leave its run marked `running`; reconciling abandoned run records is
+not implemented here.
+
+Each production mutation below is one fixed-purpose RPC. Every RPC first calls
+`assert_matter_sync_lease`, which locks the singleton with `FOR UPDATE`, validates
+ownership/expiry, and retains the lock until the **same transaction containing
+the mutation** ends. Acquisition/renewal/release use that same row. A mutation
+validated before expiry may finish while holding the lock; takeover must wait
+for it to commit. A worker that checked ownership earlier in application code
+still must pass this transactional validation for its actual write. There are
+no SQL transactions, row locks or advisory locks across Matter requests.
+
+| Actual mutation path | Fenced database operation |
+| --- | --- |
+| Stream start/resume, cursor, cycle completion, watermark, coverage intent and catch-path cooldown | `sync_upsert_stream` |
+| Linked-item placeholders, fetched/embedded enrichment and library items | `sync_upsert_matter_items` |
+| Reading-session import | `sync_upsert_reading_sessions` |
+| Tags and annotations, including optional enrichment | `sync_upsert_matter_tags`, `sync_upsert_annotations` |
+| Item-tag removal/replacement | `sync_replace_item_tags` (both statements in its own transaction, max 100 item IDs) |
+| Recalculation and date-range helper's rollup batches | `sync_upsert_daily_stats` |
+| Run creation, successful completion and error/cancellation catch paths | `sync_create_run`, `sync_update_run` |
+
+Run IDs equal invocation UUIDs; run patches require `p_id=p_owner`, without
+rewriting old runs or adding metadata columns to them. The cron wrapper performs
+no independent database writes. The legacy `sync_state` remains read-only for
+cooldown compatibility; unused unfenced sync-state/item-tag mutation exports were
+removed. Missing/invalid lease contexts are rejected before client operations.
+There is no ordinary table mutation fallback when an RPC is missing or fails.
+The SQL operations name fixed relations/columns and use typed record conversion;
+there is no arbitrary table-name or SQL mutation API. Batches are bounded to 100
+rows, except tag replacement's bounded 10,000 links across at most 100 items.
+
+All 14 new functions, including `assert_matter_sync_lease` and
+`validate_matter_sync_batch`, are SECURITY INVOKER with empty `search_path` and
+qualified relation/function references. Exact signature grants revoke PUBLIC,
+`anon` and `authenticated` execution and allow only `service_role`. The new
+exposed-schema table has RLS enabled and browser/PUBLIC access revoked. See the
+catalog inventory in `scripts/matter-sync-lease-inventory.mjs` and the release
+runbook for real permission-denial evidence requirements.
+
+**Known boundary:** fencing protects each existing mutation transaction, not an
+entire page. Items, tags, annotations, sessions, rollups, stream state and run
+status still commit separately. Earlier committed work may remain after failure;
+retries resume/replay the durable cycle. Task 13 must implement an entire page
+plus checkpoint and dirty-rollup marker atomically. Tasks 14–15 retain the
+continuation/backfill/shared-quota work. No new queue, scheduler, historical
+repair, multi-tenant model or metric change is introduced.
+
 ## Database and release order
 
 Apply every file in `supabase/migrations` in timestamp order. The login schema specifically requires:
@@ -80,6 +163,7 @@ Apply every file in `supabase/migrations` in timestamp order. The login schema s
 3. Only after both migrations succeed should application code that calls that RPC be deployed.
 4. `20261004000000_add_independent_sync_stream_cycles.sql` adds the protected stream-cycle rows and must precede Task 11 runtime code.
 5. `20261004010000_preserve_sync_cooldown_and_window.sql` preserves the legacy account cooldown and adds explicit session-window intent; it must also precede Task 11 runtime code.
+6. `20261005000000_matter_account_lease_fencing.sql` adds the singleton lease and its 14 invoker RPCs/helpers; it must precede Task 12 runtime. Disable and drain all old unfenced writers before enabling the new runtime; an additive migration alone cannot fence old ordinary table writes.
 
 The SQL expresses the intended RLS and grant policy, and the TypeScript implements service-role-only access. That is not evidence that production has applied the migrations. Fresh and upgrade migration runs, Data API denial for `anon`/`authenticated`, service-role allowance, and the RPC's behavior under real concurrent database calls must be verified separately in an isolated Supabase environment. Unit-test mocks do not establish those properties.
 
@@ -98,7 +182,7 @@ The SQL expresses the intended RLS and grant policy, and the TypeScript implemen
 The merged interface redesign does not complete the stabilization plan. Remaining work includes:
 
 - review official advisories and apply the smallest supported security dependency patches;
-- reliable sync continuation, leases/concurrency control, and large-history behavior;
+- reliable sync continuation and large-history behavior; Task 12 ownership requires isolated SQL/Data API verification before release;
 - complete/paginated database queries rather than implicit Data API result limits;
 - historical timezone rollup repair and reconciliation;
 - repair/rebuild tooling for derived data and interrupted sync state; and
