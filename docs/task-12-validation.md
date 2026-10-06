@@ -43,9 +43,31 @@ the full report has **8 high development-only entries**, all under the existing
 GHSA-vfj7-8cjw-p6xm allowance. Neither new advisory is present. No exception or
 audit assertion was added or weakened, and no forced audit fix was used.
 
-Exact-head regular CI and both real database paths will be recorded here after
-the updated branch finishes verification. Earlier failed audit runs below are
-historical evidence, not the result for these patched dependencies.
+Completed security implementation verification:
+**`ce740d19c1d775b8eadcee67d57bdc3913f8d072`**, tree
+`0e27b09cbcb2374652ed7ae5cdcb46df62fddd8c`.
+
+| Gate | Actual GitHub result |
+| --- | --- |
+| [Regular CI](https://github.com/dfalidas/matter-stats/actions/runs/37450455453/job/112225477529) | **Passed**: npm ci, route type generation, typecheck, lint, tests, build and audit. Node 22.23.3 / npm 10.9.9. **231 tests: 228 passed, 0 failed/cancelled/skipped, 3 existing TODO.** |
+| [Real fresh/upgrade database job](https://github.com/dfalidas/matter-stats/actions/runs/37450455453/job/112225477256) | **Passed**: `DISPOSABLE_DB_ACK=yes npm run test`; both fresh and upgrade paths, their catalog/security/SQL/Data API/runtime suites and cleanup. **2 passed, 0 failed/blocked/skipped.** |
+| [Retained audit JSON](https://github.com/dfalidas/matter-stats/actions/runs/37450455453/artifacts/11406761751) | Downloaded and inspected: production **0**; full report **8 high, 0 low/moderate/critical**, covered by the unchanged development-only allowance. Both targeted advisories absent. |
+| [Retained database JSON](https://github.com/dfalidas/matter-stats/actions/runs/37450455453/artifacts/11406987375) | Downloaded and inspected: exact SHA above, CLI **2.48.3**, all **13 migrations per path**, **7 completed real acceptance groups per path** (14 total), both owned stacks stopped and temporary directory removed. No JWT/secret keys. |
+
+Each real path ran 24 concurrent Data API and 12 concurrent SQL acquisitions,
+renewal/expiry/compare-release/stale mutation checks, protected-transaction
+takeover serialization, browser denial/service controls, actual import/enrichment/
+item-tag deletion/rollup/stream/runtime paths, delayed success/429 takeover and
+cancellation checks. Upgrade preserved legacy data and Task 11 active contracts,
+cycle generations, watermarks and cooldowns. Group counts are not assertion
+counts; the unit TODOs do not replace these completed real suites.
+
+The subsequent evidence commit changes only this document. Its final-head
+regular CI and both database paths are independently rerun; final head and run
+URLs are recorded in [PR #74](https://github.com/dfalidas/matter-stats/pull/74)
+without creating another documentation commit that would change that head.
+Earlier failed audit runs below are historical evidence, not the result for
+these patched dependencies.
 
 ## Previous GitHub verification gate (historical, 2026-10-06)
 
