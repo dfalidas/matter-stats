@@ -41,6 +41,7 @@ JSON; detailed failures remain in the job log. Missing evidence fails upload.
 | Tested PR head | Regular CI | Database gate |
 | --- | --- | --- |
 | `11c37541e5d92e6a5f10830c39c7493d13d75253` | [Run 37438130816, verify](https://github.com/dfalidas/matter-stats/actions/runs/37438130816/job/112184910717): install, typegen, typecheck, lint, 223 passed / 3 TODO, build passed; audit failed. | [Database job](https://github.com/dfalidas/matter-stats/actions/runs/37438130816/job/112184911017): failed at the fresh lease fixture's JSON key-order comparison; catalog and existing security suite had completed. No fresh/upgrade pass claimed. |
+| `b3c988b6b20627a92dbdadc0457a8298bd4730b5` | [Run 37439204083, verify](https://github.com/dfalidas/matter-stats/actions/runs/37439204083/job/112188468118): install, typegen, typecheck, lint, 224 passed / 3 TODO, build passed; audit failed. | [Database job](https://github.com/dfalidas/matter-stats/actions/runs/37439204083/job/112188468444): failed on the existing sync_mode constraint; no fresh/upgrade pass. |
 
 That first real execution exposed a fixture comparison bug: JSONB returned
 library filter keys in PostgreSQL's order, whereas the fixture used
@@ -49,6 +50,18 @@ and still rejects missing, changed or extra filters; a regression covers these
 cases. The
 [failure artifact](https://github.com/dfalidas/matter-stats/actions/runs/37438130816/artifacts/11399629751)
 was retained, including owned-stack cleanup evidence.
+
+The second execution reached production mutation RPCs and exposed a real run
+label regression: manual/scheduled trigger identities were sent to a database
+column that permits only `recent_activity` or `backfill_library`. The minimal
+runtime correction keeps trigger identities for control flow and uses the
+existing persisted labels for run creation, completion and errors. The valid
+SQL/security fixture now uses `recent_activity`; real runtime readbacks assert
+the manual, scheduled and library labels. No SQL constraint or migration was
+changed. This is a failure found by the requested gate, not additional sync
+functionality. Its
+[sanitized failure artifact](https://github.com/dfalidas/matter-stats/actions/runs/37439204083/artifacts/11400323935)
+was uploaded despite failure.
 
 The new audit report has one high production finding in `source-map-js`,
 [GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q).

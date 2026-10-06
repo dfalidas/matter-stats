@@ -75,7 +75,7 @@ const payloads = (lease) => ({
   sync_upsert_daily_stats: { ...args(lease), p_rows: [daily] },
   sync_replace_item_tags: { ...args(lease), p_item_ids: [item.id], p_rows: [{ item_id: item.id, tag_id: tag.id }] },
   sync_upsert_stream: { ...args(lease), p_state: streamState("recent_sessions", `${prefix}-cursor`) },
-  sync_create_run: { ...args(lease), p_started_at: "2200-01-02T09:00:00Z", p_sync_mode: "recent_activity_manual" },
+  sync_create_run: { ...args(lease), p_started_at: "2200-01-02T09:00:00Z", p_sync_mode: "recent_activity" },
   sync_update_run: { ...args(lease), p_id: lease.owner, p_patch: { status: "error", error_message: "synthetic" } },
 });
 async function snapshot() {
@@ -253,10 +253,14 @@ try {
 
   // Successful session import calls linked-item lookup, annotation import,
   // item-tag replacement and daily rollup writes on the real runtime path.
-  assert.equal((await syncMatterData("recent_activity_manual", {}, deps)).ok, true);
+  const manualRun = await syncMatterData("recent_activity_manual", {}, deps);
+  assert.equal(manualRun.ok, true);
+  assert.equal((await service.from("sync_runs").select("sync_mode").eq("id", manualRun.syncRunId).single()).data.sync_mode, "recent_activity");
   assert.equal((await service.from("daily_stats").select("words_read").eq("date", daily.date).single()).data.words_read, 225);
   const sessionCycle = (await snapshot()).matter_sync_streams.find((row) => row.stream === "recent_sessions");
-  assert.equal((await syncMatterData("backfill_library", {}, deps)).ok, true);
+  const libraryRun = await syncMatterData("backfill_library", {}, deps);
+  assert.equal(libraryRun.ok, true);
+  assert.equal((await service.from("sync_runs").select("sync_mode").eq("id", libraryRun.syncRunId).single()).data.sync_mode, "backfill_library");
   assert.deepEqual((await snapshot()).matter_sync_streams.find((row) => row.stream === "recent_sessions"), sessionCycle);
   assert.equal((await service.from("item_tags").select("*").eq("item_id", item.id)).data.length, 0, "library tags replaced with empty set");
   checks.push("B/H: production trigger exclusion, linked imports/rollup/tag deletion, and independent stream state verified");
@@ -286,6 +290,7 @@ try {
     assert.equal(matterRequests, contendedRequests);
     assert.deepEqual(await snapshot(), contendedState);
     const stored = await readLease(); a = { owner: stored.owner, generation: String(stored.generation) }; leases.push(a);
+    assert.equal((await service.from("sync_runs").select("sync_mode").eq("id", stored.owner).single()).data.sync_mode, "recent_activity");
     await expire(a); b = await acquire(); assert.ok(b); leases.push(b);
     const checkpoint = await snapshot();
     unblock(); assert.equal((await running).ok, false);

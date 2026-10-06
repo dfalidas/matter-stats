@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util";
+
 export async function attemptTrackedWrite(attempts, attempt, write) {
   attempts.push(attempt);
   return await write();
@@ -120,4 +122,3 @@ export async function verifyLimiterGroups(groups) {
     throw new AggregateError(failures, `Limiter verification failed for ${failures.length} group(s): ${details}`);
   }
 }
-import { isDeepStrictEqual } from "node:util";

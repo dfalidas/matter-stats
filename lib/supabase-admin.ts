@@ -141,7 +141,7 @@ export async function upsertMatterSyncStream(state: TablesInsert<"matter_sync_st
 
 export async function createSyncRun(syncRun: TablesInsert<"sync_runs">, lease: MatterSyncLease) {
   const { data, error } = await getSupabaseAdminClient().rpc("sync_create_run", {
-    ...leaseRpcArgs(lease), p_started_at: syncRun.started_at ?? new Date().toISOString(), p_sync_mode: syncRun.sync_mode ?? "recent_activity_manual",
+    ...leaseRpcArgs(lease), p_started_at: syncRun.started_at ?? new Date().toISOString(), p_sync_mode: syncRun.sync_mode ?? "recent_activity",
   });
   if (error?.code === "55000") throw new MatterSyncLeaseLostError();
   if (error) throw error;

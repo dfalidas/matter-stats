@@ -195,6 +195,8 @@ export async function syncMatterData(
   let syncRunId: string | null = null;
   let storedState: MatterSyncStream | null = null;
   let activeCycle: ActiveMatterCycle | null = null;
+  // Trigger identities share the existing recent_activity database run label.
+  const runMode = isRecentActivityMode(mode) ? "recent_activity" : mode;
 
   try {
     lease = await deps.acquireLease();
@@ -222,7 +224,7 @@ export async function syncMatterData(
     }
 
     const startedAt = invocationNow.toISOString();
-    const syncRun = await deps.createRun({ status: "running", started_at: startedAt, sync_mode: mode }, lease);
+    const syncRun = await deps.createRun({ status: "running", started_at: startedAt, sync_mode: runMode }, lease);
     syncRunId = syncRun.id;
 
     const recentActivitySince = isRecentActivityMode(mode) ? getRecentActivityWindowStart(new Date(startedAt), options.recentActivityWindow) : null;
@@ -260,7 +262,7 @@ export async function syncMatterData(
       sessions_synced: counts.sessions,
       annotations_synced: counts.annotations,
       tags_synced: counts.tags,
-      sync_mode: mode,
+      sync_mode: runMode,
       matter_requests_count: diagnostics.requestCount,
       matter_sessions_returned: diagnostics.sessionsReturned,
       matter_items_returned: diagnostics.itemsReturned,
@@ -307,7 +309,7 @@ export async function syncMatterData(
           status: "error",
           finished_at: new Date().toISOString(),
           error_message: sanitizedError,
-          sync_mode: mode,
+          sync_mode: runMode,
           checkpoint_timestamp: null,
         }, lease);
       } catch (updateError) {
