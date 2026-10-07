@@ -209,11 +209,11 @@ try {
   const dailyRow = { date, reading_time_seconds: 60, words_read: 225, sessions_count: 1, items_read_count: 1, highlights_count: 1, top_source: "old.example" };
   assert.equal(await rpc("ack_matter_rollup", { ...leaseArgs(activeLease), p_date: date, p_revision: marker1.revision, p_timezone: marker1.timezone, p_row: dailyRow }), false);
   assert.equal((await read("matter_dirty_rollups")).find((r) => r.date === date).revision, marker2.revision);
-  const staleBefore = await snapshot(); assert.equal((await service.rpc("commit_matter_page", first)).error?.code, "40001"); assert.deepEqual(await snapshot(), staleBefore);
+  const staleBefore = await snapshot(); assert.equal((await service.rpc("commit_matter_page", first)).error?.code, "PT409"); assert.deepEqual(await snapshot(), staleBefore);
   const loopState = (await read("matter_sync_streams")).find((s) => s.stream === "library_items");
   await rpc("commit_matter_page", await commitArgs(activeLease, loopState, emptyPlan(), crypto.randomUUID(), stateNow.cursor));
   const loopBefore = await snapshot();
-  assert.equal((await service.rpc("commit_matter_page", first)).error?.code, "40001", "reused opaque cursor must not admit delayed old page");
+  assert.equal((await service.rpc("commit_matter_page", first)).error?.code, "PT409", "reused opaque cursor must not admit delayed old page");
   assert.deepEqual(await snapshot(), loopBefore);
   checks.push("Exact page replay is read-only; delayed old page rejects; metadata dates dirty; older acknowledgement cannot clear newer same-lease revision");
 

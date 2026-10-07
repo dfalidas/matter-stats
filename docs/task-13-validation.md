@@ -90,3 +90,8 @@ Sources: [functions](https://supabase.com/docs/guides/database/functions),
 Replay also compares the receipt that preceded preparation, so an old page cannot
 be accepted if an opaque cursor value recurs within the same cycle. The latest
 receipt remains bounded; a reused-cursor SQL regression verifies this guard.
+Stale contract conflicts use `PT409`, not `40001`: the current official
+[PostgREST retry advisory](https://supabase.com/docs/guides/troubleshooting/high-cpu-and-infinite-transaction-retries-when-using-custom-error-codes-in-rpc-functions-77326b)
+documents infinite retries for deliberately raised serialization failures in
+PostgREST 14. The disposable Data API gate exposed this behavior; contract
+conflicts now return a bounded HTTP 409 without retrying the SQL transaction.

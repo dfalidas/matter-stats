@@ -80,7 +80,7 @@ begin
     raise exception 'Invalid page request contract' using errcode='22023';
   end if;
   select * into current_stream from public.matter_sync_streams where stream=expected.stream for update;
-  if not found then raise exception 'Missing stream' using errcode = '40001'; end if;
+  if not found then raise exception 'Missing stream' using errcode = 'PT409'; end if;
   fingerprint := md5(jsonb_build_object('previous',p_previous_receipt_id,'expected',p_expected,'plan',p_plan,'more',p_has_more,'next',p_next_cursor,'timezone',p_timezone)::text);
   select * into receipt from public.matter_page_receipts where stream=expected.stream;
   if receipt.receipt_id = p_receipt_id then
@@ -90,7 +90,9 @@ begin
   if receipt.receipt_id is distinct from p_previous_receipt_id or current_stream.cycle_active is distinct from true or
     row(current_stream.endpoint,current_stream.filters,current_stream.page_limit,current_stream.cursor,current_stream.cycle_started_at,current_stream.cycle_generation,current_stream.completed_watermark,current_stream.coverage_window,current_stream.transition_status)
     is distinct from row(expected.endpoint,expected.filters,expected.page_limit,expected.cursor,expected.cycle_started_at,expected.cycle_generation,expected.completed_watermark,expected.coverage_window,expected.transition_status) then
-    raise exception 'Stale or divergent page transition' using errcode = '40001';
+    -- A contract conflict is permanent for this request, not a serialization
+    -- failure: 40001 can trigger infinite retries in PostgREST 14.
+    raise exception 'Stale or divergent page transition' using errcode = 'PT409';
   end if;
   -- Only known operations and fields; never table-name or SQL arguments.
   perform public.validate_matter_page_rows(p_plan->'placeholders','items');
