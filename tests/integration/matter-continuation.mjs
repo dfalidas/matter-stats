@@ -36,7 +36,7 @@ const originalResolve = Module._resolveFilename;
 const originalFetch = globalThis.fetch;
 const checks = [];
 const ownedRuns = new Set();
-let originalStreams, originalIntent, initialRuns, authUser, activeLease, ready = false;
+let originalStreams, originalIntent, originalDailyStats, initialRuns, authUser, activeLease, ready = false;
 let runtime, upstream;
 const page = (results = [], next = null) => ({ object: "list", results, has_more: next !== null, next_cursor: next });
 const limits = { pages: 8, requests: 224, upstreamMs: 90000, totalMs: 150000, requestMs: 10000 };
@@ -61,10 +61,11 @@ async function worker(mode, now, limit = 99, loseTerminal = false) {
 }
 try {
   originalStreams = await read("matter_sync_streams"); originalIntent = (await read("matter_sync_continuation"))[0];
+  originalDailyStats = await read("daily_stats");
   initialRuns = new Set((await read("sync_runs")).map((r) => r.id));
   assert.equal(originalIntent.history_status, "none"); assert.equal((await read("matter_sync_leases"))[0].owner, null);
   assert.equal((await read("matter_page_receipts")).length, 0); assert.equal((await read("matter_dirty_rollups")).length, 0);
-  assert.equal((await read("daily_stats")).length, 0); ready = true;
+  ready = true;
   activeLease = await acquire();
   // A completed narrow incremental watermark must not suppress full enumeration.
   await rpc("sync_upsert_stream", { ...args(activeLease), p_state: { ...originalStreams.find((s)=>s.stream === "recent_sessions"), completed_watermark: "2026-12-15T00:00:00Z", coverage_window: "current_year" } });
@@ -231,11 +232,17 @@ try {
       for (const state of originalStreams) await rpc("sync_upsert_stream",{...args(activeLease),p_state:state});
       assertSuccessful(await service.from("matter_page_receipts").delete().in("stream",["recent_sessions","library_items"]),"receipts cleanup");
       await sql(`delete from public.matter_dirty_rollups where date in (select distinct (started_at at time zone 'Europe/Athens')::date from public.reading_sessions where id like '${prefix}%'); delete from public.daily_stats where date in (select distinct (started_at at time zone 'Europe/Athens')::date from public.reading_sessions where id like '${prefix}%'); delete from public.reading_sessions where id like '${prefix}%'; delete from public.matter_items where id like '${prefix}%';`);
+      // Restore aggregates present before the owned fixture, including dates
+      // touched by its multi-year sessions. INSERT preserves exact timestamps;
+      // an UPSERT would invoke the updated_at trigger on the legacy row.
+      const originalDailyJson = JSON.stringify(originalDailyStats).replaceAll("'", "''");
+      await sql(`insert into public.daily_stats select restored.* from jsonb_populate_recordset(null::public.daily_stats, '${originalDailyJson}'::jsonb) restored where not exists (select 1 from public.daily_stats current where current.date=restored.date);`);
       if (ownedRuns.size) assertSuccessful(await service.from("sync_runs").delete().in("id",[...ownedRuns]),"owned runs cleanup");
     } finally { await release(activeLease); activeLease=null; }
     assert.deepEqual((await read("matter_sync_continuation"))[0],originalIntent);
     assert.equal(await sql(`select count(*) from public.reading_sessions where id like '${prefix}%';`),"0");
     assert.equal((await read("matter_dirty_rollups")).length,0);
+    assert.deepEqual((await read("daily_stats")).sort((a,b)=>a.date.localeCompare(b.date)),originalDailyStats.sort((a,b)=>a.date.localeCompare(b.date)),"exact legacy aggregate restoration");
     if (authUser) assertSuccessful(await service.auth.admin.deleteUser(authUser),"Auth cleanup");
   }
 }
