@@ -1,0 +1,240 @@
+{
+  "ci": {
+    "gitSha": "63e82b0748d1507b4d0c1977eab100f0c2dd4bcb",
+    "verificationOutcome": "success",
+    "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37607515359",
+    "runAttempt": "1"
+  },
+  "results": {
+    "status": "passed",
+    "gitSha": "63e82b0748d1507b4d0c1977eab100f0c2dd4bcb",
+    "supabaseCli": "2.48.3",
+    "paths": [
+      {
+        "name": "fresh",
+        "catalog": "passed",
+        "dataApi": "passed",
+        "accountLeaseSqlAndRuntime": "passed",
+        "leaseEvidence": {
+          "checks": [
+            "A: 24 concurrent Data API acquisitions admit exactly one owner",
+            "G: every lease table/RPC/helper grant denied to both browser roles; service controls succeed",
+            "C/D/E/F: renewal, invalid TTL, expiry recovery, every stale write, success/cooldown, and compare-release verified",
+            "A SQL: 12 concurrent psql transactions admit one owner",
+            "E SQL: protected RPC transaction serializes takeover through commit",
+            "B/H: production trigger exclusion, linked imports/rollup/tag deletion, and independent stream state verified",
+            "E/F: delayed success and 429 responses after takeover are fenced; cancellation releases own lease"
+          ],
+          "realSqlAndDataApi": true,
+          "syntheticMatterOnly": true
+        },
+        "atomicPageAndRollupRecovery": "passed",
+        "pageEvidence": {
+          "checks": [
+            "Both real import paths: preparation and checkpoint failures roll back all page effects; session SQL failure after item/tag/annotation writes is atomic",
+            "Rollup persistence failure preserves dirty work and committed cursor; later empty terminal page recovers and completes fixed watermark",
+            "Library path commits joins/receipt/checkpoint independently; lost real SQL response retries identical receipt without duplicate rows or cursor rewind",
+            "Exact page replay is read-only; delayed old page rejects; metadata dates dirty; older acknowledgement cannot clear newer same-lease revision",
+            "Updated sessions/annotations dirty old and new APP_TIMEZONE dates across UTC/local boundary; unchanged rows preserve pending revisions",
+            "Oversized/unknown-field payloads reject without writes; expiry/takeover rejects stale page and rollup acknowledgement without changing successor state",
+            "Real anon/authenticated deny reads/writes and all four exact RPCs; intended service page/marker/helper operations succeed",
+            "Interrupted acknowledgement retains dirty revision; bounded production recovery processes 32 dates and retains remaining 8 for next call",
+            "Both SQL acknowledgements lost: later invocation recovers durable dirty work and resumes committed cursor without duplicate sessions/joins",
+            "Real embedded items, optional 403/404, insert-only placeholders, unlinked sessions and sanitized per-row skips preserve accepted import contract"
+          ],
+          "realSqlAndDataApi": true,
+          "syntheticMatterOnly": true,
+          "cleanup": "passed"
+        },
+        "preservation": null,
+        "streamPreservation": null,
+        "leasePreservation": null,
+        "migrationHistory": [
+          "20260513000000",
+          "20260514000000",
+          "20260515000000",
+          "20260515010000",
+          "20260515020000",
+          "20260515030000",
+          "20260518000000",
+          "20260519090000",
+          "20260929000000",
+          "20260929010000",
+          "20261004000000",
+          "20261004010000",
+          "20261005000000",
+          "20261007085051"
+        ]
+      },
+      {
+        "name": "upgrade",
+        "catalog": "passed",
+        "dataApi": "passed",
+        "accountLeaseSqlAndRuntime": "passed",
+        "leaseEvidence": {
+          "checks": [
+            "A: 24 concurrent Data API acquisitions admit exactly one owner",
+            "G: every lease table/RPC/helper grant denied to both browser roles; service controls succeed",
+            "C/D/E/F: renewal, invalid TTL, expiry recovery, every stale write, success/cooldown, and compare-release verified",
+            "A SQL: 12 concurrent psql transactions admit one owner",
+            "E SQL: protected RPC transaction serializes takeover through commit",
+            "B/H: production trigger exclusion, linked imports/rollup/tag deletion, and independent stream state verified",
+            "E/F: delayed success and 429 responses after takeover are fenced; cancellation releases own lease"
+          ],
+          "realSqlAndDataApi": true,
+          "syntheticMatterOnly": true
+        },
+        "atomicPageAndRollupRecovery": "passed",
+        "pageEvidence": {
+          "checks": [
+            "Both real import paths: preparation and checkpoint failures roll back all page effects; session SQL failure after item/tag/annotation writes is atomic",
+            "Rollup persistence failure preserves dirty work and committed cursor; later empty terminal page recovers and completes fixed watermark",
+            "Library path commits joins/receipt/checkpoint independently; lost real SQL response retries identical receipt without duplicate rows or cursor rewind",
+            "Exact page replay is read-only; delayed old page rejects; metadata dates dirty; older acknowledgement cannot clear newer same-lease revision",
+            "Updated sessions/annotations dirty old and new APP_TIMEZONE dates across UTC/local boundary; unchanged rows preserve pending revisions",
+            "Oversized/unknown-field payloads reject without writes; expiry/takeover rejects stale page and rollup acknowledgement without changing successor state",
+            "Real anon/authenticated deny reads/writes and all four exact RPCs; intended service page/marker/helper operations succeed",
+            "Interrupted acknowledgement retains dirty revision; bounded production recovery processes 32 dates and retains remaining 8 for next call",
+            "Both SQL acknowledgements lost: later invocation recovers durable dirty work and resumes committed cursor without duplicate sessions/joins",
+            "Real embedded items, optional 403/404, insert-only placeholders, unlinked sessions and sanitized per-row skips preserve accepted import contract"
+          ],
+          "realSqlAndDataApi": true,
+          "syntheticMatterOnly": true,
+          "cleanup": "passed"
+        },
+        "preservation": "passed",
+        "streamPreservation": "passed",
+        "leasePreservation": "passed",
+        "migrationHistory": [
+          "20260513000000",
+          "20260514000000",
+          "20260515000000",
+          "20260515010000",
+          "20260515020000",
+          "20260515030000",
+          "20260518000000",
+          "20260519090000",
+          "20260929000000",
+          "20260929010000",
+          "20261004000000",
+          "20261004010000",
+          "20261005000000",
+          "20261007085051"
+        ]
+      }
+    ],
+    "cleanup": "passed"
+  },
+  "cleanup": {
+    "gitSha": "63e82b0748d1507b4d0c1977eab100f0c2dd4bcb",
+    "resources": [
+      {
+        "path": "upgrade",
+        "status": "stopped"
+      },
+      {
+        "path": "fresh",
+        "status": "stopped"
+      }
+    ],
+    "temporaryDirectoryRemoved": true
+  },
+  "baseSha": "d48491dcc51b2e9fca3d901f5c849643a3524951",
+  "databaseArtifact": {
+    "id": 11475504536,
+    "digest": "sha256:8a1c906aed43f2a8c4779547c4a7df8eaac75dd33734ebcb37eca1d7ba19ddf9"
+  },
+  "checks": {
+    "npmCi": "passed",
+    "typecheck": "passed",
+    "lint": "passed (3 unchanged Visual Explainer warnings)",
+    "test": {
+      "passed": 232,
+      "failed": 0,
+      "todo": 3
+    },
+    "build": "passed",
+    "auditCi": "passed",
+    "nativeSharpSmoke": {
+      "sharp": "0.35.5",
+      "pngDecodeAndResize": "passed",
+      "outputBytes": 90
+    }
+  },
+  "audit": {
+    "artifactId": 11475353567,
+    "digest": "sha256:9fd39e48c484357a430a341fff8ba4a5fc2d2d1974496dfc130952ff25df6f03",
+    "productionCounts": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "fullCounts": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 8,
+      "critical": 0,
+      "total": 8
+    },
+    "fullAdvisories": [
+      "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm"
+    ],
+    "lockedSharp": "0.35.5",
+    "lockedNext": "15.5.27",
+    "tailwindOverride": {
+      "dot": "$tailwindcss",
+      "postcss-selector-parser": "7.1.6"
+    },
+    "policyChanged": false,
+    "advisoryExceptionsAdded": [],
+    "resolvedAdvisory": "https://github.com/advisories/GHSA-wq5f-xc86-pv6w"
+  },
+  "gatewayInvestigation": {
+    "priorFailedAttempt": {
+      "ci": {
+        "gitSha": "77f2ff0521c218725967d1c66d07eed9d4590ddf",
+        "verificationOutcome": "failure",
+        "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37603043220",
+        "runAttempt": "1"
+      },
+      "failedPath": "upgrade",
+      "completedPaths": [
+        "fresh"
+      ],
+      "artifactId": 11474320558,
+      "operation": "/rest/v1/rpc/ack_matter_rollup",
+      "databaseErrorCode": null,
+      "message": "An invalid response was received from the upstream server",
+      "cleanup": {
+        "gitSha": "77f2ff0521c218725967d1c66d07eed9d4590ddf",
+        "resources": [
+          {
+            "path": "upgrade",
+            "status": "stopped"
+          },
+          {
+            "path": "fresh",
+            "status": "stopped"
+          }
+        ],
+        "temporaryDirectoryRemoved": true
+      }
+    },
+    "priorRetry": {
+      "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37603043220",
+      "runAttempt": 2,
+      "databaseJob": 112739312037,
+      "outcome": "passed",
+      "artifactId": 11474348645
+    },
+    "rootCause": "Not established by retained prior logs; no PostgreSQL error code or gateway/container diagnostics were retained",
+    "newAttempt": "Fresh and upgrade passed on attempt 1; gateway response did not recur",
+    "assertionsWeakened": false,
+    "testRetriesAdded": false
+  },
+  "finalCommitEvidence": "The final documentation/evidence commit is independently re-tested. Its exact SHA, CI results and cleanup are retained in its workflow ci.json/results.json/cleanup.json and the PR description."
+}

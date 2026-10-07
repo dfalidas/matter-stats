@@ -301,6 +301,18 @@ export type Database = {
         };
         Relationships: [];
       };
+      matter_page_receipts: {
+        Row: { stream: string; receipt_id: string; fingerprint: string };
+        Insert: { stream: string; receipt_id: string; fingerprint: string };
+        Update: { receipt_id?: string; fingerprint?: string };
+        Relationships: [];
+      };
+      matter_dirty_rollups: {
+        Row: { date: string; revision: string; timezone: string };
+        Insert: { date: string; revision: string; timezone: string };
+        Update: { revision?: string; timezone?: string };
+        Relationships: [];
+      };
       matter_sync_leases: {
         Row: { account_scope: string; owner: string | null; expires_at: string | null; generation: number };
         Insert: { account_scope: string; owner?: string | null; expires_at?: string | null; generation?: number };
@@ -418,6 +430,13 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      commit_matter_page: {
+        Args: LeaseRpcArgs & { p_receipt_id: string; p_previous_receipt_id: string | null; p_expected: TablesInsert<"matter_sync_streams">; p_plan: import("./matter-page-plan").MatterPagePlan; p_has_more: boolean; p_next_cursor: string | null; p_timezone: string };
+        Returns: MatterSyncStream;
+      };
+      validate_matter_page_rows: { Args: { p_rows: Json; p_kind: string }; Returns: undefined };
+      pending_matter_rollups: { Args: LeaseRpcArgs & { p_limit: number }; Returns: DirtyMatterRollup[] };
+      ack_matter_rollup: { Args: LeaseRpcArgs & { p_date: string; p_revision: string; p_timezone: string; p_row: TablesInsert<"daily_stats"> }; Returns: boolean };
       acquire_matter_sync_lease: {
         Args: { p_account_scope: string; p_owner: string; p_ttl_seconds: number };
         Returns: { generation: string; expires_at: string }[];
@@ -460,3 +479,5 @@ export type MatterSyncStream = Tables<"matter_sync_streams">;
 export type SyncRun = Tables<"sync_runs">;
 
 export type LeaseRpcArgs = { p_account_scope: string; p_owner: string; p_generation: string };
+
+export type DirtyMatterRollup = Tables<"matter_dirty_rollups">;

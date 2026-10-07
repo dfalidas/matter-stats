@@ -28,6 +28,7 @@ Apply every SQL file in `supabase/migrations` in filename/timestamp order:
 11. `20261004000000_add_independent_sync_stream_cycles.sql`
 12. `20261004010000_preserve_sync_cooldown_and_window.sql`
 13. `20261005000000_matter_account_lease_fencing.sql`
+14. `20261007085051_atomic_matter_page_commit.sql`
 
 The two `20260929` migrations must both succeed **before** deploying code that performs login. The first creates `public.app_sessions` and `public.app_login_attempts` and declares the table RLS/grant policy. The second defines:
 
@@ -161,3 +162,36 @@ or Matter request is made. A slow request may outlast the TTL and be discarded;
 an abandoned run may retain `running` status. Task 13's page/marker transaction,
 and Tasks 14–15 continuation/backfill/shared-quota work, remain separate release
 work. Neither a successful build nor mock tests establish real database fencing.
+
+## Task 13 release order and rollback
+
+Apply `20261007085051_atomic_matter_page_commit.sql` after the Task 12 lease
+migration and **before** deploying Task 13 code. It adds receipt/dirty-work tables
+and page/recovery RPCs without rewriting existing domain rows, active Task 11
+contracts/cursors/coverage/cooldowns or Task 12 owners/expiry/generations. No new
+configuration, secret, dependency or cron cadence is required.
+
+For a separately authorized production rollout:
+
+1. Disable all sync ingress, including cron, manual actions, old deployment and
+   preview URLs, local/background jobs. Drain or stop every old writer. Task 12
+   writers are fenced per mutation but can still partially import pages and move
+   checkpoints without dirty work; they must not run with Task 13 writers.
+2. Retain a backup and the reviewed SHA/migration inventory. Apply the additive
+   migration in order. Verify service-only object grants/RLS and function catalog.
+   Both disposable fresh/upgrade runtime gates and existing dependency/audit policy
+   must pass before enabling sync. See task-13-validation.md for current results.
+3. Deploy the reviewed Task 13 runtime while ingress stays disabled. Ensure all
+   writers use it, then re-enable existing manual/cron triggers. Keep old writers
+   and previews blocked. Pending markers recover under normal leased invocations;
+   no real Matter sync or historical rebuild is part of this implementation.
+
+Prefer rolling code forward. To roll code back, disable/drain Task 13 writers
+again and leave the additive schema, stream checkpoints, receipts, dirty work and
+lease generation history intact. A read-only/non-sync rollback can safely leave
+pending work for a later compatible runtime. Task 12 or older sync code does not
+consume markers or honor the atomic page boundary: keep its sync ingress disabled
+until a compatible recovery/commit runtime is restored. Do not drop marker/receipt
+tables, reset cursors/generations/coverage, clear pending work, disable RLS, or
+replay from a client-assumed checkpoint as a rollback. Production execution and
+any destructive recovery require separate authorization.

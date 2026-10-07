@@ -5,7 +5,7 @@ from pg_class c join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public' and c.relname in (
   'matter_items','reading_sessions','matter_tags','item_tags','annotations',
   'daily_stats','sync_runs','sync_state','app_sessions','app_login_attempts',
-  'matter_sync_streams','matter_sync_leases'
+  'matter_sync_streams','matter_sync_leases','matter_page_receipts','matter_dirty_rollups'
 ) order by c.relname;
 
 select table_name, grantee, privilege_type
@@ -13,7 +13,7 @@ from information_schema.role_table_grants
 where table_schema = 'public' and table_name in (
   'matter_items','reading_sessions','matter_tags','item_tags','annotations',
   'daily_stats','sync_runs','sync_state','app_sessions','app_login_attempts',
-  'matter_sync_streams','matter_sync_leases'
+  'matter_sync_streams','matter_sync_leases','matter_page_receipts','matter_dirty_rollups'
 ) order by table_name, grantee, privilege_type;
 
 select schemaname, tablename, policyname, roles, cmd, qual, with_check
@@ -45,3 +45,12 @@ from pg_proc p join pg_namespace n on n.oid=p.pronamespace
 where n.nspname='public' and (p.proname like '%matter_sync_lease'
   or p.proname='validate_matter_sync_batch' or p.proname like 'sync_%')
 order by signature::text;
+
+-- Task 13 exact function inventory (invoker, search_path and ACL).
+select p.oid::regprocedure, p.prosecdef, p.proconfig, p.proacl
+from pg_catalog.pg_proc p where p.oid in (
+  'public.validate_matter_page_rows(jsonb,text)'::regprocedure,
+  'public.commit_matter_page(text,uuid,bigint,uuid,uuid,jsonb,jsonb,boolean,text,text)'::regprocedure,
+  'public.pending_matter_rollups(text,uuid,bigint,integer)'::regprocedure,
+  'public.ack_matter_rollup(text,uuid,bigint,date,uuid,text,jsonb)'::regprocedure
+) order by p.oid::regprocedure::text;

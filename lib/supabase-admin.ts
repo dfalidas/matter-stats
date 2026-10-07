@@ -156,3 +156,59 @@ export async function updateSyncRun(id: string, syncRun: TablesUpdate<"sync_runs
   if (!data) throw new Error("Missing fenced run response");
   return data;
 }
+
+export type MatterPageCommit = {
+  receiptId: string;
+  previousReceiptId: string | null;
+  expected: TablesInsert<"matter_sync_streams">;
+  plan: import("./matter-page-plan").MatterPagePlan;
+  hasMore: boolean;
+  nextCursor: string | null;
+  timezone: string;
+};
+export async function commitMatterPage(page: MatterPageCommit, lease: MatterSyncLease): Promise<import("./supabase-types").MatterSyncStream> {
+  const args = { ...leaseRpcArgs(lease), p_receipt_id: page.receiptId, p_previous_receipt_id: page.previousReceiptId, p_expected: page.expected,
+    p_plan: page.plan, p_has_more: page.hasMore, p_next_cursor: page.nextCursor, p_timezone: page.timezone };
+  // Retry once with the same immutable identity. The database receipt handles
+  // a committed transaction whose response was lost; no table-write fallback.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { data, error } = await getSupabaseAdminClient().rpc("commit_matter_page", args);
+      if (error?.code === "55000") throw new MatterSyncLeaseLostError();
+      if (error) {
+        if (error.code && !["", "PGRST000", "PGRST001", "PGRST002"].includes(error.code)) throw error;
+        if (attempt === 0) continue;
+        throw error;
+      }
+      if (!data || !data.stream) throw new Error("Missing atomic page response");
+      return data;
+    } catch (error) {
+      if (error instanceof MatterSyncLeaseLostError || (error && typeof error === "object" && "code" in error && error.code)) throw error;
+      if (attempt === 1) throw error;
+    }
+  }
+  throw new Error("Atomic page outcome uncertain; resume from durable stream state");
+}
+
+export async function getPendingDailyStats(limit: number, lease: MatterSyncLease) {
+  const { data, error } = await getSupabaseAdminClient().rpc("pending_matter_rollups", { ...leaseRpcArgs(lease), p_limit: limit });
+  if (error?.code === "55000") throw new MatterSyncLeaseLostError();
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error("Missing pending rollup response");
+  return data;
+}
+export async function acknowledgeDailyStat(marker: import("./supabase-types").DirtyMatterRollup, row: TablesInsert<"daily_stats">, lease: MatterSyncLease) {
+  const { data, error } = await getSupabaseAdminClient().rpc("ack_matter_rollup", {
+    ...leaseRpcArgs(lease), p_date: marker.date, p_revision: marker.revision, p_timezone: marker.timezone, p_row: row,
+  });
+  if (error?.code === "55000") throw new MatterSyncLeaseLostError();
+  if (error) throw error;
+  if (typeof data !== "boolean") throw new Error("Missing rollup acknowledgement response");
+  return data;
+}
+
+export async function getMatterPageReceipt(stream: "recent_sessions" | "library_items"): Promise<string | null> {
+  const { data, error } = await getSupabaseAdminClient().from("matter_page_receipts").select("receipt_id").eq("stream", stream).maybeSingle();
+  if (error) throw error;
+  return data?.receipt_id ?? null;
+}

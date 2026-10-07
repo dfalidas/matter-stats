@@ -13,6 +13,8 @@ Module._resolveFilename = function (request, parent, isMain, options) {
 };
 const { syncMatterData } = createRequire(import.meta.url)(path.join(root, ".test-build/lib/matter-sync.js"));
 
+const emptyPlan = () => ({ placeholders: [], items: [], sessions: [], tags: [], itemTagIds: [], itemTags: [], annotations: [] });
+
 function stream(name, overrides = {}) {
   return {
     stream: name,
@@ -53,15 +55,22 @@ function harness({ sessions = [], items = [], now = [], legacyCooldown = null } 
     getAccount: async () => { calls.push("account"); return {}; },
     listSessions: async (params) => { calls.push(["sessions", { ...params }]); const page = sessions.shift(); if (page instanceof Error) throw page; return page; },
     listItems: async (params) => { calls.push(["items", { ...params }]); const page = items.shift(); if (page instanceof Error) throw page; return page; },
-    recalculate: async () => {},
-    importSessions: async (page, _dates, _checkpoint, diagnostics) => {
+    recoverRollups: async () => 0,
+    getPageReceipt: async () => null,
+    commitPage: async ({ expected, hasMore, nextCursor }) => {
+      return deps.upsertStream({ ...expected, cursor: nextCursor, cycle_active: hasMore,
+        cycle_started_at: hasMore ? expected.cycle_started_at : null,
+        completed_watermark: hasMore ? expected.completed_watermark : expected.cycle_started_at,
+        transition_status: hasMore ? expected.transition_status : "native" });
+    },
+    importSessions: async (page, diagnostics) => {
       for (const result of page.results) {
         importedSessionIds.add(result.id);
         if (!result.item_id) diagnostics.sessionsWithoutLinkedItem += 1;
       }
-      return { sessions: page.results.length, items: 0, tags: 0, annotations: 0 };
+      return { plan: emptyPlan(), sessions: page.results.length, items: 0, tags: 0, annotations: 0 };
     },
-    importItems: async (page) => ({ itemCount: page.results.length, tagCount: 0, annotationCount: 0 }),
+    importItems: async (page) => ({ plan: emptyPlan(), itemCount: page.results.length, tagCount: 0, annotationCount: 0 }),
   };
   return { deps, states, calls, importedSessionIds };
 }
@@ -192,4 +201,23 @@ test("inclusive overlap replay is idempotent and imports sessions without item l
   assert.equal(h.calls.find((call) => Array.isArray(call))[1].since, "2026-04-02T00:00:00.000Z");
   assert.deepEqual([...h.importedSessionIds].sort(), ["new", "same"]);
   assert.equal(h.importedSessionIds.size, 2);
+});
+
+test("invalid continuation is rejected before preparation or page persistence", async () => {
+  const h = harness({ sessions: [{ object: "list", results: [{ id: "synthetic" }], has_more: true, next_cursor: null }] });
+  let prepared = false; let committed = false;
+  h.deps.importSessions = async () => { prepared = true; };
+  h.deps.commitPage = async () => { committed = true; };
+  assert.equal((await syncMatterData("recent_activity_scheduled", {}, h.deps)).ok, false);
+  assert.equal(prepared, false); assert.equal(committed, false);
+  assert.equal(h.states.get("recent_sessions").completed_watermark, null);
+});
+test("rollup failure preserves the committed cursor and later invocation recovers", async () => {
+  const h = harness({ sessions: [page([], "next"), page([], null)] });
+  let recoverCalls = 0;
+  h.deps.recoverRollups = async () => { if (++recoverCalls === 2) throw new Error("synthetic rollup failure"); };
+  assert.equal((await syncMatterData("recent_activity_scheduled", {}, h.deps)).ok, false);
+  assert.equal(h.states.get("recent_sessions").cursor, "next");
+  assert.equal((await syncMatterData("recent_activity_scheduled", {}, h.deps)).ok, true);
+  assert.equal(h.states.get("recent_sessions").cycle_active, false);
 });

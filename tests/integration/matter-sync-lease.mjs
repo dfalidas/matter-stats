@@ -109,7 +109,7 @@ let upstream = async (request) => {
 try {
   const seed = await readLease();
   assert.equal(seed.owner, null, "refusing a live lease fixture collision");
-  assert.equal(seed.generation, 0, "runner requires a fresh migration lease seed");
+  assert.ok(seed.generation >= 0, "runner preserves upgrade lease generation");
   const saved = await service.from("matter_sync_streams").select("*"); assertSuccessful(saved, "stream seeds");
   assert.equal(saved.data.length, 2);
   assert.ok(saved.data.every((row) => isMigrationSeededStream(row, row.stream)), "refusing non-seed stream fixture collision");
@@ -320,6 +320,8 @@ try {
     if (current.owner) await expire({ owner: current.owner, generation: String(current.generation) });
     const cleanupLease = await acquire(); assert.ok(cleanupLease);
     try {
+      assertSuccessful(await service.from("matter_page_receipts").delete().in("stream", ["recent_sessions", "library_items"]), "cleanup receipts");
+      assertSuccessful(await service.from("matter_dirty_rollups").delete().eq("date", daily.date), "cleanup dirty work");
       for (const state of originalStreams ?? []) await rpc("sync_upsert_stream", { ...args(cleanupLease), p_state: state });
       for (const [table, key, values] of [["annotations", "id", [annotation.id]], ["reading_sessions", "id", [session.id, `${prefix}-delayed-session`]], ["item_tags", "item_id", [item.id]], ["matter_items", "id", [item.id, `${prefix}-delayed-item`]], ["matter_tags", "id", [tag.id]], ["daily_stats", "date", [daily.date]], ["sync_runs", "id", [...ownedRuns]]]) assertSuccessful(await service.from(table).delete().in(key, values), `cleanup ${table}`);
     } finally { assert.equal(await rpc("release_matter_sync_lease", args(cleanupLease)), true); }
