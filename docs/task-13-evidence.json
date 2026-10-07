@@ -1,13 +1,13 @@
 {
   "ci": {
-    "gitSha": "b6b53e56afc96653d85f03c0c92df6e89c451ae2",
+    "gitSha": "63e82b0748d1507b4d0c1977eab100f0c2dd4bcb",
     "verificationOutcome": "success",
-    "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37601808504",
+    "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37607515359",
     "runAttempt": "1"
   },
   "results": {
     "status": "passed",
-    "gitSha": "b6b53e56afc96653d85f03c0c92df6e89c451ae2",
+    "gitSha": "63e82b0748d1507b4d0c1977eab100f0c2dd4bcb",
     "supabaseCli": "2.48.3",
     "paths": [
       {
@@ -126,7 +126,7 @@
     "cleanup": "passed"
   },
   "cleanup": {
-    "gitSha": "b6b53e56afc96653d85f03c0c92df6e89c451ae2",
+    "gitSha": "63e82b0748d1507b4d0c1977eab100f0c2dd4bcb",
     "resources": [
       {
         "path": "upgrade",
@@ -141,8 +141,8 @@
   },
   "baseSha": "d48491dcc51b2e9fca3d901f5c849643a3524951",
   "databaseArtifact": {
-    "id": 11473063007,
-    "digest": "sha256:40726f0bfd358635d977b76ca8cf457720ff2b616e76d96f78fbcc0d24e685a3"
+    "id": 11475504536,
+    "digest": "sha256:8a1c906aed43f2a8c4779547c4a7df8eaac75dd33734ebcb37eca1d7ba19ddf9"
   },
   "checks": {
     "npmCi": "passed",
@@ -154,52 +154,87 @@
       "todo": 3
     },
     "build": "passed",
-    "auditCi": "failed"
+    "auditCi": "passed",
+    "nativeSharpSmoke": {
+      "sharp": "0.35.5",
+      "pngDecodeAndResize": "passed",
+      "outputBytes": 90
+    }
   },
   "audit": {
-    "artifactId": 11473521934,
-    "digest": "sha256:4bc0cc3bb5cdb962165bad8a451101bcdd9853007c00afafb47b99db37705d2a",
+    "artifactId": 11475353567,
+    "digest": "sha256:9fd39e48c484357a430a341fff8ba4a5fc2d2d1974496dfc130952ff25df6f03",
     "productionCounts": {
       "info": 0,
       "low": 0,
       "moderate": 0,
-      "high": 2,
+      "high": 0,
       "critical": 0,
-      "total": 2
+      "total": 0
     },
-    "productionAdvisory": {
-      "source": 1241331,
-      "name": "sharp",
-      "dependency": "sharp",
-      "title": "sharp : Vulnerability in librsvg dependency CVE-2026-96889",
-      "url": "https://github.com/advisories/GHSA-wq5f-xc86-pv6w",
-      "severity": "high",
-      "cwe": [
-        "CWE-416",
-        "CWE-1395"
-      ],
-      "cvss": {
-        "score": 0,
-        "vectorString": null
-      },
-      "range": "<0.35.5"
+    "fullCounts": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 8,
+      "critical": 0,
+      "total": 8
     },
-    "lockedSharp": "0.35.4",
-    "policyChanged": false
+    "fullAdvisories": [
+      "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm"
+    ],
+    "lockedSharp": "0.35.5",
+    "lockedNext": "15.5.27",
+    "tailwindOverride": {
+      "dot": "$tailwindcss",
+      "postcss-selector-parser": "7.1.6"
+    },
+    "policyChanged": false,
+    "advisoryExceptionsAdded": [],
+    "resolvedAdvisory": "https://github.com/advisories/GHSA-wq5f-xc86-pv6w"
   },
-  "localDatabaseAttempt": {
-    "gitSha": "beee81f671929fc7617ed69f5ff7d489e876b656",
-    "command": "DISPOSABLE_DB_ACK=yes npm run test:stabilization-db",
-    "outcome": "cancelled during provisioning; no database gate pass",
-    "cleanup": {
-      "gitSha": "beee81f671929fc7617ed69f5ff7d489e876b656",
-      "resources": [
-        {
-          "path": "fresh",
-          "status": "stopped"
-        }
+  "gatewayInvestigation": {
+    "priorFailedAttempt": {
+      "ci": {
+        "gitSha": "77f2ff0521c218725967d1c66d07eed9d4590ddf",
+        "verificationOutcome": "failure",
+        "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37603043220",
+        "runAttempt": "1"
+      },
+      "failedPath": "upgrade",
+      "completedPaths": [
+        "fresh"
       ],
-      "temporaryDirectoryRemoved": true
-    }
-  }
+      "artifactId": 11474320558,
+      "operation": "/rest/v1/rpc/ack_matter_rollup",
+      "databaseErrorCode": null,
+      "message": "An invalid response was received from the upstream server",
+      "cleanup": {
+        "gitSha": "77f2ff0521c218725967d1c66d07eed9d4590ddf",
+        "resources": [
+          {
+            "path": "upgrade",
+            "status": "stopped"
+          },
+          {
+            "path": "fresh",
+            "status": "stopped"
+          }
+        ],
+        "temporaryDirectoryRemoved": true
+      }
+    },
+    "priorRetry": {
+      "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37603043220",
+      "runAttempt": 2,
+      "databaseJob": 112739312037,
+      "outcome": "passed",
+      "artifactId": 11474348645
+    },
+    "rootCause": "Not established by retained prior logs; no PostgreSQL error code or gateway/container diagnostics were retained",
+    "newAttempt": "Fresh and upgrade passed on attempt 1; gateway response did not recur",
+    "assertionsWeakened": false,
+    "testRetriesAdded": false
+  },
+  "finalCommitEvidence": "The final documentation/evidence commit is independently re-tested. Its exact SHA, CI results and cleanup are retained in its workflow ci.json/results.json/cleanup.json and the PR description."
 }

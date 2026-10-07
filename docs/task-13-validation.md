@@ -44,12 +44,16 @@ contracts/cursors/watermarks/coverage/cooldowns through Task 12, and active Task
 owner/expiry/generation plus stream state through Task 13. It does not reset
 production state or derive unsupported completion claims.
 
-Tested runtime SHA: `b6b53e56afc96653d85f03c0c92df6e89c451ae2`.
-The subsequent evidence/documentation commit changes no runtime, migration or
-test code. Permanent sanitized results, migration history and cleanup are retained
+Tested dependency/runtime/CI SHA: `63e82b0748d1507b4d0c1977eab100f0c2dd4bcb`.
+Permanent sanitized results, migration history and cleanup are retained
 in [task-13-evidence.json](task-13-evidence.json), copied from
-[CI run 37601808504](https://github.com/dfalidas/matter-stats/actions/runs/37601808504)
-(database artifact `11473063007`, attempt 1, completed 2026-10-07).
+[CI run 37607515359](https://github.com/dfalidas/matter-stats/actions/runs/37607515359)
+(database artifact `11475504536`, attempt 1, completed 2026-10-07).
+The final documentation/evidence commit is independently tested through both
+jobs. Its exact tested SHA, final workflow/artifact link and results are recorded
+in [PR #76](https://github.com/dfalidas/matter-stats/pull/76) and that workflow's
+sanitized `ci.json`, `results.json` and `cleanup.json`; the checked-in evidence
+above records the preceding fully validated dependency commit.
 
 | Check | Actual outcome |
 | --- | --- |
@@ -58,26 +62,52 @@ in [task-13-evidence.json](task-13-evidence.json), copied from
 | `npm run lint` | Passed; three unchanged Visual Explainer warnings |
 | `npm run test` | 232 passed, 0 failed, 3 existing TODOs (235 total) |
 | `npm run build` | Passed locally and in CI |
-| `npm run audit:ci` | Failed under the unchanged policy; see blocker below |
+| `npm run audit:ci` | Passed: 0 production vulnerabilities; 8 CI full-audit entries derive only from the existing permitted development advisory |
 | Disposable fresh database | Catalog, real Data API grants, Task 12 SQL/runtime concurrency and Task 13 page/recovery suite passed |
 | Disposable upgrade database | Same suites passed; full legacy rows, active Task 11 stream contracts/cooldowns and Task 12 lease owner/expiry/generation preservation passed |
 | Disposable cleanup | Both stacks stopped, temporary directory removed; atomic fixture/trigger/Auth cleanup passed |
 
-The hosted gate ran `DISPOSABLE_DB_ACK=yes npm run test`, which invokes the same
-disposable orchestrator as `DISPOSABLE_DB_ACK=yes npm run test:stabilization-db`,
-with runner-created synthetic databases and no normal production/Matter credentials.
-The separate local `test:stabilization-db` attempt was cancelled during slow
-provisioning before it established any pass; its owned stack was stopped and
-temporary directory removed. That attempt is explicitly **not** passing evidence.
+The hosted database job runs the regular tests and then explicitly runs
+`DISPOSABLE_DB_ACK=yes npm run test:stabilization-db`, with runner-created
+synthetic databases and no normal production/Matter credentials. Existing SQL,
+Data API and runtime assertions are retained. The earlier local provisioning
+attempt established no pass; passing database evidence comes from the hosted
+runner, including its verified cleanup.
 
-Release remains blocked: production audit reports high-severity
+The previous audit blocker is resolved:
 [GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w), affecting
-the existing `sharp` 0.35.4 override (`<0.35.5`) and its dependent `next` entry
-(two affected production packages). No dependency, audit policy or exception was
-changed to obtain a pass. Resolve the dependency advisory separately and rerun
-the required audit before release; this PR is not release-ready. No production
+`sharp <0.35.5`, was removed by changing the existing override from 0.35.4 to
+0.35.5 and regenerating the lockfile through npm. Bundled sharp/libvips platform
+packages update with it; other shared dependency entries remain unchanged.
+Next.js remains 15.5.27, the Tailwind selector override remains 7.1.6, and the
+audit policy is unchanged. No new advisory exceptions were added. The full audit
+retains only GHSA-vfj7-8cjw-p6xm under the existing development policy (CI: 8
+entries; local Node 24: 7); both environments report zero production findings.
+A native sharp 0.35.5 PNG decode/resize smoke check passed. No production
 deployment, migration, real Matter sync, secret change or personal-data mutation
 was performed.
+
+### Upgrade gateway investigation
+
+The first attempt of [run 37603043220](https://github.com/dfalidas/matter-stats/actions/runs/37603043220/attempts/1)
+on `77f2ff0521c218725967d1c66d07eed9d4590ddf` passed fresh verification but
+failed during upgrade bounded-rollup acknowledgement. The Data API returned
+`An invalid response was received from the upstream server` for
+`/rest/v1/rpc/ack_matter_rollup`, without a PostgreSQL error code. Its failure and
+cleanup artifact is retained as `11474320558`; both stacks stopped and the
+temporary directory was removed. The same SHA's attempt 2 passed the database
+job (`11474348645`). That retry does not establish a root cause: the original
+artifact retained no gateway/container diagnostics. It is distinct from the
+earlier deliberately raised `40001` retry issue fixed with `PT409`.
+
+The new dependency commit passed both paths on attempt 1 without reproducing
+the gateway error. No assertions were relaxed, test transport retries added,
+gateway errors accepted as grant denials, or failure fixtures removed. Current
+Supabase [local Kong load guidance](https://supabase.com/docs/guides/troubleshooting/kong-stops-responding-under-heavy-load-locally)
+was reviewed; it does not establish that worker exhaustion caused this historical
+failure. Any recurrence must remain a failing gate and be investigated with
+disposable gateway/PostgREST diagnostics before release. The PR stays draft while
+its final-head checks run.
 
 ## Limits and operations
 
