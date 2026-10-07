@@ -95,7 +95,18 @@ try {
   const repeated = await worker("backfill_sessions", "2027-02-01T00:00:00Z"); assert.equal(repeated.requests.length, 0); assert.equal(repeated.result.historyStatus, "complete");
   await worker("cron", "2027-02-02T06:00:00Z");
   assert.equal(await sql(`select count(*) from public.reading_sessions where id like '${prefix}-%';`), "5000");
-  checks.push("A/B/C: 5000 documented sessions, ties/multiple years, independent SQL raw reference, 51 exact pages, bounded fresh processes/daily cron, pinned contract/watermark, pending library fairness, completed replay and overlap idempotence");
+  // Enumeration completion is independent of analytics-ready state. Continue
+  // the real durable backlog through bounded cron invocations, with no browser.
+  for (let i=0; i<50; i++) {
+    const before = Number(await sql("select count(*) from public.matter_dirty_rollups;"));
+    if (before===0) break;
+    const recovery = await worker("cron","2027-02-03T06:00:00Z");
+    const after = Number(await sql("select count(*) from public.matter_dirty_rollups;"));
+    assert.ok(before>after && before-after<=64,"cron recovery is bounded and durable after enumeration completion");
+    assert.ok(recovery.requests.length<=224);
+  }
+  assert.equal(await sql("select count(*) from public.matter_dirty_rollups;"),"0");
+  checks.push("A/B/C: 5000 documented sessions, ties/multiple years, independent SQL raw reference, 51 exact pages, bounded fresh processes/daily cron, pinned contract/watermark, pending library fairness, completed replay/overlap idempotence and bounded post-exhaustion cron recovery");
 
   process.env.SUPABASE_URL = url; process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.STABILIZATION_TEST_SUPABASE_SERVICE_ROLE_KEY;
   process.env.MATTER_API_TOKEN = "synthetic-never-sent"; process.env.APP_TIMEZONE = "Europe/Athens";
