@@ -62,19 +62,36 @@ must pass. No production or real Matter credentials are provided to test childre
 
 ## Current evidence
 
-Local `npm ci` passed with the unchanged lockfile (workspace npm cache was needed
-because the default home cache was unavailable). Route type generation, typecheck,
-build and audit passed during implementation. Lint retains only the three existing
-Visual Explainer warnings. The regular suite and disposable FINAL-head gate are
-rerun before delivery; intermediate results are not final-head proof.
+On `120efb8eca1310ed549bd0ed766c6b24c163ca61`, local `npm ci`, Next route type
+generation, typecheck, lint, tests, build, audit:ci and git diff --check passed.
+The unchanged lockfile uses a workspace cache because the home cache is unavailable.
+Tests: 239 passed, 0 failed, 3 TODOs, 0 skipped (242 total). Lint retains three
+existing Visual Explainer warnings. Production audit findings: zero; the existing
+development-only GHSA-vfj7-8cjw-p6xm exception remains unchanged.
 
-The first local disposable startup was interrupted while CLI 2.48.3 downloaded
-images. Its gate recorded failure, the owned fresh stack was stopped and temporary
-directory removed. No SQL/Data API acceptance was established by that attempt.
-The subsequent gate and hosted final-head checks must supply real passing evidence;
-unavailable/failed execution remains BLOCKED/FAILED, never passed. The R3 TODO
-remains until the real 5,000-session acceptance is established. Sanitized permanent
-evidence and exact final PR-head workflow/artifact links are added after execution.
+**Database/final-head CI acceptance is currently BLOCKED.** GitHub's
+[2026-10-07 incident](https://www.githubstatus.com/incidents/djlmxz2zd0j7) delayed
+Git operations, PR synchronization and Actions. A REST fast-forward published the
+corrected code with the exact local file tree, but the PR still reported its prior
+head and no workflow was queued at the evidence snapshot. Local CLI provisioning
+also exceeded the 32 GB vfs workspace before any database started. The verified
+runner-owned startup was stopped; the fresh stack and temporary directory were
+cleaned up. No passing SQL/Data API acceptance is inferred from these attempts.
+
+[task-14-evidence.json](task-14-evidence.json) retains sanitized SHA-linked failed
+attempts and cleanup. The cooldown gate exposed SQL 21000 for the first migration's
+unfiltered UPDATE under safeupdate. The additive follow-up explicitly selects the
+two streams; the subsequent gate passed cooldown cases, then rejected the test's
+direct library LOAD. Its replacement verifies an unfiltered UPDATE rejection and
+the bounded production RPC through the real service Data API session, using an
+owned service-only fixture that is dropped during cleanup. Earlier gateway errors
+remain failures with no established root cause; no assertions or transport errors
+are accepted as successful verification. Failure-only diagnostics retain known
+container state/error counts and endpoint/status/codes, never raw credentials/logs.
+
+The R3 5,000-session TODO remains until real fresh AND upgrade acceptance passes.
+The final PR-head gate must still run and pass; an intermediate passing standard
+job or progress through an earlier fixture does not establish final-head acceptance.
 
 ## Official sources and rollout
 

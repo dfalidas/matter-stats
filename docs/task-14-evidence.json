@@ -1,0 +1,376 @@
+{
+  "baseSha": "198701e187e2b49522eb40451c8c87d9a72beda7",
+  "branch": "codex/task-14-continuation-backfill",
+  "pr": "https://github.com/dfalidas/matter-stats/pull/77",
+  "status": "blocked",
+  "snapshotAt": "2026-10-07T15:31:55Z",
+  "localStandardChecks": {
+    "gitSha": "120efb8eca1310ed549bd0ed766c6b24c163ca61",
+    "npmCi": "passed",
+    "routeTypeGeneration": "passed",
+    "typecheck": "passed",
+    "lint": "passed (3 unchanged Visual Explainer warnings)",
+    "tests": {
+      "total": 242,
+      "passed": 239,
+      "failed": 0,
+      "todo": 3,
+      "skipped": 0
+    },
+    "build": "passed",
+    "auditCi": "passed (0 production findings; existing development-only exception)",
+    "gitDiffCheck": "passed"
+  },
+  "currentDatabaseGate": {
+    "gitSha": "120efb8eca1310ed549bd0ed766c6b24c163ca61",
+    "outcome": "blocked",
+    "reason": "GitHub outage delayed PR synchronization and Actions; local vfs provisioning exceeded the 32 GB workspace. No fresh/upgrade SQL acceptance claimed.",
+    "localFailure": {
+      "status": "failed",
+      "gitSha": "120efb8eca1310ed549bd0ed766c6b24c163ca61",
+      "failedPath": "fresh",
+      "paths": [],
+      "message": "Disposable verification failed; see the workflow job log.",
+      "disposableDiagnostics": [
+        {
+          "component": "kong",
+          "stateAvailable": false,
+          "running": false,
+          "outOfMemory": false,
+          "exitCode": null,
+          "logsAvailable": false,
+          "errorCounts": {
+            "upstream": 0,
+            "workerConnections": 0,
+            "databaseConnections": 0,
+            "postgrest": 0
+          }
+        },
+        {
+          "component": "rest",
+          "stateAvailable": false,
+          "running": false,
+          "outOfMemory": false,
+          "exitCode": null,
+          "logsAvailable": false,
+          "errorCounts": {
+            "upstream": 0,
+            "workerConnections": 0,
+            "databaseConnections": 0,
+            "postgrest": 0
+          }
+        },
+        {
+          "component": "db",
+          "stateAvailable": false,
+          "running": false,
+          "outOfMemory": false,
+          "exitCode": null,
+          "logsAvailable": false,
+          "errorCounts": {
+            "upstream": 0,
+            "workerConnections": 0,
+            "databaseConnections": 0,
+            "postgrest": 0
+          }
+        }
+      ],
+      "cleanup": "pending"
+    },
+    "localCleanup": {
+      "gitSha": "120efb8eca1310ed549bd0ed766c6b24c163ca61",
+      "resources": [
+        {
+          "path": "fresh",
+          "status": "stopped"
+        }
+      ],
+      "temporaryDirectoryRemoved": true
+    }
+  },
+  "githubIncident": "https://www.githubstatus.com/incidents/djlmxz2zd0j7",
+  "previousAttempts": [
+    {
+      "gitSha": "f726b7ced50a50bb423713b09a87068032a14b0d",
+      "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37633094416",
+      "databaseArtifactId": 11487538232,
+      "gateOutcome": "failed",
+      "reason": "Task 13 fault fixture selected an eligible sibling under fair scheduling; corrected with a fenced owned-fixture turn.",
+      "failure": {
+        "status": "failed",
+        "gitSha": "f726b7ced50a50bb423713b09a87068032a14b0d",
+        "failedPath": "fresh",
+        "paths": [],
+        "message": "Disposable verification failed; see the workflow job log.",
+        "cleanup": "pending"
+      },
+      "cleanup": {
+        "gitSha": "f726b7ced50a50bb423713b09a87068032a14b0d",
+        "resources": [
+          {
+            "path": "fresh",
+            "status": "stopped"
+          }
+        ],
+        "temporaryDirectoryRemoved": true
+      }
+    },
+    {
+      "gitSha": "ec30a8f6ea6b61285b7b6423e89eeff60779486e",
+      "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37635885069",
+      "databaseArtifactId": 11490230915,
+      "gateOutcome": "failed",
+      "reason": "Existing security fixture received an invalid upstream response from the disposable gateway; root cause not established.",
+      "failure": {
+        "status": "failed",
+        "gitSha": "ec30a8f6ea6b61285b7b6423e89eeff60779486e",
+        "failedPath": "fresh",
+        "paths": [],
+        "message": "Disposable verification failed; see the workflow job log.",
+        "cleanup": "pending"
+      },
+      "cleanup": {
+        "gitSha": "ec30a8f6ea6b61285b7b6423e89eeff60779486e",
+        "resources": [
+          {
+            "path": "fresh",
+            "status": "stopped"
+          }
+        ],
+        "temporaryDirectoryRemoved": true
+      }
+    },
+    {
+      "gitSha": "07301bbea0c061b8cc69ea83ddd67e2ce8822a23",
+      "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37636988078",
+      "databaseArtifactId": 11490167045,
+      "gateOutcome": "failed",
+      "reason": "A synthetic continuation worker returned a database failure before bounded endpoint diagnostics were available; root cause not established.",
+      "failure": {
+        "status": "failed",
+        "gitSha": "07301bbea0c061b8cc69ea83ddd67e2ce8822a23",
+        "failedPath": "fresh",
+        "paths": [],
+        "message": "Disposable verification failed; see the workflow job log.",
+        "cleanup": "pending"
+      },
+      "cleanup": {
+        "gitSha": "07301bbea0c061b8cc69ea83ddd67e2ce8822a23",
+        "resources": [
+          {
+            "path": "fresh",
+            "status": "stopped"
+          }
+        ],
+        "temporaryDirectoryRemoved": true
+      }
+    },
+    {
+      "gitSha": "07444aef0a7d356e355afdfb50e33d2c37d8f5ff",
+      "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37638265657",
+      "databaseArtifactId": 11490888987,
+      "gateOutcome": "failed",
+      "reason": "Cooldown persistence failed; later exact HTTP/SQL diagnostics identified unfiltered UPDATE rejection.",
+      "failure": {
+        "status": "failed",
+        "gitSha": "07444aef0a7d356e355afdfb50e33d2c37d8f5ff",
+        "failedPath": "fresh",
+        "paths": [],
+        "message": "Disposable verification failed; see the workflow job log.",
+        "disposableDiagnostics": [
+          {
+            "component": "kong",
+            "stateAvailable": true,
+            "running": true,
+            "outOfMemory": false,
+            "exitCode": 0,
+            "logsAvailable": true,
+            "errorCounts": {
+              "upstream": 0,
+              "workerConnections": 0,
+              "databaseConnections": 0,
+              "postgrest": 0
+            }
+          },
+          {
+            "component": "rest",
+            "stateAvailable": true,
+            "running": true,
+            "outOfMemory": false,
+            "exitCode": 0,
+            "logsAvailable": true,
+            "errorCounts": {
+              "upstream": 0,
+              "workerConnections": 0,
+              "databaseConnections": 0,
+              "postgrest": 0
+            }
+          },
+          {
+            "component": "db",
+            "stateAvailable": true,
+            "running": true,
+            "outOfMemory": false,
+            "exitCode": 0,
+            "logsAvailable": true,
+            "errorCounts": {
+              "upstream": 0,
+              "workerConnections": 0,
+              "databaseConnections": 0,
+              "postgrest": 0
+            }
+          }
+        ],
+        "cleanup": "pending"
+      },
+      "cleanup": {
+        "gitSha": "07444aef0a7d356e355afdfb50e33d2c37d8f5ff",
+        "resources": [
+          {
+            "path": "fresh",
+            "status": "stopped"
+          }
+        ],
+        "temporaryDirectoryRemoved": true
+      }
+    },
+    {
+      "gitSha": "59e30d3b220c6b4c99e22ea61e4858a80df40455",
+      "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37639965384",
+      "databaseArtifactId": 11492615956,
+      "gateOutcome": "failed",
+      "reason": "Data API cooldown RPC returned HTTP 400 / SQL 21000 under safeupdate; fixed by additive bounded UPDATE migration.",
+      "failure": {
+        "status": "failed",
+        "gitSha": "59e30d3b220c6b4c99e22ea61e4858a80df40455",
+        "failedPath": "fresh",
+        "paths": [],
+        "message": "Disposable verification failed; see the workflow job log.",
+        "disposableDiagnostics": [
+          {
+            "component": "kong",
+            "stateAvailable": true,
+            "running": true,
+            "outOfMemory": false,
+            "exitCode": 0,
+            "logsAvailable": true,
+            "errorCounts": {
+              "upstream": 0,
+              "workerConnections": 0,
+              "databaseConnections": 0,
+              "postgrest": 0
+            }
+          },
+          {
+            "component": "rest",
+            "stateAvailable": true,
+            "running": true,
+            "outOfMemory": false,
+            "exitCode": 0,
+            "logsAvailable": true,
+            "errorCounts": {
+              "upstream": 0,
+              "workerConnections": 0,
+              "databaseConnections": 0,
+              "postgrest": 0
+            }
+          },
+          {
+            "component": "db",
+            "stateAvailable": true,
+            "running": true,
+            "outOfMemory": false,
+            "exitCode": 0,
+            "logsAvailable": true,
+            "errorCounts": {
+              "upstream": 0,
+              "workerConnections": 0,
+              "databaseConnections": 0,
+              "postgrest": 0
+            }
+          }
+        ],
+        "cleanup": "pending"
+      },
+      "cleanup": {
+        "gitSha": "59e30d3b220c6b4c99e22ea61e4858a80df40455",
+        "resources": [
+          {
+            "path": "fresh",
+            "status": "stopped"
+          }
+        ],
+        "temporaryDirectoryRemoved": true
+      }
+    },
+    {
+      "gitSha": "87df6480ed4a76f531f352e6f4ba7801193854a6",
+      "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37641252897",
+      "databaseArtifactId": 11492532607,
+      "gateOutcome": "failed",
+      "reason": "Cooldown checks passed; additional test attempted a restricted LOAD. Replaced with an owned service-only Data API guard/control.",
+      "failure": {
+        "status": "failed",
+        "gitSha": "87df6480ed4a76f531f352e6f4ba7801193854a6",
+        "failedPath": "fresh",
+        "paths": [],
+        "message": "Disposable verification failed; see the workflow job log.",
+        "disposableDiagnostics": [
+          {
+            "component": "kong",
+            "stateAvailable": true,
+            "running": true,
+            "outOfMemory": false,
+            "exitCode": 0,
+            "logsAvailable": true,
+            "errorCounts": {
+              "upstream": 0,
+              "workerConnections": 0,
+              "databaseConnections": 0,
+              "postgrest": 0
+            }
+          },
+          {
+            "component": "rest",
+            "stateAvailable": true,
+            "running": true,
+            "outOfMemory": false,
+            "exitCode": 0,
+            "logsAvailable": true,
+            "errorCounts": {
+              "upstream": 0,
+              "workerConnections": 0,
+              "databaseConnections": 0,
+              "postgrest": 0
+            }
+          },
+          {
+            "component": "db",
+            "stateAvailable": true,
+            "running": true,
+            "outOfMemory": false,
+            "exitCode": 0,
+            "logsAvailable": true,
+            "errorCounts": {
+              "upstream": 0,
+              "workerConnections": 0,
+              "databaseConnections": 0,
+              "postgrest": 0
+            }
+          }
+        ],
+        "cleanup": "pending"
+      },
+      "cleanup": {
+        "gitSha": "87df6480ed4a76f531f352e6f4ba7801193854a6",
+        "resources": [
+          {
+            "path": "fresh",
+            "status": "stopped"
+          }
+        ],
+        "temporaryDirectoryRemoved": true
+      }
+    }
+  ]
+}
