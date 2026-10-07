@@ -261,7 +261,11 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     assert.equal(continuationReport.realSqlAndDataApi, true);
     assert.equal(continuationReport.syntheticMatterOnly, true);
     assert.equal(continuationReport.cleanup, "passed");
-    continuationEvidence = { checks: continuationReport.checks, realSqlAndDataApi: true, syntheticMatterOnly: true, cleanup: "passed" };
+    const referenceFields = ["count","distinct","mismatches","duration","referenceDuration","sessionPages","invocations"];
+    assert.ok(referenceFields.every((field)=>Number.isSafeInteger(continuationReport.historyReference?.[field]) && continuationReport.historyReference[field]>=0));
+    continuationEvidence = { checks: continuationReport.checks,
+      historyReference:Object.fromEntries(referenceFields.map((field)=>[field,continuationReport.historyReference[field]])),
+      realSqlAndDataApi: true, syntheticMatterOnly: true, cleanup: "passed" };
   };
   if (upgrade) {
     await removeOwnedLegacySingleton({ query: (sql) => Promise.resolve(containerPsql(projectId, sql)), ownershipMarker, runIntegration });

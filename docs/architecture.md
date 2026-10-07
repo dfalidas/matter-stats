@@ -323,7 +323,9 @@ while busy, rate-limited or failing). Cron/manual responses expose partial statu
 page/attempt counts and history status without claiming analytics completeness.
 
 429s in `/me`, item or annotation preparation stop the page and persist an
-account cooldown through a fenced RPC updating current durable rows. Previously
+account cooldown through a fenced RPC updating current durable rows.
+The additive cooldown follow-up explicitly selects both account streams, retaining
+Supabase safeupdate protection and the same signature/lease fence. Previously
 accepted annotation pages are never committed as a subset after a later optional
 endpoint failure. Lost SQL responses retain exact receipt replay; cooldown writes
 cannot rewind a cursor. Authentication, raw UTC values, `APP_TIMEZONE`, per-session

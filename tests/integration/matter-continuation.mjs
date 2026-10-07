@@ -39,6 +39,7 @@ const ownedRuns = new Set();
 const databaseErrors = [];
 let originalStreams, originalIntent, originalDailyStats, initialRuns, authUser, activeLease, ready = false;
 let runtime, upstream;
+let historyReference;
 const page = (results = [], next = null) => ({ object: "list", results, has_more: next !== null, next_cursor: next });
 const limits = { pages: 8, requests: 224, upstreamMs: 90000, totalMs: 150000, requestMs: 10000 };
 let tick = 0;
@@ -94,6 +95,7 @@ try {
   assert.equal(Date.parse(complete.streams.find((s) => s.stream === "recent_sessions").completed_watermark), Date.parse("2026-12-31T23:59:00Z"));
   const reference = JSON.parse(await sql(`with expected as (select '${prefix}-'||i id, timestamptz '2026-12-30T10:00:00Z' - (i/4)*interval '1 day' occurred, i%601 seconds from generate_series(0,4999) i), actual as (select * from public.reading_sessions where id like '${prefix}-%') select jsonb_build_object('count',(select count(*) from actual),'distinct',(select count(distinct id) from actual),'mismatches',(select count(*) from expected e full join actual a on a.id=e.id where a.id is null or e.id is null or a.started_at is distinct from e.occurred or a.duration_seconds is distinct from e.seconds or a.item_id is not null),'duration',(select sum(duration_seconds) from actual),'referenceDuration',(select sum(seconds) from expected))::text;`));
   assert.equal(reference.count, 5000); assert.equal(reference.distinct, 5000); assert.equal(reference.mismatches, 0); assert.equal(reference.duration, reference.referenceDuration);
+  historyReference = { ...reference, sessionPages:sessions.length, invocations:outcomes.length };
   const repeated = await worker("backfill_sessions", "2027-02-01T00:00:00Z"); assert.equal(repeated.requests.length, 0); assert.equal(repeated.result.historyStatus, "complete");
   await worker("cron", "2027-02-02T06:00:00Z");
   assert.equal(await sql(`select count(*) from public.reading_sessions where id like '${prefix}-%';`), "5000");
@@ -233,6 +235,7 @@ try {
   const password = `S-${crypto.randomUUID()}-aA1!`; assertSuccessful(await service.auth.admin.updateUserById(authUser,{ password }),"synthetic password");
   assertSuccessful(await authenticated.auth.signInWithPassword({ email: created.data.user.email,password }),"browser role session");
   activeLease = await acquire();
+  await sql(`begin; load 'safeupdate'; set local safeupdate.enabled=on; set local role service_role; select public.cooldown_matter_account('matter','${activeLease.owner}',${activeLease.generation},'2027-03-01T00:01:00Z'); rollback;`);
   const payloads = {
     cooldown_matter_account: { ...args(activeLease),p_retry_at:"2027-03-01T00:01:00Z" },
     request_matter_history: { ...args(activeLease),p_coverage:"all" },
@@ -262,7 +265,7 @@ try {
   for (const name of ["request_matter_history","begin_matter_history","turn_matter_continuation","cooldown_matter_account"]) assert.equal((await service.rpc(name,payloads[name])).error.code,"55000");
   assert.equal(await release(stale),false); assert.deepEqual(await snapshot(),beforeStale);
   await release(activeLease); activeLease=null;
-  checks.push("F/H: real anon/authenticated CRUD and exact function denials; service controls, invalid coverage, idempotent intent, expiry/takeover and stale intent/start/turn/release fences");
+  checks.push("F/H: real anon/authenticated CRUD and exact function denials; service controls including safeupdate-enabled cooldown SQL, invalid coverage, idempotent intent, expiry/takeover and stale intent/start/turn/release fences");
 } finally {
   globalThis.fetch=originalFetch; Module._resolveFilename=originalResolve;
   if (activeLease) await release(activeLease);
@@ -291,4 +294,4 @@ try {
     if (authUser) assertSuccessful(await service.auth.admin.deleteUser(authUser),"Auth cleanup");
   }
 }
-console.log(JSON.stringify({status:"passed",checks,realSqlAndDataApi:true,syntheticMatterOnly:true,cleanup:"passed"}));
+console.log(JSON.stringify({status:"passed",checks,historyReference,realSqlAndDataApi:true,syntheticMatterOnly:true,cleanup:"passed"}));

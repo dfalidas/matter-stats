@@ -198,13 +198,16 @@ any destructive recovery require separate authorization.
 
 ## Task 14 release order and rollback
 
-Apply `20261007132750_matter_continuation_history_intent.sql` after Task 13 and
-before Task 14 code. The Supabase CLI generated its filename. It adds one RLS
+Apply `20261007132750_matter_continuation_history_intent.sql` after Task 13, then
+`20261007145024_bound_account_cooldown_update.sql`, before Task 14 code. The
+Supabase CLI generated both filenames. The intent migration adds one RLS
 singleton, four fenced invoker RPCs and an invoker completion trigger; exact
 signatures/grants are inventoried in `scripts/matter-continuation-inventory.mjs`.
 No existing migration, domain row, contract, receipt, dirty marker or lease
 history is rewritten. Service access to the new table is SELECT/UPDATE only,
 with no INSERT/DELETE/TRUNCATE; PUBLIC/browser access is revoked.
+The follow-up scopes the cooldown UPDATE to the two account streams, preserving
+its signature/grants and compatibility with Data API safeupdate enforcement.
 
 No new secrets, configuration variables, dependency, service or cron cadence are
 required. Existing page-size variables remain strict integer 1–100/default 25.

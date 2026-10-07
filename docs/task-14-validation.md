@@ -3,7 +3,8 @@
 Base: `198701e187e2b49522eb40451c8c87d9a72beda7`, fetched origin/main on
 2026-10-07. No newer main commits were present. Branch:
 `codex/task-14-continuation-backfill`. Task 14 only; Tasks 15–21 remain separate.
-Migration: `20261007132750_matter_continuation_history_intent.sql`, generated with
+Migrations: `20261007132750_matter_continuation_history_intent.sql` and
+`20261007145024_bound_account_cooldown_update.sql`, generated with
 Supabase CLI 2.48.3 after checking its help. Applied migrations remain unchanged.
 
 ## Implementation and acceptance gate
