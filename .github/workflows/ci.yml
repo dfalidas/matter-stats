@@ -73,7 +73,9 @@ jobs:
         run: npm ci
       - name: Verify disposable fresh and upgrade databases
         id: database
-        run: DISPOSABLE_DB_ACK=yes npm run test
+        run: |
+          npm run test
+          DISPOSABLE_DB_ACK=yes npm run test:stabilization-db
       - name: Record sanitized CI outcome
         if: ${{ always() }}
         env:
