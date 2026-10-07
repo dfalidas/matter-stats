@@ -49,5 +49,5 @@ async function authorizeAction(): Promise<boolean> {
 }
 
 function parseSyncMode(value: FormDataEntryValue | null | undefined): MatterSyncMode {
-  return value === "backfill_library" ? "backfill_library" : "recent_activity_manual";
+  return value === "backfill_sessions" ? "backfill_sessions" : value === "backfill_library" ? "backfill_library" : "recent_activity_manual";
 }

@@ -6,7 +6,7 @@ const DEFAULT_MATTER_SYNC_SESSIONS_LIMIT = 25;
 export const MATTER_SYNC_BATCH_LIMIT = DEFAULT_MATTER_SYNC_ITEMS_LIMIT;
 
 export type MatterSyncPhase = "items" | "tags" | "sessions" | "complete";
-export type MatterSyncMode = "recent_activity" | "recent_activity_manual" | "recent_activity_scheduled" | "backfill_library";
+export type MatterSyncMode = "recent_activity" | "recent_activity_manual" | "recent_activity_scheduled" | "backfill_library" | "backfill_sessions";
 export type MatterRecentActivityWindow = "7_days" | "30_days" | "90_days" | "current_year" | "all";
 
 export const DEFAULT_MATTER_SYNC_MODE: MatterSyncMode = "recent_activity";
@@ -74,7 +74,7 @@ export function buildMatterSyncMessage(
   mode: MatterSyncMode = DEFAULT_MATTER_SYNC_MODE,
   diagnostics: MatterSyncMessageDiagnostics = {}
 ): string {
-  const modeLabel = mode === "backfill_library" ? "Backfill library" : "Recent activity sync";
+  const modeLabel = mode === "backfill_library" ? "Library sync" : mode === "backfill_sessions" ? "Available session history" : "Recent activity sync";
   const imported = `Imported ${counts.sessions} reading sessions, ${counts.items} linked items, ${counts.annotations} annotations, and ${counts.tags} tags.`;
   const skipped = diagnostics.sessionsSkipped ?? 0;
   const withoutLinkedItem = diagnostics.sessionsWithoutLinkedItem ?? 0;
@@ -83,14 +83,14 @@ export function buildMatterSyncMessage(
   const unlinkedSuffix = withoutLinkedItem > 0 ? " Item metadata unavailable for these sessions." : "";
 
   if (hasMore) {
-    return `${modeLabel} started. ${imported}${unlinkedSuffix}${skippedSuffix} More ${mode === "backfill_library" ? "library data" : "recent activity"} remains — click Sync again.`;
+    return `${modeLabel} started. ${imported}${unlinkedSuffix}${skippedSuffix} Work remains; the daily 06:00 UTC cron resumes it in bounded chunks. You may resume sooner here.`;
   }
 
-  if (mode !== "backfill_library" && counts.sessions === 0) {
+  if (mode !== "backfill_library" && mode !== "backfill_sessions" && counts.sessions === 0) {
     return "No recent reading sessions found. Try expanding the sync window or confirm Matter has reading-session data.";
   }
 
-  return `${modeLabel} complete. ${imported}${unlinkedSuffix}${skippedSuffix}`;
+  return `${modeLabel} enumeration complete. ${imported}${unlinkedSuffix}${skippedSuffix}`;
 }
 
 export function getMatterSyncInitialPhase(mode: MatterSyncMode): MatterSyncPhase {
@@ -235,7 +235,7 @@ function parseMatterSyncLimit(rawValue: string | undefined, fallback: number): n
     return fallback;
   }
 
-  const parsed = Number.parseInt(rawValue, 10);
+  const parsed = /^\d+$/.test(rawValue) ? Number(rawValue) : NaN;
   if (!Number.isFinite(parsed) || parsed < 1 || parsed > 100) {
     return fallback;
   }

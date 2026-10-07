@@ -1,6 +1,6 @@
 # Matter API v1 contract and capability matrix
 
-**Reviewed:** 2026-10-04 against the official documentation links below. This is a documentation review, not a live account/API contract test.
+**Reviewed:** 2026-10-07 against the official documentation links below. This is a documentation review, not a live account/API contract test.
 
 Base URL: `https://api.getmatter.com/public/v1/`. Authentication is a server-side Bearer token for Matter Pro. The account has one active Matter token; generating another immediately invalidates the previous token. Unknown response fields are ignored while required fields are validated.
 
@@ -32,3 +32,12 @@ Missing item linkage is expected, must not trigger enrichment retries, and does 
 The seven-day incremental overlap is an application replay policy over the documented inclusive session `since` boundary; it is not an upstream guarantee about late arrivals, cursor snapshots, or retention. Active cycles persist and reuse their exact endpoint parameters and limit. The adapter does not send session `until`, `order`, or `updated_since` parameters.
 
 Official sources: [overview](https://docs.getmatter.com/api), [sessions](https://docs.getmatter.com/api/reading-sessions/list), [items](https://docs.getmatter.com/api/items/list), [item detail](https://docs.getmatter.com/api/items/get), [item update](https://docs.getmatter.com/api/items/update), [pagination](https://docs.getmatter.com/api/pagination), [rate limits](https://docs.getmatter.com/api/rate-limits), [authentication](https://docs.getmatter.com/api/authentication), [errors](https://docs.getmatter.com/api/errors), [versioning](https://docs.getmatter.com/api/versioning), [annotations](https://docs.getmatter.com/api/annotations/list), [tags](https://docs.getmatter.com/api/tags/list).
+
+Task 14 explicit full history uses only `limit`/`cursor` and omits `since`.
+It pins the full request contract until validated exhaustion, independently of
+completed incremental watermarks. Optional custom/lower-bound history is not
+exposed. The current official sessions/pagination/rate-limit documentation was
+retrieved during implementation; no real Matter calls were made. An exhausted
+enumeration is not a retention guarantee or proof of universal historical
+completeness. Budgets count every HTTP attempt including enrichment; a failed or
+budget-exhausted preparation cannot commit its accepted subset.

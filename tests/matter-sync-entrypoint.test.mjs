@@ -11,7 +11,10 @@ Module._resolveFilename = function (request, parent, isMain, options) {
   if (request.startsWith("@/")) return path.join(root, ".test-build", `${request.slice(2)}.js`);
   return originalResolve.call(this, request, parent, isMain, options);
 };
-const { syncMatterData } = createRequire(import.meta.url)(path.join(root, ".test-build/lib/matter-sync.js"));
+const { syncMatterData: runSync } = createRequire(import.meta.url)(path.join(root, ".test-build/lib/matter-sync.js"));
+
+const limits = { pages: 1, requests: 224, upstreamMs: 90000, totalMs: 150000, requestMs: 10000 };
+const syncMatterData = (mode, options, deps) => runSync(mode, { budget: limits, ...options }, deps);
 
 const emptyPlan = () => ({ placeholders: [], items: [], sessions: [], tags: [], itemTagIds: [], itemTags: [], annotations: [] });
 
@@ -33,15 +36,28 @@ function harness({ sessions = [], items = [], now = [], legacyCooldown = null } 
     ["recent_sessions", stream("recent_sessions")],
     ["library_items", stream("library_items")],
   ]);
+  let intent = { history_status: "none", next_stream: "library_items" };
   const calls = [];
   const importedSessionIds = new Set();
   let run = 0;
   let generation = 0;
   const deps = {
+    cooldownAccount: async (retry) => { for (const state of states.values()) state.retry_at = retry; },
+    getContinuation: async () => intent,
+    requestHistory: async () => { if (intent.history_status === "none") intent = { ...intent, history_status: "pending" }; return intent; },
+    beginHistory: async (limit, started) => {
+      const stored = states.get("recent_sessions");
+      if (intent.history_status === "pending" && !stored.cycle_active) {
+        Object.assign(stored, { filters: {}, page_limit: limit, cursor: null, cycle_started_at: started, cycle_generation: stored.cycle_generation + 1, cycle_active: true, coverage_window: "all" });
+        intent = { ...intent, history_status: "running", history_cycle_generation: stored.cycle_generation };
+      }
+      return stored;
+    },
+    turnContinuation: async (name) => { intent = { ...intent, next_stream: name === "recent_sessions" ? "library_items" : "recent_sessions" }; },
     acquireLease: async () => ({ accountScope: "matter", owner: crypto.randomUUID(), generation: String(++generation) }),
     renewLease: async () => {},
     releaseLease: async () => true,
-    now: () => new Date(now.shift() ?? "2026-06-01T00:00:00.000Z"),
+    now: () => new Date(now.length > 1 ? now.shift() : now[0] ?? "2026-06-01T00:00:00.000Z"),
     getStreams: async () => [...states.values()],
     getLegacyState: async () => ({ rate_limited_until: legacyCooldown }),
     getStream: async (name) => states.get(name) ?? null,
@@ -58,6 +74,7 @@ function harness({ sessions = [], items = [], now = [], legacyCooldown = null } 
     recoverRollups: async () => 0,
     getPageReceipt: async () => null,
     commitPage: async ({ expected, hasMore, nextCursor }) => {
+      if (!hasMore && expected.cycle_generation === intent.history_cycle_generation) intent = { ...intent, history_status: "complete" };
       return deps.upsertStream({ ...expected, cursor: nextCursor, cycle_active: hasMore,
         cycle_started_at: hasMore ? expected.cycle_started_at : null,
         completed_watermark: hasMore ? expected.completed_watermark : expected.cycle_started_at,
@@ -74,12 +91,12 @@ function harness({ sessions = [], items = [], now = [], legacyCooldown = null } 
   };
   return { deps, states, calls, importedSessionIds };
 }
-const page = (results, next = null) => ({ object: "list", results, has_more: next !== null, next_cursor: next });
+const page = (results = [], next = null) => ({ object: "list", results, has_more: next !== null, next_cursor: next });
 
 test("busy account lease denies all trigger modes before any reads, writes or Matter", async () => {
   for (const mode of ["recent_activity_manual", "recent_activity_scheduled", "backfill_library"]) {
     const touched = [];
-    const deps = new Proxy({ acquireLease: async () => null }, {
+    const deps = new Proxy({ acquireLease: async () => null, budgetClock: undefined }, {
       get: (target, key) => key in target ? target[key] : async () => { touched.push(key); throw new Error("unexpected work"); },
     });
     const result = await syncMatterData(mode, {}, deps);
@@ -168,17 +185,13 @@ test("cross-stream and legacy account cooldowns make zero upstream calls and pre
   }
 });
 
-test("deliberate window changes are rejected during and after cycles without Matter or state mutation", async () => {
-  for (const active of [true, false]) {
-    const h = harness();
-    h.states.set("recent_sessions", stream("recent_sessions", { cycle_active: active, cycle_started_at: active ? "2026-01-01T00:00:00Z" : null, cursor: active ? "keep" : null, completed_watermark: active ? null : "2026-02-01T00:00:00Z", coverage_window: "current_year" }));
-    const before = structuredClone(h.states.get("recent_sessions"));
-    const result = await syncMatterData("recent_activity_manual", { recentActivityWindow: "all" }, h.deps);
-    assert.equal(result.ok, false);
-    assert.match(result.message, /differs/);
-    assert.deepEqual(h.calls, []);
-    assert.deepEqual(h.states.get("recent_sessions"), before);
-  }
+test("conflicting narrow windows reject active contracts without Matter or mutation", async () => {
+  const h = harness();
+  h.states.set("recent_sessions", stream("recent_sessions", { cycle_active: true, cycle_started_at: "2026-01-01T00:00:00Z", cursor: "keep", coverage_window: "current_year" }));
+  const before = structuredClone(h.states.get("recent_sessions"));
+  const result = await syncMatterData("recent_activity_manual", { recentActivityWindow: "30_days" }, h.deps);
+  assert.equal(result.ok, false); assert.match(result.message, /conflicts/);
+  assert.deepEqual(h.calls, []); assert.deepEqual(h.states.get("recent_sessions"), before);
 });
 
 test("failure preserves progress; exhausted and empty cycles promote only captured start", async () => {
@@ -220,4 +233,49 @@ test("rollup failure preserves the committed cursor and later invocation recover
   assert.equal(h.states.get("recent_sessions").cursor, "next");
   assert.equal((await syncMatterData("recent_activity_scheduled", {}, h.deps)).ok, true);
   assert.equal(h.states.get("recent_sessions").cycle_active, false);
+});
+
+test("default invocation commits multiple pages and each next contract/receipt is durable", async () => {
+  const h = harness({ sessions: Array.from({ length: 9 }, (_, i) => page([{ id: `s-${i}` }], i < 8 ? `c-${i + 1}` : null)) });
+  let preceding = null; const committed = [];
+  h.deps.getPageReceipt = async () => preceding;
+  const commit = h.deps.commitPage;
+  h.deps.commitPage = async (payload) => {
+    assert.equal(payload.previousReceiptId, preceding);
+    assert.equal(payload.expected.cursor, h.states.get("recent_sessions").cursor);
+    committed.push(payload.expected.cursor); const value = await commit(payload);
+    preceding = payload.receiptId; return value;
+  };
+  const first = await runSync("recent_activity_scheduled", {}, h.deps);
+  assert.equal(first.pagesCommitted, 8); assert.equal(first.status, "partial");
+  assert.equal(h.states.get("recent_sessions").completed_watermark, null);
+  const second = await runSync("recent_activity_scheduled", {}, { ...h.deps });
+  assert.equal(second.pagesCommitted, 1); assert.equal(second.status, "complete");
+  assert.deepEqual(committed, [null, ...Array.from({ length: 8 }, (_, i) => `c-${i + 1}`)]);
+});
+
+test("explicit full history bypasses a completed narrow watermark and repeats idempotently", async () => {
+  const h = harness({ sessions: [page([{ id: "history" }], "historical-next"), page()] });
+  h.states.set("recent_sessions", stream("recent_sessions", { completed_watermark: "2026-05-01T00:00:00Z" }));
+  const first = await syncMatterData("backfill_sessions", {}, h.deps);
+  assert.equal(first.status, "partial");
+  assert.deepEqual(h.states.get("recent_sessions").filters, {});
+  const second = await syncMatterData("recent_activity_scheduled", {}, { ...h.deps });
+  assert.equal(second.historyStatus, "complete");
+  const calls = h.calls.length;
+  const repeated = await syncMatterData("backfill_sessions", {}, h.deps);
+  assert.equal(repeated.historyStatus, "complete"); assert.equal(h.calls.length, calls);
+});
+
+test("history request queues behind an active narrow cycle without altering its cursor/coverage", async () => {
+  const h = harness({ sessions: [page([], "narrow-next"), page(), page()] });
+  h.states.set("recent_sessions", stream("recent_sessions", { cycle_active: true, cursor: "narrow", filters: { since: "2026-01-01T00:00:00Z" }, cycle_started_at: "2026-02-01T00:00:00Z", cycle_generation: 5 }));
+  const first = await syncMatterData("backfill_sessions", {}, h.deps);
+  assert.equal(first.historyStatus,"pending");
+  assert.equal(h.states.get("recent_sessions").cursor,"narrow-next");
+  assert.deepEqual(h.states.get("recent_sessions").filters,{ since:"2026-01-01T00:00:00Z" });
+  await syncMatterData("recent_activity_scheduled",{},h.deps);
+  await syncMatterData("recent_activity_scheduled",{},h.deps);
+  assert.deepEqual(h.states.get("recent_sessions").filters,{});
+  assert.equal(h.states.get("recent_sessions").cycle_generation,6);
 });

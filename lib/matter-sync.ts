@@ -13,6 +13,7 @@ import {
   type MatterListResponse,
 } from "@/lib/matter-api";
 import {
+  getMatterContinuation, requestMatterHistory, beginMatterHistory, turnMatterContinuation, cooldownMatterAccount,
   commitMatterPage,
   getMatterPageReceipt,
   createSyncRun,
@@ -24,6 +25,7 @@ import {
 } from "@/lib/supabase-admin";
 import { acquireMatterSyncLease, renewMatterSyncLease, releaseMatterSyncLease } from "@/lib/matter-sync-lease";
 import { leaseRpcArgs, MatterSyncLeaseLostError, type MatterSyncLease } from "@/lib/matter-sync-lease-context";
+import { MatterInvocationBudget, MatterBudgetStop, withMatterInvocationBudget, type MatterInvocationLimits } from "./matter-invocation-budget";
 import { processPendingDailyStats } from "@/lib/daily-stats";
 import { getAppTimezone } from "@/lib/calendar";
 import type { Json, MatterSyncStream, TablesInsert } from "@/lib/supabase-types";
@@ -61,6 +63,10 @@ const OPTIONAL_MATTER_STATUSES = new Set([403, 404]);
 
 export type MatterSyncResult = {
   ok: boolean;
+  status?: "complete" | "partial";
+  pagesCommitted?: number;
+  requestsAttempted?: number;
+  historyStatus?: string;
   skippedReason?: "busy" | "rate_limited";
   message: string;
   syncRunId?: string;
@@ -85,6 +91,12 @@ type MatterSyncDiagnostics = {
 };
 
 export type MatterSyncRuntimeDeps = {
+  cooldownAccount: typeof cooldownMatterAccount;
+  getContinuation: typeof getMatterContinuation;
+  requestHistory: typeof requestMatterHistory;
+  beginHistory: typeof beginMatterHistory;
+  turnContinuation: typeof turnMatterContinuation;
+  budgetClock?: () => number;
   acquireLease: typeof acquireMatterSyncLease;
   renewLease: typeof renewMatterSyncLease;
   releaseLease: typeof releaseMatterSyncLease;
@@ -106,6 +118,9 @@ export type MatterSyncRuntimeDeps = {
 };
 
 export const productionSyncDeps: MatterSyncRuntimeDeps = {
+  cooldownAccount: cooldownMatterAccount,
+  getContinuation: getMatterContinuation, requestHistory: requestMatterHistory,
+  beginHistory: beginMatterHistory, turnContinuation: turnMatterContinuation,
   acquireLease: acquireMatterSyncLease,
   renewLease: renewMatterSyncLease,
   releaseLease: releaseMatterSyncLease,
@@ -164,11 +179,12 @@ async function loadActiveMatterCooldown(deps: MatterSyncRuntimeDeps, now: Date =
 
 export async function getMatterSyncAvailability(
   deps: MatterSyncRuntimeDeps = productionSyncDeps
-): Promise<{ rateLimitedUntil: string | null; message: string | null }> {
+): Promise<{ rateLimitedUntil: string | null; message: string | null; historyStatus?: string }> {
   const rateLimitedUntil = await loadActiveMatterCooldown(deps);
 
   if (!rateLimitedUntil) {
-    return { rateLimitedUntil: null, message: null };
+    const intent = await deps.getContinuation();
+    return { rateLimitedUntil: null, message: null, historyStatus: intent.history_status };
   }
 
   return {
@@ -179,155 +195,143 @@ export async function getMatterSyncAvailability(
 
 export async function syncMatterData(
   mode: MatterSyncMode = "recent_activity_manual",
-  options: { recentActivityWindow?: MatterRecentActivityWindow } = {},
+  options: { recentActivityWindow?: MatterRecentActivityWindow; budget?: MatterInvocationLimits } = {},
   deps: MatterSyncRuntimeDeps = productionSyncDeps
 ): Promise<MatterSyncResult> {
+  const budget = new MatterInvocationBudget(options.budget, deps.budgetClock);
+  return withMatterInvocationBudget(budget, () => runMatterInvocation(mode, options, deps, budget));
+}
+
+async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivityWindow?: MatterRecentActivityWindow },
+  deps: MatterSyncRuntimeDeps, budget: MatterInvocationBudget): Promise<MatterSyncResult> {
   let lease: MatterSyncLease | null = null;
   let syncRunId: string | null = null;
-  let storedState: MatterSyncStream | null = null;
   let activeCycle: ActiveMatterCycle | null = null;
-  // Trigger identities share the existing recent_activity database run label.
-  const runMode = isRecentActivityMode(mode) ? "recent_activity" : mode;
-
+  const counts = createEmptyMatterBatchCounts();
+  const diagnostics = createEmptyMatterSyncDiagnostics();
+  // Retain existing DB run labels; history is a recent_activity invocation.
+  const runMode = mode === "backfill_library" ? mode : "recent_activity";
+  const explicitHistory = mode === "backfill_sessions" || options.recentActivityWindow === "all";
+  let stop: MatterBudgetStop | null = null;
   try {
     lease = await deps.acquireLease();
     if (!lease) return { ok: false, skippedReason: "busy", message: "Matter sync is already running for this account. Try again shortly." };
     leaseRpcArgs(lease);
-    // Recovery is independent of upstream availability, cooldowns and empty pages.
-    await deps.recoverRollups(lease);
+    let intent = explicitHistory ? await deps.requestHistory(lease) : await deps.getContinuation();
+    // Recovery runs during cooldown as well, bounded to two 32-marker snapshots.
+    await deps.recoverRollups(lease, budget.canRecover);
     const invocationNow = deps.now();
-    const stream = mode === "backfill_library" ? "library_items" : "recent_sessions";
     const rateLimitedUntil = await loadActiveMatterCooldown(deps, invocationNow);
-    if (rateLimitedUntil) {
-      return {
-        ok: false,
-        message: buildMatterRateLimitMessage(rateLimitedUntil),
-        skippedReason: "rate_limited",
-        rateLimitedUntil,
-      };
+    if (rateLimitedUntil) return { ok: false, skippedReason: "rate_limited", message: buildMatterRateLimitMessage(rateLimitedUntil), rateLimitedUntil, historyStatus: intent.history_status };
+    if (explicitHistory && intent.history_status === "complete") return {
+      ok: true, status: "complete", historyStatus: "complete", pagesCommitted: 0, requestsAttempted: 0,
+      message: "The requested enumeration of all sessions available from Matter is complete. This does not establish retention or universal historical completeness.",
+    };
+    const states = new Map((await deps.getStreams()).map((state) => [state.stream, state]));
+    const requestedWindow = isRecentActivityMode(mode) && !explicitHistory ? options.recentActivityWindow : undefined;
+    const initialSession = states.get("recent_sessions");
+    if (requestedWindow && initialSession?.cycle_active && initialSession.coverage_window
+        && requestedWindow !== initialSession.coverage_window && intent.history_status !== "running") {
+      return { ok: false, message: "The requested window conflicts with the active session contract. Resume its pinned coverage or wait for it to finish." };
     }
-    storedState = await deps.getStream(stream);
-
-    const requestedWindow = isRecentActivityMode(mode) ? options.recentActivityWindow : undefined;
-    if (requestedWindow && storedState?.coverage_window && requestedWindow !== storedState.coverage_window) {
-      return {
-        ok: false,
-        message: `The requested ${requestedWindow} history window differs from this stream's ${storedState.coverage_window} contract. Finish or explicitly restart that history operation before changing coverage.`,
-      };
-    }
-
+    const eligible = new Set<"recent_sessions" | "library_items">();
+    if (initialSession?.cycle_active || intent.history_status === "pending" || intent.history_status === "running"
+        || isRecentActivityMode(mode)) eligible.add("recent_sessions");
+    if (states.get("library_items")?.cycle_active || mode === "backfill_library") eligible.add("library_items");
     const startedAt = invocationNow.toISOString();
-    const syncRun = await deps.createRun({ status: "running", started_at: startedAt, sync_mode: runMode }, lease);
-    syncRunId = syncRun.id;
-
-    const recentActivitySince = isRecentActivityMode(mode) ? getRecentActivityWindowStart(new Date(startedAt), options.recentActivityWindow) : null;
-    activeCycle = startOrResumeMatterCycle({
-      stream,
-      stored: storedState,
-      now: new Date(startedAt),
-      configuredLimit: stream === "recent_sessions" ? getMatterSyncSessionsLimit() : getMatterSyncItemsLimit(),
-      initialSince: recentActivitySince,
-      requestedWindow: requestedWindow ?? null,
-    });
-    // Persist the complete request contract before making any upstream call.
-    await deps.upsertStream(persistActiveMatterCycle(activeCycle, activeCycle.cursor), lease);
-    const previousReceiptId = await deps.getPageReceipt(activeCycle.stream);
+    const run = await deps.createRun({ status: "running", started_at: startedAt, sync_mode: runMode }, lease);
+    syncRunId = run.id;
     await deps.renewLease(lease);
     await deps.getAccount(() => deps.renewLease(lease!));
     await deps.renewLease(lease);
-    const counts = createEmptyMatterBatchCounts();
-    const diagnostics = createEmptyMatterSyncDiagnostics();
-    const { plan, hasMore, nextCursor } = await prepareNextMatterBatch({ cycle: activeCycle, counts, diagnostics, deps, lease });
-    validateMatterPagePlan(plan);
-    await deps.renewLease(lease);
-    const persistedState = await deps.commitPage({
-      receiptId: randomUUID(), previousReceiptId, expected: persistActiveMatterCycle(activeCycle, activeCycle.cursor),
-      plan, hasMore, nextCursor, timezone: getAppTimezone(),
-    }, lease);
-    // Checkpoint durability never depends on this calculation succeeding.
-    await deps.recoverRollups(lease);
-    const finishedRun = await deps.updateRun(syncRunId, {
-      status: "success",
-      finished_at: new Date().toISOString(),
-      items_synced: counts.items,
-      sessions_synced: counts.sessions,
-      annotations_synced: counts.annotations,
-      tags_synced: counts.tags,
-      sync_mode: runMode,
-      matter_requests_count: diagnostics.requestCount,
-      matter_sessions_returned: diagnostics.sessionsReturned,
-      matter_items_returned: diagnostics.itemsReturned,
-      matter_sessions_skipped: diagnostics.sessionsSkipped,
+    let checkpoint: string | null = null;
+    const cursors = new Map<string, Set<string>>();
+    while (eligible.size) {
+      const stream = eligible.has(intent.next_stream) ? intent.next_stream : [...eligible][0];
+      let stored = states.get(stream) ?? null;
+      if (stream === "recent_sessions" && intent.history_status === "pending" && !stored?.cycle_active) {
+        stored = await deps.beginHistory(getMatterSyncSessionsLimit(), startedAt, lease);
+        intent = await deps.getContinuation();
+        states.set(stream, stored);
+      }
+      activeCycle = startOrResumeMatterCycle({ stream, stored, now: invocationNow,
+        configuredLimit: stream === "recent_sessions" ? getMatterSyncSessionsLimit() : getMatterSyncItemsLimit(),
+        initialSince: stream === "recent_sessions" ? getRecentActivityWindowStart(invocationNow, requestedWindow) : null,
+        requestedWindow: requestedWindow ?? null });
+      try { budget.admitPage(activeCycle.pageLimit); }
+      catch (error) { if (error instanceof MatterBudgetStop) { stop = error; break; } throw error; }
+      if (!stored?.cycle_active) await deps.upsertStream(persistActiveMatterCycle(activeCycle, activeCycle.cursor), lease);
+      // Persist the next turn before reads: an expensive/failed page cannot starve
+      // its sibling after process death or repeated small/time-limited invocations.
+      await deps.turnContinuation(stream, lease);
+      intent = { ...intent, next_stream: stream === "recent_sessions" ? "library_items" : "recent_sessions" };
+      const previousReceiptId = await deps.getPageReceipt(stream);
+      const pageCounts = createEmptyMatterBatchCounts();
+      let prepared: Awaited<ReturnType<typeof prepareNextMatterBatch>>;
+      try { prepared = await prepareNextMatterBatch({ cycle: activeCycle, counts: pageCounts, diagnostics, deps, lease }); budget.check(); }
+      catch (error) { if (error instanceof MatterBudgetStop) { stop = error; break; } throw error; }
+      validateMatterPagePlan(prepared.plan);
+      const seen = cursors.get(stream) ?? new Set<string>(activeCycle.cursor ? [activeCycle.cursor] : []);
+      if (prepared.nextCursor && seen.has(prepared.nextCursor)) throw new MatterPageValidationError("stream_cursor_loop");
+      if (prepared.nextCursor) seen.add(prepared.nextCursor);
+      cursors.set(stream, seen);
+      await deps.renewLease(lease);
+      const persisted = await deps.commitPage({ receiptId: randomUUID(), previousReceiptId,
+        expected: persistActiveMatterCycle(activeCycle, activeCycle.cursor), ...prepared, timezone: getAppTimezone() }, lease);
+      budget.pages++;
+      for (const key of ["items", "sessions", "annotations", "tags"] as const) counts[key] += pageCounts[key];
+      states.set(stream, persisted);
+      checkpoint = persisted.completed_watermark;
+      // Always derive the next expected contract from the returned durable state.
+      activeCycle = persisted.cycle_active ? startOrResumeMatterCycle({ stream, stored: persisted, now: invocationNow, configuredLimit: persisted.page_limit }) : null;
+      if (!persisted.cycle_active) {
+        intent = await deps.getContinuation();
+        if (!(stream === "recent_sessions" && intent.history_status === "pending")) eligible.delete(stream);
+      }
+    }
+    await deps.recoverRollups(lease, budget.canRecover);
+    intent = await deps.getContinuation();
+    const hasMore = eligible.size > 0 || intent.history_status === "pending" || intent.history_status === "running";
+    await deps.updateRun(syncRunId, {
+      status: "success", finished_at: deps.now().toISOString(), sync_mode: runMode,
+      items_synced: counts.items, sessions_synced: counts.sessions, annotations_synced: counts.annotations, tags_synced: counts.tags,
+      matter_requests_count: budget.requests, matter_sessions_returned: diagnostics.sessionsReturned,
+      matter_items_returned: diagnostics.itemsReturned, matter_sessions_skipped: diagnostics.sessionsSkipped,
       matter_sessions_without_linked_item: diagnostics.sessionsWithoutLinkedItem,
-      matter_first_session_shape: diagnostics.firstSessionShape,
-      matter_has_more: diagnostics.lastHasMore,
-      matter_next_cursor_present: diagnostics.lastNextCursorPresent,
-      error_message: null,
-      checkpoint_timestamp: persistedState.completed_watermark ?? null,
+      matter_first_session_shape: diagnostics.firstSessionShape, matter_has_more: hasMore,
+      matter_next_cursor_present: diagnostics.lastNextCursorPresent, error_message: null,
+      checkpoint_timestamp: hasMore ? null : checkpoint,
     }, lease);
-
-    return {
-      ok: true,
-      message: buildMatterSyncMessage(counts, hasMore, mode, {
-        sessionsReturned: diagnostics.sessionsReturned,
-        sessionsSkipped: diagnostics.sessionsSkipped,
+    return { ok: true, status: hasMore ? "partial" : "complete", hasMore, syncRunId,
+      pagesCommitted: budget.pages, requestsAttempted: budget.requests, historyStatus: intent.history_status,
+      itemsSynced: counts.items, sessionsSynced: counts.sessions, annotationsSynced: counts.annotations, tagsSynced: counts.tags,
+      message: buildMatterSyncMessage(counts, hasMore, explicitHistory ? "backfill_sessions" : mode, {
+        sessionsReturned: diagnostics.sessionsReturned, sessionsSkipped: diagnostics.sessionsSkipped,
         sessionsWithoutLinkedItem: diagnostics.sessionsWithoutLinkedItem,
-      }),
-      syncRunId: finishedRun.id,
-      itemsSynced: finishedRun.items_synced,
-      sessionsSynced: finishedRun.sessions_synced,
-      annotationsSynced: finishedRun.annotations_synced,
-      tagsSynced: finishedRun.tags_synced,
-      hasMore,
+      }) + (stop ? ` Invocation ${stop.reason} budget reached; the last committed checkpoint is retained.` : ""),
     };
   } catch (error) {
-    const rateLimitedUntil = getRateLimitedUntil(error);
+    const rateLimitedUntil = getRateLimitedUntil(error, deps.now());
     const sanitizedError = sanitizeSyncError(error);
-
     if (rateLimitedUntil && lease) {
-      try {
-        if (activeCycle) {
-          await deps.upsertStream(persistActiveMatterCycle(activeCycle, activeCycle.cursor, rateLimitedUntil), lease);
-        }
-      } catch (stateError) {
-        console.error("Matter sync rate-limit state update failed", { error: sanitizeLogError(stateError) });
-      }
+      try { await deps.cooldownAccount(rateLimitedUntil, lease); }
+      catch (stateError) { console.error("Matter cooldown persistence failed", { error: sanitizeLogError(stateError) }); }
     }
-
     if (syncRunId && lease) {
-      try {
-        await deps.updateRun(syncRunId, {
-          status: "error",
-          finished_at: new Date().toISOString(),
-          error_message: sanitizedError,
-          sync_mode: runMode,
-          checkpoint_timestamp: null,
-        }, lease);
-      } catch (updateError) {
-        console.error("Matter sync run error update failed", { syncRunId, error: sanitizeLogError(updateError) });
-      }
+      try { await deps.updateRun(syncRunId, { status: "error", finished_at: deps.now().toISOString(), error_message: sanitizedError,
+        sync_mode: runMode, matter_requests_count: budget.requests, checkpoint_timestamp: null }, lease); }
+      catch (updateError) { console.error("Matter run update failed", { error: sanitizeLogError(updateError) }); }
     }
-
     console.error("Matter sync failed", { syncRunId, error: sanitizeLogError(error) });
-
-    if (rateLimitedUntil) {
-      return {
-        ok: false,
-        message: buildMatterRateLimitMessage(rateLimitedUntil),
-        syncRunId: syncRunId ?? undefined,
-        rateLimitedUntil,
-      };
-    }
-
-    return {
-      ok: false,
-      message: `Matter sync failed safely. ${sanitizedError} Earlier committed work remains; retry resumes or replays the stored cycle.`,
-      syncRunId: syncRunId ?? undefined,
+    return { ok: false, hasMore: true, pagesCommitted: budget.pages, requestsAttempted: budget.requests,
+      syncRunId: syncRunId ?? undefined, rateLimitedUntil,
+      message: rateLimitedUntil ? buildMatterRateLimitMessage(rateLimitedUntil)
+        : `Matter sync stopped safely. ${sanitizedError} Earlier committed work remains; continuation uses the stored contract.`,
     };
   } finally {
     if (lease) {
       try { await deps.releaseLease(lease); }
-      catch (error) { console.error("Matter sync lease release failed", { error: sanitizeLogError(error) }); }
+      catch (error) { console.error("Matter lease release failed", { error: sanitizeLogError(error) }); }
     }
   }
 }
@@ -337,7 +341,7 @@ async function prepareNextMatterBatch({ cycle, counts, diagnostics, deps, lease 
   deps: MatterSyncRuntimeDeps; lease: MatterSyncLease;
 }): Promise<{ plan: MatterPagePlan; hasMore: boolean; nextCursor: string | null }> {
   await deps.renewLease(lease);
-  diagnostics.requestCount += 1;
+
   if (cycle.stream === "library_items") {
     const page = await deps.listItems({ status: "all", order: "updated", updatedSince: cycle.filters.updated_since,
       cursor: cycle.cursor ?? undefined, limit: cycle.pageLimit }, () => deps.renewLease(lease));
@@ -430,7 +434,7 @@ async function importMatterSessionPage(page: Awaited<ReturnType<typeof listMatte
   const results: NormalizableMatterItem[] = [];
   for (const id of linkedIds) {
     const item = embedded.get(id) ?? await getOptionalMatterItem(id, lease);
-    if (!embedded.has(id)) diagnostics.requestCount += 1;
+
     if (item) {
       if (item.id !== id) throw new MatterPageValidationError("divergent_linked_item");
       results.push(item);
@@ -490,7 +494,7 @@ async function getOptionalMatterItem(itemId: string, lease: MatterSyncLease): Pr
     await renewMatterSyncLease(lease);
     return item;
   } catch (error) {
-    if (isOptionalMatterEndpointError(error) || error instanceof MatterRateLimitError) {
+    if (isOptionalMatterEndpointError(error)) {
       console.info("Matter optional endpoint unavailable", { operation: "item", status: (error as MatterApiError).status });
       return null;
     }
@@ -500,22 +504,21 @@ async function getOptionalMatterItem(itemId: string, lease: MatterSyncLease): Pr
 
 
 
-function getRateLimitedUntil(error: unknown): string | null {
+function getRateLimitedUntil(error: unknown, now: Date): string | null {
   if (!(error instanceof MatterRateLimitError)) {
     return null;
   }
 
   const retryAfterSeconds = error.rateLimit.retryAfterSeconds;
-  if (retryAfterSeconds === null) {
-    return null;
-  }
-
-  return new Date(Date.now() + retryAfterSeconds * 1_000).toISOString();
+  const resetAt = error.rateLimit.reset === null ? null : error.rateLimit.reset * 1_000;
+  const retryMs = retryAfterSeconds === null ? (resetAt && resetAt > now.getTime() ? resetAt - now.getTime() : 60_000) : Math.max(retryAfterSeconds * 1_000, 1_000);
+  return new Date(now.getTime() + retryMs).toISOString();
 }
 
 async function* iterateOptionalMatterAnnotations(itemId: string, lease: MatterSyncLease, budget: { rows: number; pages: number }) {
   let cursor: string | null = null;
   const cursors = new Set<string>();
+  let acceptedPages = 0;
   try {
     do {
       if (++budget.pages > 100) throw new MatterPageValidationError("annotation_page_bound_exceeded");
@@ -523,6 +526,7 @@ async function* iterateOptionalMatterAnnotations(itemId: string, lease: MatterSy
       const page = await listMatterAnnotations(itemId, { limit: 100, cursor: cursor ?? undefined }, () => renewMatterSyncLease(lease));
       await renewMatterSyncLease(lease);
       validateMatterPage(page, 100, cursor);
+      acceptedPages++;
       budget.rows += page.results.length;
       if (budget.rows > MATTER_ENRICHMENT_MAX_ROWS) throw new MatterPageValidationError("enrichment_bound_exceeded");
       if (page.next_cursor && cursors.has(page.next_cursor)) throw new MatterPageValidationError("annotation_cursor_loop");
@@ -531,7 +535,7 @@ async function* iterateOptionalMatterAnnotations(itemId: string, lease: MatterSy
       cursor = page.has_more ? page.next_cursor : null;
     } while (cursor);
   } catch (error) {
-    if (isOptionalMatterEndpointError(error)) {
+    if (isOptionalMatterEndpointError(error) && acceptedPages === 0) {
       console.info("Matter optional endpoint unavailable", { operation: "annotations", status: (error as MatterApiError).status });
       return;
     }
@@ -544,6 +548,7 @@ function isOptionalMatterEndpointError(error: unknown): boolean {
 }
 
 function sanitizeSyncError(error: unknown): string {
+  if (error instanceof MatterBudgetStop) return error.message;
   if (error instanceof MatterSyncLeaseLostError) return error.message;
   if (error instanceof MatterPageValidationError) return `Matter page rejected (${error.reason}); no page writes were applied.`;
   if (error instanceof MatterApiError) {

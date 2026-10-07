@@ -568,3 +568,4 @@ function formatTimestamp(timestamp: string | null | undefined): string {
 function formatInteger(value: number): string {
   return new Intl.NumberFormat("en").format(value);
 }
+export const maxDuration = 180;

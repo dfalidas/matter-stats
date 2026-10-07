@@ -147,6 +147,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   let preservation = null;
   let streamPreservation = null;
   let leasePreservation = null;
+  let pagePreservation = null;
   const ownershipMarker = `task05-${projectId}`;
   if (upgrade) {
     containerPsql(projectId, legacySeedSql(ownershipMarker));
@@ -168,11 +169,24 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     containerPsql(projectId, `update public.matter_sync_leases set owner='${leaseOwner}', generation=81, expires_at=clock_timestamp()+interval '120 seconds' where account_scope='matter';`);
     const task12SnapshotSql = "select jsonb_build_object('streams',(select jsonb_agg(to_jsonb(s) order by stream) from public.matter_sync_streams s),'leases',(select jsonb_agg(to_jsonb(l)) from public.matter_sync_leases l))::text;";
     const beforeTask13 = containerPsql(projectId, task12SnapshotSql);
-    await copyMigrations(workdir, (filename) => filename.slice(0, 14) > "20261005000000");
+    await copyMigrations(workdir, (filename) => filename.slice(0, 14) > "20261005000000" && filename.slice(0,14) <= "20261007085051");
     cli(["migration", "up", "--local", "--workdir", workdir], { env: sanitizedEnvironment() });
     assert.deepEqual(JSON.parse(containerPsql(projectId, task12SnapshotSql)), JSON.parse(beforeTask13), "Task 13 changed active Task 11 contracts, cooldowns or Task 12 lease generation/expiry");
     assert.equal(containerPsql(projectId, `select public.release_matter_sync_lease('matter','${leaseOwner}',81);`).trim(), "t");
     leasePreservation = "passed";
+    const receiptId = "00000000-0000-4000-8000-000000000082";
+    const dirtyRevision = "00000000-0000-4000-8000-000000000083";
+    containerPsql(projectId, `insert into public.matter_page_receipts(stream,receipt_id,fingerprint) values ('recent_sessions','${receiptId}','owned-upgrade-receipt');
+      insert into public.matter_dirty_rollups(date,revision,timezone) values ('2099-01-02','${dirtyRevision}','Europe/Athens');`);
+    const task13SnapshotSql = "select jsonb_build_object('streams',(select jsonb_agg(to_jsonb(s) order by stream) from public.matter_sync_streams s),'leases',(select jsonb_agg(to_jsonb(l)) from public.matter_sync_leases l),'receipts',(select jsonb_agg(to_jsonb(r)) from public.matter_page_receipts r),'dirty',(select jsonb_agg(to_jsonb(d)) from public.matter_dirty_rollups d))::text;";
+    const beforeTask14 = containerPsql(projectId,task13SnapshotSql);
+    await copyMigrations(workdir,(filename) => filename.slice(0,14) > "20261007085051");
+    cli(["migration","up","--local","--workdir",workdir],{env:sanitizedEnvironment()});
+    assert.deepEqual(JSON.parse(containerPsql(projectId,task13SnapshotSql)),JSON.parse(beforeTask14),"Task 14 changed Task 11/12/13 contracts, cooldowns, leases, receipts or dirty work");
+    pagePreservation = "passed";
+    assert.equal(containerPsql(projectId,`delete from public.matter_page_receipts where receipt_id='${receiptId}' returning receipt_id;`).trim(),receiptId);
+    assert.equal(containerPsql(projectId,`delete from public.matter_dirty_rollups where revision='${dirtyRevision}' returning revision;`).trim(),dirtyRevision);
+
     // Restore only the two synthetic contracts this path owns, after verifying
     // preservation. No unrelated row is overwritten for integration fixtures.
     for (const seed of streamSeeds) {
@@ -193,6 +207,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   const versions = await catalog(projectId, path.join(workdir, "supabase/migrations"));
   let leaseEvidence;
   let pageEvidence;
+  let continuationEvidence;
   const runIntegration = () => {
     command(process.execPath, [path.join(repoRoot, "node_modules/typescript/bin/tsc"), "-p", "tests/tsconfig.json"], { env: sanitizedEnvironment() });
     const env = integrationEnvironment(status, projectId);
@@ -212,11 +227,18 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     assert.equal(pageReport.syntheticMatterOnly, true);
     assert.equal(pageReport.cleanup, "passed");
     pageEvidence = { checks: pageReport.checks, realSqlAndDataApi: true, syntheticMatterOnly: true, cleanup: "passed" };
+    const continuationOutput = command(process.execPath, [path.join(repoRoot, "tests/integration/matter-continuation.mjs")], { env });
+    const continuationReport = JSON.parse(continuationOutput.trim().split(/\r?\n/).at(-1));
+    assert.equal(continuationReport.status, "passed");
+    assert.equal(continuationReport.realSqlAndDataApi, true);
+    assert.equal(continuationReport.syntheticMatterOnly, true);
+    assert.equal(continuationReport.cleanup, "passed");
+    continuationEvidence = { checks: continuationReport.checks, realSqlAndDataApi: true, syntheticMatterOnly: true, cleanup: "passed" };
   };
   if (upgrade) {
     await removeOwnedLegacySingleton({ query: (sql) => Promise.resolve(containerPsql(projectId, sql)), ownershipMarker, runIntegration });
   } else runIntegration();
-  return { name, catalog: "passed", dataApi: "passed", accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, preservation, streamPreservation, leasePreservation, migrationHistory: versions };
+  return { name, catalog: "passed", dataApi: "passed", accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, boundedContinuationAndHistory: "passed", continuationEvidence, preservation, streamPreservation, leasePreservation, pagePreservation, migrationHistory: versions };
 }
 
 export async function runStabilizationDatabases({ evidenceRoot = path.join(repoRoot, "artifacts/stabilization-db"), hasDocker = dockerAvailable } = {}) {

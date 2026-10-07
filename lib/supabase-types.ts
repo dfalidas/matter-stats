@@ -301,6 +301,12 @@ export type Database = {
         };
         Relationships: [];
       };
+      matter_sync_continuation: {
+        Row: MatterContinuation;
+        Insert: Partial<MatterContinuation> & { account_scope: string };
+        Update: Partial<MatterContinuation>;
+        Relationships: [];
+      };
       matter_page_receipts: {
         Row: { stream: string; receipt_id: string; fingerprint: string };
         Insert: { stream: string; receipt_id: string; fingerprint: string };
@@ -430,6 +436,11 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      cooldown_matter_account: { Args: LeaseRpcArgs & { p_retry_at: string }; Returns: undefined };
+      request_matter_history: { Args: LeaseRpcArgs & { p_coverage: string }; Returns: MatterContinuation };
+      begin_matter_history: { Args: LeaseRpcArgs & { p_limit: number; p_started_at: string }; Returns: MatterSyncStream };
+      turn_matter_continuation: { Args: LeaseRpcArgs & { p_stream: string }; Returns: undefined };
+      complete_matter_history: { Args: Record<string, never>; Returns: unknown };
       commit_matter_page: {
         Args: LeaseRpcArgs & { p_receipt_id: string; p_previous_receipt_id: string | null; p_expected: TablesInsert<"matter_sync_streams">; p_plan: import("./matter-page-plan").MatterPagePlan; p_has_more: boolean; p_next_cursor: string | null; p_timezone: string };
         Returns: MatterSyncStream;
@@ -481,3 +492,9 @@ export type SyncRun = Tables<"sync_runs">;
 export type LeaseRpcArgs = { p_account_scope: string; p_owner: string; p_generation: string };
 
 export type DirtyMatterRollup = Tables<"matter_dirty_rollups">;
+
+export type MatterContinuation = {
+  account_scope: string; coverage: "all"; history_status: "none" | "pending" | "running" | "complete";
+  requested_at: string | null; history_cycle_generation: number | null; completed_at: string | null;
+  next_stream: "recent_sessions" | "library_items";
+};

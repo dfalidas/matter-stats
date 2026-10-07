@@ -17,6 +17,7 @@ const initialState: SyncMatterActionState = null;
 export function SyncMatterButton({ showBackfill = false }: { showBackfill?: boolean } = {}) {
   const [state, formAction, isPending] = useActionState(syncMatterAction, initialState);
   const [rateLimitedUntil, setRateLimitedUntil] = useState<string | null>(null);
+  const [historyStatus, setHistoryStatus] = useState<string | null>(null);
   const [availabilityMessage, setAvailabilityMessage] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
 
@@ -31,6 +32,7 @@ export function SyncMatterButton({ showBackfill = false }: { showBackfill?: bool
 
         setRateLimitedUntil(availability.rateLimitedUntil);
         setAvailabilityMessage(availability.message);
+        setHistoryStatus(availability.historyStatus ?? null);
       })
       .catch(() => {
         if (isMounted) {
@@ -44,6 +46,7 @@ export function SyncMatterButton({ showBackfill = false }: { showBackfill?: bool
   }, []);
 
   useEffect(() => {
+    if (state?.historyStatus) setHistoryStatus(state.historyStatus);
     if (state?.rateLimitedUntil !== undefined) {
       setRateLimitedUntil(state.rateLimitedUntil);
       setAvailabilityMessage(state.rateLimitedUntil ? buildMatterRateLimitMessage(state.rateLimitedUntil) : null);
@@ -98,6 +101,18 @@ export function SyncMatterButton({ showBackfill = false }: { showBackfill?: bool
           <SyncButton
             type="submit"
             name="mode"
+            value="backfill_sessions"
+            variant="outline"
+            isSyncing={isPending}
+            disabled={isDisabled}
+            idleLabel="Start / Resume Session History"
+            syncingLabel="Starting history..."
+          />
+        ) : null}
+        {showBackfill ? (
+          <SyncButton
+            type="submit"
+            name="mode"
             value="backfill_library"
             variant="outline"
             className="border-white/10 bg-transparent hover:bg-white/[0.05]"
@@ -108,6 +123,8 @@ export function SyncMatterButton({ showBackfill = false }: { showBackfill?: bool
           />
         ) : null}
       </form>
+      {showBackfill ? <p className="text-sm text-dashboard-muted">Available session history continues daily at 06:00 UTC, even after closing this page.</p> : null}
+      {showBackfill && historyStatus && historyStatus !== "none" ? <p className="text-sm text-dashboard-muted" role="status">Available session history: {historyStatus}.</p> : null}
       {rateLimitNotice ? <p className="text-sm text-warning">{rateLimitNotice}</p> : null}
       {state || (availabilityMessage && isRateLimited) ? (
         <p className={state?.ok ? "text-sm text-emerald-400" : "text-sm text-destructive"} role="status" aria-live="polite">

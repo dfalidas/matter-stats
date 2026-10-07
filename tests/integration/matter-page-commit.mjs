@@ -119,6 +119,8 @@ try {
     return originalResolve.call(this, request, parent, isMain, options);
   };
   runtime = createRequire(import.meta.url)(path.join(root, ".test-build/lib/matter-sync.js"));
+  const runSync = runtime.syncMatterData;
+  runtime = { ...runtime, syncMatterData: (mode, options, dependencies) => runSync(mode, { budget: { pages: 1, requests: 224, upstreamMs: 90000, totalMs: 150000, requestMs: 10000 }, ...options }, dependencies) };
   deps = { ...runtime.productionSyncDeps, now: () => new Date("2026-10-01T00:00:00Z"), createRun: async (row, lease) => { ownedRuns.add(lease.owner); return runtime.productionSyncDeps.createRun(row, lease); } };
   globalThis.fetch = async (request, init) => String(request).startsWith("https://api.getmatter.com/") ? upstream(String(request), init) : transport(request, init);
 

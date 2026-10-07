@@ -186,7 +186,10 @@ test("actual page guard and actions fail closed before protected work", async ()
     reset(); await arrange();
     await expectRedirect(() => requireAccessSession(), "/login");
     assert.deepEqual(await dashboardActions.getMatterSyncAvailabilityAction(), { rateLimitedUntil: null, message: null });
-    assert.equal((await dashboardActions.syncMatterAction(null)).ok, false);
+    for (const mode of ["recent_activity_manual", "backfill_sessions", "backfill_library"]) {
+      const form = new FormData(); form.set("mode", mode);
+      assert.equal((await dashboardActions.syncMatterAction(null, form)).ok, false);
+    }
     assert.equal(syncState.availabilityCalls, 0); assert.equal(syncState.syncCalls, 0); assert.equal(revalidated.length, 0);
   }
 });

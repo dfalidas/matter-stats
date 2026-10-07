@@ -96,11 +96,12 @@ function isValidDateString(value: string): boolean {
 
 // One bounded snapshot per call. Newer work survives exact-revision acknowledgement.
 export const PENDING_ROLLUP_WORK_LIMIT = 32;
-export async function processPendingDailyStats(lease: MatterSyncLease): Promise<number> {
+export async function processPendingDailyStats(lease: MatterSyncLease, shouldContinue: () => boolean = () => true): Promise<number> {
   leaseRpcArgs(lease);
   const pending = await getPendingDailyStats(PENDING_ROLLUP_WORK_LIMIT, lease);
   let acknowledged = 0;
   for (const marker of pending) {
+    if (!shouldContinue()) break;
     await renewMatterSyncLease(lease);
     const row = await calculateDailyStat(marker.date, marker.timezone);
     if (await acknowledgeDailyStat(marker, row, lease)) acknowledged++;

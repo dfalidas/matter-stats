@@ -195,3 +195,40 @@ until a compatible recovery/commit runtime is restored. Do not drop marker/recei
 tables, reset cursors/generations/coverage, clear pending work, disable RLS, or
 replay from a client-assumed checkpoint as a rollback. Production execution and
 any destructive recovery require separate authorization.
+
+## Task 14 release order and rollback
+
+Apply `20261007132750_matter_continuation_history_intent.sql` after Task 13 and
+before Task 14 code. The Supabase CLI generated its filename. It adds one RLS
+singleton, four fenced invoker RPCs and an invoker completion trigger; exact
+signatures/grants are inventoried in `scripts/matter-continuation-inventory.mjs`.
+No existing migration, domain row, contract, receipt, dirty marker or lease
+history is rewritten. Service access to the new table is SELECT/UPDATE only,
+with no INSERT/DELETE/TRUNCATE; PUBLIC/browser access is revoked.
+
+No new secrets, configuration variables, dependency, service or cron cadence are
+required. Existing page-size variables remain strict integer 1–100/default 25.
+The dashboard, Settings server actions and cron route cap duration at 180 seconds;
+verify Node.js/Fluid Compute support and effective deployed duration before
+release. The daily cron remains `0 6 * * *` UTC, authenticated by the exact Bearer
+`CRON_SECRET`; manual actions retain the database-backed app session guard. Never
+send credentials in URLs or browser state. Default invocation budgets are fixed
+in code; reduced budget injection is used only by deterministic tests.
+
+For a separately authorized rollout: disable all sync ingress/old preview writers,
+drain existing workers, retain a backup, apply migrations in order, verify exact
+catalog/grants and fresh/upgrade FINAL-head gates, deploy compatible code, verify
+its runtime limits, then re-enable existing manual/cron ingress. One explicit
+history initiation is sufficient; pending work persists across process/browser/
+deployment changes, but remaining chunks may wait for the next daily invocation.
+Completion certifies only exhaustion of that requested Matter enumeration.
+
+For rollback, disable/drain ingress and prefer rolling forward. Leave the additive
+schema, history intent/progress, contracts, receipts, dirty revisions and lease
+generations intact. Task 13 writers still fence/commit pages and the new trigger
+records bound history completion, but their one-page scheduler does not provide
+Task 14 continuation/fairness or stop restarting completed intents. Keep older
+sync writers disabled until compatible Task 14 code is restored; a read-only app
+rollback can leave pending work safely. Task 12/older writers also lack atomic
+page recovery. Do not reset cursors, delete intent/receipt/dirty rows, re-import by
+destructive reset, remove RLS or apply production SQL as part of these tests.
