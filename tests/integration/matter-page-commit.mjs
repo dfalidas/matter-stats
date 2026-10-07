@@ -283,6 +283,27 @@ try {
   assert.equal((await read("matter_dirty_rollups")).length, 0);
   checks.push("Interrupted acknowledgement retains dirty revision; bounded production recovery processes 32 dates and retains remaining 8 for next call");
   await release(activeLease); activeLease = null;
+  await seedCycle("recent_sessions");
+  let uncertainResponses = 0;
+  transport = async (request, init) => {
+    const response = await originalFetch(request, init);
+    if (String(request).endsWith("/rpc/commit_matter_page")) {
+      assert.equal(response.ok, true); await response.text(); uncertainResponses++;
+      throw new TypeError("synthetic both acknowledgements lost");
+    }
+    return response;
+  };
+  assert.equal((await runtime.syncMatterData("recent_activity_scheduled", {}, deps)).ok, false);
+  assert.equal(uncertainResponses, 2);
+  assert.equal((await read("matter_sync_streams")).find((s) => s.stream === "recent_sessions").cursor, "session-next");
+  assert.ok((await read("matter_dirty_rollups")).length > 0);
+  transport = (request, init) => originalFetch(request, init);
+  upstream = (request) => new URL(request).pathname.endsWith("/reading_sessions") ? Response.json(page()) : normal(request);
+  assert.equal((await runtime.syncMatterData("recent_activity_scheduled", {}, deps)).ok, true);
+  assert.equal((await read("matter_dirty_rollups")).length, 0);
+  assert.equal((await read("reading_sessions")).filter((r) => r.id === session.id).length, 1);
+  assert.equal((await read("item_tags")).filter((r) => r.item_id === item.id).length, 1);
+  checks.push("Both SQL acknowledgements lost: later invocation recovers durable dirty work and resumes committed cursor without duplicate sessions/joins");
   // Embedded metadata, unavailable optional endpoints, required placeholders and
   // per-row skips all pass through the production preparation and commit path.
   const embeddedItem = { ...item, id: `${prefix}-embedded-item`, title: "Embedded" };
