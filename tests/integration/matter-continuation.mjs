@@ -190,16 +190,33 @@ try {
     } finally { globalThis.setTimeout = originalSetTimeout; }
     await resetOwnedCycles();
   }
-  // An expensive valid page receives a fresh invocation and completes in full.
-  tick = 0; let annotationCalls = 0;
+  // An expensive valid page stops inside preparation, then resumes the stored
+  // contract in a fresh invocation without any fixture/cursor reset.
+  tick = 0; let annotationCalls = 0; const expensiveParams = [];
   upstream = (url) => {
     if (url.pathname.endsWith("/me")) return Response.json({});
-    if (url.pathname.endsWith("/reading_sessions")) return Response.json(page([{ id: `${prefix}-budget`, item_id: fixtureItem.id, date: "2027-03-01T10:00:00Z", seconds_read: 61 }]));
-    if (url.pathname.endsWith("/annotations")) return Response.json(page([], ++annotationCalls < 100 ? `annotation:${annotationCalls}` : null));
+    if (url.pathname.endsWith("/reading_sessions")) { expensiveParams.push(Object.fromEntries(url.searchParams)); return Response.json(page([{ id: `${prefix}-budget`, item_id: fixtureItem.id, date: "2027-03-01T10:00:00Z", seconds_read: 61 }])); }
+    if (url.pathname.endsWith("/annotations")) {
+      annotationCalls++;
+      const ordinal = Number((url.searchParams.get("cursor") ?? "annotation:0").split(":")[1]) + 1;
+      return Response.json(page([], ordinal < 100 ? `annotation:${ordinal}` : null));
+    }
     return Response.json(fixtureItem);
   };
-  const expensive = await runtime.syncMatterData("recent_activity_scheduled", {}, deps);
+  const beforeExpensive = await snapshot();
+  const pausedExpensive = await runtime.syncMatterData("recent_activity_scheduled", { budget: { ...limits, requests: 5 } }, deps);
+  assert.equal(pausedExpensive.status,"partial"); assert.equal(pausedExpensive.pagesCommitted,0); assert.equal(pausedExpensive.requestsAttempted,5); assert.equal(annotationCalls,2);
+  const pausedState = await snapshot();
+  assert.deepEqual(pausedState.sessions,beforeExpensive.sessions); assert.deepEqual(pausedState.receipts,beforeExpensive.receipts); assert.deepEqual(pausedState.dirty,beforeExpensive.dirty);
+  const pausedContract = pausedState.streams.find((s)=>s.stream==="recent_sessions");
+  assert.equal(pausedContract.cursor,null); assert.equal(pausedContract.completed_watermark,beforeExpensive.streams.find((s)=>s.stream==="recent_sessions").completed_watermark);
+  annotationCalls = 0;
+  const expensive = await runtime.syncMatterData("recent_activity_scheduled", {}, { ...deps, now: () => new Date("2028-01-02T06:00:00Z") });
   assert.equal(expensive.ok,true); assert.equal(expensive.pagesCommitted,1); assert.equal(expensive.requestsAttempted,103); assert.equal(annotationCalls,100);
+  assert.deepEqual(expensiveParams[1],expensiveParams[0]);
+  const resumedContract = (await snapshot()).streams.find((s)=>s.stream==="recent_sessions");
+  assert.equal(resumedContract.cycle_generation,pausedContract.cycle_generation); assert.equal(resumedContract.page_limit,pausedContract.page_limit);
+  assert.equal(Date.parse(resumedContract.completed_watermark),Date.parse(pausedContract.cycle_started_at));
   checks.push("D/G: counted me/list/item/all annotation attempts; request/deadline stops and deterministic cancellation timers inside real preparation never commit a subset; fresh reservation completes a valid 100-annotation-page preparation");
 
   // HTTP failures retain the last committed cursor. 429 in optional paths is

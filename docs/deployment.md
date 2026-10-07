@@ -62,8 +62,8 @@ Copy `.env.example` only as a template. Replace its obvious placeholders in Verc
 | `SUPABASE_URL` | Required server-side Supabase URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Required server-only administrative key. |
 | `CRON_SECRET` | Required for authorized scheduled sync; use a long random secret. |
-| `MATTER_SYNC_ITEMS_LIMIT` | Optional positive integer; defaults to `25`. |
-| `MATTER_SYNC_SESSIONS_LIMIT` | Optional positive integer; defaults to `25`. |
+| `MATTER_SYNC_ITEMS_LIMIT` | Optional integer 1–100; defaults to `25`. |
+| `MATTER_SYNC_SESSIONS_LIMIT` | Optional integer 1–100; defaults to `25`. |
 
 None of these variables should be prefixed with `NEXT_PUBLIC_`. In particular, the service-role key bypasses normal RLS enforcement and must never reach browser code. Redeploy after changing Vercel environment values.
 
@@ -230,7 +230,7 @@ For rollback, disable/drain ingress and prefer rolling forward. Leave the additi
 schema, history intent/progress, contracts, receipts, dirty revisions and lease
 generations intact. Task 13 writers still fence/commit pages and the new trigger
 records bound history completion, but their one-page scheduler does not provide
-Task 14 continuation/fairness or stop restarting completed intents. Keep older
+Task 14 continuation/fairness or consult explicit history-intent idempotence. Keep older
 sync writers disabled until compatible Task 14 code is restored; a read-only app
 rollback can leave pending work safely. Task 12/older writers also lack atomic
 page recovery. Do not reset cursors, delete intent/receipt/dirty rows, re-import by

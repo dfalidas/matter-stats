@@ -75,36 +75,57 @@ and [CLI startup](https://github.com/supabase/cli/blob/v2.48.3/internal/start/st
 
 ## Current evidence
 
-On `120efb8eca1310ed549bd0ed766c6b24c163ca61`, local `npm ci`, Next route type
-generation, typecheck, lint, tests, build, audit:ci and git diff --check passed.
-The unchanged lockfile uses a workspace cache because the home cache is unavailable.
-Tests: 239 passed, 0 failed, 3 TODOs, 0 skipped (242 total). Lint retains three
+Real disposable fresh **and** upgrade SQL/Data API acceptance passed on
+`e900f57b0d9dca95a911c22b9d35ab6da2689444` in
+[CI run 37650167397](https://github.com/dfalidas/matter-stats/actions/runs/37650167397).
+The [sanitized database artifact](https://github.com/dfalidas/matter-stats/actions/runs/37650167397/artifacts/11496618372)
+records both paths, all 16 migration versions, real browser-role denials/service
+controls, atomicity/fencing/recovery and owned fixture cleanup. Each path's
+independent SQL reference found **5,000 distinct IDs, zero raw-data mismatches,
+1,460,736 seconds**, matching its reference total. History required 51 session
+pages and seven recreated server/cron invocations. Both stacks were stopped and
+the runner's temporary directory was removed. The verified owned-gateway setting
+is recorded separately from application/runtime configuration.
+
+The standard CI job on that SHA passed npm ci, route type generation, typecheck,
+lint, tests, build and audit:ci: 239 passed, 0 failed, 3 TODOs, 0 skipped (242 total)
+before R3 activation. The earlier complete local checks on
+`120efb8eca1310ed549bd0ed766c6b24c163ca61` remain recorded. Lint retains three
 existing Visual Explainer warnings. Production audit findings: zero; the existing
 development-only GHSA-vfj7-8cjw-p6xm exception remains unchanged.
 
-**Database/final-head CI acceptance is currently BLOCKED.** GitHub's
-[2026-10-07 incident](https://www.githubstatus.com/incidents/djlmxz2zd0j7) delayed
-Git operations, PR synchronization and Actions. A REST fast-forward published the
-corrected code with the exact local file tree, but the PR still reported its prior
-head and no workflow was queued at the evidence snapshot. Local CLI provisioning
-also exceeded the 32 GB vfs workspace before any database started. The verified
-runner-owned startup was stopped; the fresh stack and temporary directory were
-cleaned up. No passing SQL/Data API acceptance is inferred from these attempts.
+Only after that real acceptance, the R3 5,000-session TODO was activated in the
+production-entrypoint suite. Its pinned parameters, preceding receipts, seven
+invocations, empty terminal page and candidate watermark assertions pass. The
+standard suite then reports **240 passed, 0 failed, 2 TODOs, 0 skipped** (242 total).
+The unrelated R4/R5 TODOs remain. The final database fixture additionally stops
+an expensive valid page inside annotation preparation, then resumes the same
+stored contract in a fresh invocation across a year boundary without resetting
+its cycle, and commits its complete 100-annotation-page preparation.
 
-[task-14-evidence.json](task-14-evidence.json) retains sanitized SHA-linked failed
-attempts and cleanup. The cooldown gate exposed SQL 21000 for the first migration's
-unfiltered UPDATE under safeupdate. The additive follow-up explicitly selects the
-two streams; the subsequent gate passed cooldown cases, then rejected the test's
-direct library LOAD. Its replacement verifies an unfiltered UPDATE rejection and
-the bounded production RPC through the real service Data API session, using an
-owned service-only fixture that is dropped during cleanup. Earlier gateway errors
-remain failures with no established root cause; no assertions or transport errors
-are accepted as successful verification. Failure-only diagnostics retain known
-container state/error counts and endpoint/status/codes, never raw credentials/logs.
+[task-14-evidence.json](task-14-evidence.json) is an immutable, sanitized snapshot
+linked to the accepted pre-final SHA. The final code/evidence commit must run the
+same fresh/upgrade gate again. Exact final-head CI, artifact and cleanup links
+are retained in the draft PR and delivery record; an earlier pass never substitutes
+for final-head acceptance. This avoids claiming a commit contains evidence of its
+own not-yet-created hash.
 
-The R3 5,000-session TODO remains until real fresh AND upgrade acceptance passes.
-The final PR-head gate must still run and pass; an intermediate passing standard
-job or progress through an earlier fixture does not establish final-head acceptance.
+Earlier attempts remain failed/blocked evidence. GitHub's
+[2026-10-07 incident](https://www.githubstatus.com/incidents/djlmxz2zd0j7) delayed Git
+operations/PR synchronization/Actions. The local 32 GB vfs workspace could not
+provision the PostgreSQL image; its owned startup/stack/temp directory were cleaned
+up. Local database provisioning remains BLOCKED, and no SQL acceptance is inferred
+from it. The hosted gates above performed the real execution.
+
+The failed cooldown gate exposed SQL 21000 for the first migration's unfiltered
+UPDATE under safeupdate. The additive follow-up selects exactly the two streams.
+The service-only fixture verifies the enabled guard and unfiltered UPDATE rejection,
+then the bounded production cooldown RPC, in a real Data API transaction. It uses
+no privileged SET/LOAD and is dropped during cleanup. Later gateway diagnostics
+identified upstream connection resets; the owned disposable transport mitigation
+is described above. No unexpected HTTP failure, permission mismatch or malformed
+payload is accepted as successful verification. Diagnostics retain known numeric
+counts/public gateway messages, never raw credentials or container logs.
 
 ## Official sources and rollout
 

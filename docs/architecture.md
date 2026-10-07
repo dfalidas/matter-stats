@@ -58,14 +58,14 @@ All application/data routes above except `/login` require an app session.
 | `SUPABASE_URL` | Yes | Server-side Supabase project URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Server-only administrative key; can bypass RLS. |
 | `CRON_SECRET` | Required for scheduled sync | Server-only Bearer secret; a missing value makes cron authorization fail closed. |
-| `MATTER_SYNC_ITEMS_LIMIT` | Optional | Positive per-request item page limit; defaults to `25`. |
-| `MATTER_SYNC_SESSIONS_LIMIT` | Optional | Positive per-request session page limit; defaults to `25`. |
+| `MATTER_SYNC_ITEMS_LIMIT` | Optional | Integer per-request item page limit, 1–100; defaults to `25`. |
+| `MATTER_SYNC_SESSIONS_LIMIT` | Optional | Integer per-request session page limit, 1–100; defaults to `25`. |
 
 ## Matter sync stream cycles
 
 Matter pagination is persisted independently in `public.matter_sync_streams` for `recent_sessions` (`GET /reading_sessions`) and `library_items` (`GET /items`). Manual and scheduled activity syncs are only different triggers for the same `recent_sessions` stream. Each active cycle pins its endpoint, exact documented filters/lower bound, page limit, opaque cursor, start time, and cycle generation; later invocations resume that contract even across a year boundary or environment limit change. Cycle generation identifies a logical cycle and is not the Task 12 lease/fencing generation.
 
-Matter cooldowns are account-wide: availability checks and every sync invocation use the latest active retry timestamp across both streams and the retained legacy singleton before any cycle write or upstream call. An explicit manual history-window selection is also durable. Repeating that same selection resumes the pinned contract without recomputing its rolling boundary; requesting a different window is rejected without changing state or calling Matter. Scheduled triggers do not change the stored history intent.
+Matter cooldowns are account-wide: availability checks and every sync invocation use the latest active retry timestamp across both streams and the retained legacy singleton before any cycle write or upstream call. An explicit manual history-window selection is also durable. Repeating that same selection resumes the pinned contract without recomputing its rolling boundary; conflicting incremental windows are rejected without changing state or calling Matter. During an explicit available-history enumeration, triggers resume its fixed full-history contract. Scheduled triggers do not change the stored history intent.
 
 The first sessions cycle uses the explicitly selected coverage lower bound. A genuinely exhausted cycle promotes its captured start time to the completed watermark, including when the final page is empty. Partial and failed cycles do not promote it. Later cycles replay from seven days before that watermark using inclusive `since`; this is an application overlap policy for idempotent upserts, not a Matter late-arrival or cursor-snapshot guarantee. Imported minimum/maximum timestamps do not establish historical completeness. Library enumeration uses only documented parameters and remains independent of session import.
 
@@ -73,7 +73,7 @@ The legacy singleton did not persist its page limit, so a complete active reques
 
 ## Account lease and fencing (Task 12 / E2 / W4 / R4)
 
-All three triggers acquire the same `matter` account scope in
+Manual, scheduled and backfill triggers acquire the same `matter` account scope in
 `public.matter_sync_leases`, before reading/resuming a cycle, creating a run or
 calling Matter. The scope is a fixed single-account identifier, never the API
 token. Every invocation generates a UUID owner. An occupied, unexpired lease

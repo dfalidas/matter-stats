@@ -295,3 +295,55 @@ test("library and scheduled triggers never create history intent from a session-
     else assert.equal(h.states.get("recent_sessions").cycle_generation,0);
   }
 });
+
+// The real fresh/upgrade SQL reference is in matter-continuation.mjs. This
+// production-entrypoint regression keeps its cross-invocation contract visible
+// in the standard suite after that database acceptance has passed.
+test("R3 target (W4): a 5,000-session stream resumes across pages/invocations without an annual reset", async () => {
+  const previousLimit = process.env.MATTER_SYNC_SESSIONS_LIMIT;
+  const rows = Array.from({ length: 5000 }, (_, i) => ({ object: "reading_session", id: `r3-${i}`,
+    date: new Date(Date.UTC(2026, 11, 30, 10) - Math.floor(i / 4) * 86400000).toISOString(), seconds_read: i % 601 }));
+  const h = harness();
+  const oldWatermark = "2026-12-15T00:00:00.000Z";
+  h.states.set("recent_sessions", stream("recent_sessions", { completed_watermark: oldWatermark }));
+  let now = "2026-12-31T23:59:00.000Z";
+  h.deps.now = () => new Date(now);
+  h.deps.listSessions = async (params) => {
+    h.calls.push(["sessions", { ...params }]);
+    const offset = Number(params.cursor ?? 0);
+    return page(rows.slice(offset, offset + params.limit), offset + params.limit <= rows.length ? String(offset + params.limit) : null);
+  };
+  let preceding = null;
+  h.deps.getPageReceipt = async () => preceding;
+  const commit = h.deps.commitPage;
+  h.deps.commitPage = async (payload) => {
+    assert.equal(payload.previousReceiptId, preceding);
+    assert.equal(payload.expected.cursor, h.states.get("recent_sessions").cursor);
+    const result = await commit(payload); preceding = payload.receiptId; return result;
+  };
+  try {
+    let invocations = 0;
+    for (; invocations < 10; invocations++) {
+      process.env.MATTER_SYNC_SESSIONS_LIMIT = invocations === 0 ? "100" : "99";
+      now = invocations === 0 ? now : `2027-01-${String(invocations + 1).padStart(2,"0")}T06:00:00.000Z`;
+      const result = await runSync(invocations === 0 ? "backfill_sessions" : "recent_activity_scheduled", {}, { ...h.deps });
+      assert.equal(result.ok, true); assert.ok(result.pagesCommitted > 1 && result.pagesCommitted <= 8);
+      const state = h.states.get("recent_sessions");
+      assert.deepEqual(state.filters, {}); assert.equal(state.page_limit, 100); assert.equal(state.cycle_generation, 1);
+      if (result.historyStatus === "complete") { assert.equal(result.status,"complete"); invocations++; break; }
+      assert.equal(result.status,"partial"); assert.equal(state.completed_watermark, oldWatermark);
+      assert.equal(state.cycle_started_at,"2026-12-31T23:59:00.000Z");
+    }
+    assert.equal(invocations, 7);
+    const requests = h.calls.filter((call)=>Array.isArray(call)&&call[0]==="sessions").map((call)=>call[1]);
+    assert.equal(requests.length,51); assert.ok(requests.every((params)=>params.since === undefined && params.limit === 100));
+    assert.deepEqual(requests.map((params)=>params.cursor ?? null), [null, ...Array.from({length:50},(_,i)=>String((i+1)*100))]);
+    assert.equal(h.states.get("recent_sessions").completed_watermark,"2026-12-31T23:59:00.000Z");
+    assert.deepEqual([...h.importedSessionIds].sort(),rows.map((row)=>row.id).sort());
+    const calls = h.calls.length;
+    assert.equal((await runSync("backfill_sessions",{}, { ...h.deps })).historyStatus,"complete");
+    assert.equal(h.calls.length,calls);
+  } finally {
+    if (previousLimit === undefined) delete process.env.MATTER_SYNC_SESSIONS_LIMIT; else process.env.MATTER_SYNC_SESSIONS_LIMIT = previousLimit;
+  }
+});

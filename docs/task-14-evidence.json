@@ -2,8 +2,8 @@
   "baseSha": "198701e187e2b49522eb40451c8c87d9a72beda7",
   "branch": "codex/task-14-continuation-backfill",
   "pr": "https://github.com/dfalidas/matter-stats/pull/77",
-  "status": "blocked",
-  "snapshotAt": "2026-10-07T15:31:55Z",
+  "status": "passed-at-snapshot",
+  "snapshotAt": "2026-10-07T16:27:04+00:00",
   "localStandardChecks": {
     "gitSha": "120efb8eca1310ed549bd0ed766c6b24c163ca61",
     "npmCi": "passed",
@@ -22,70 +22,209 @@
     "gitDiffCheck": "passed"
   },
   "currentDatabaseGate": {
-    "gitSha": "120efb8eca1310ed549bd0ed766c6b24c163ca61",
-    "outcome": "blocked",
-    "reason": "GitHub outage delayed PR synchronization and Actions; local vfs provisioning exceeded the 32 GB workspace. No fresh/upgrade SQL acceptance claimed.",
-    "localFailure": {
-      "status": "failed",
-      "gitSha": "120efb8eca1310ed549bd0ed766c6b24c163ca61",
-      "failedPath": "fresh",
-      "paths": [],
-      "message": "Disposable verification failed; see the workflow job log.",
-      "disposableDiagnostics": [
+    "gitSha": "e900f57b0d9dca95a911c22b9d35ab6da2689444",
+    "outcome": "passed",
+    "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37650167397",
+    "databaseArtifactId": 11496618372,
+    "databaseArtifact": "https://github.com/dfalidas/matter-stats/actions/runs/37650167397/artifacts/11496618372",
+    "artifactDigest": "sha256:06e47fab0bc3142b771139a90d6d99258f3b706feec678f967ff1600974770f1",
+    "results": {
+      "status": "passed",
+      "gitSha": "e900f57b0d9dca95a911c22b9d35ab6da2689444",
+      "supabaseCli": "2.48.3",
+      "paths": [
         {
-          "component": "kong",
-          "stateAvailable": false,
-          "running": false,
-          "outOfMemory": false,
-          "exitCode": null,
-          "logsAvailable": false,
-          "errorCounts": {
-            "upstream": 0,
-            "workerConnections": 0,
-            "databaseConnections": 0,
-            "postgrest": 0
-          }
+          "name": "fresh",
+          "catalog": "passed",
+          "dataApi": "passed",
+          "gatewayTransport": {
+            "upstreamKeepalivePoolSize": 0,
+            "configuration": "verified",
+            "scope": "owned-disposable-only"
+          },
+          "accountLeaseSqlAndRuntime": "passed",
+          "leaseEvidence": {
+            "checks": [
+              "A: 24 concurrent Data API acquisitions admit exactly one owner",
+              "G: every lease table/RPC/helper grant denied to both browser roles; service controls succeed",
+              "C/D/E/F: renewal, invalid TTL, expiry recovery, every stale write, success/cooldown, and compare-release verified",
+              "A SQL: 12 concurrent psql transactions admit one owner",
+              "E SQL: protected RPC transaction serializes takeover through commit",
+              "B/H: production trigger exclusion, linked imports/rollup/tag deletion, and independent stream state verified",
+              "E/F: delayed success and 429 responses after takeover are fenced; cancellation releases own lease"
+            ],
+            "realSqlAndDataApi": true,
+            "syntheticMatterOnly": true
+          },
+          "atomicPageAndRollupRecovery": "passed",
+          "pageEvidence": {
+            "checks": [
+              "Both real import paths: preparation and checkpoint failures roll back all page effects; session SQL failure after item/tag/annotation writes is atomic",
+              "Rollup persistence failure preserves dirty work and committed cursor; later empty terminal page recovers and completes fixed watermark",
+              "Library path commits joins/receipt/checkpoint independently; lost real SQL response retries identical receipt without duplicate rows or cursor rewind",
+              "Exact page replay is read-only; delayed old page rejects; metadata dates dirty; older acknowledgement cannot clear newer same-lease revision",
+              "Updated sessions/annotations dirty old and new APP_TIMEZONE dates across UTC/local boundary; unchanged rows preserve pending revisions",
+              "Oversized/unknown-field payloads reject without writes; expiry/takeover rejects stale page and rollup acknowledgement without changing successor state",
+              "Real anon/authenticated deny reads/writes and all four exact RPCs; intended service page/marker/helper operations succeed",
+              "Interrupted acknowledgement retains dirty revision; bounded production recovery processes 32 dates and retains remaining 8 for next call",
+              "Both SQL acknowledgements lost: later invocation recovers durable dirty work and resumes committed cursor without duplicate sessions/joins",
+              "Real embedded items, optional 403/404, insert-only placeholders, unlinked sessions and sanitized per-row skips preserve accepted import contract"
+            ],
+            "realSqlAndDataApi": true,
+            "syntheticMatterOnly": true,
+            "cleanup": "passed"
+          },
+          "boundedContinuationAndHistory": "passed",
+          "continuationEvidence": {
+            "checks": [
+              "A/B/C: 5000 documented sessions, ties/multiple years, independent SQL raw reference, 51 exact pages, bounded fresh processes/daily cron, pinned contract/watermark, pending library fairness, completed replay/overlap idempotence and bounded post-exhaustion cron recovery",
+              "D/G: counted me/list/item/all annotation attempts; request/deadline stops and deterministic cancellation timers inside real preparation never commit a subset; fresh reservation completes a valid 100-annotation-page preparation",
+              "E/G: terminal history SQL response lost then exact receipt replay; 500/401 and me/item/annotation 429 stop without incomplete page effects; account cooldown blocks all Matter calls",
+              "F/H: real anon/authenticated CRUD and exact function denials; service controls including safeupdate-enabled cooldown SQL, invalid coverage, idempotent intent, expiry/takeover and stale intent/start/turn/release fences"
+            ],
+            "historyReference": {
+              "count": 5000,
+              "distinct": 5000,
+              "mismatches": 0,
+              "duration": 1460736,
+              "referenceDuration": 1460736,
+              "sessionPages": 51,
+              "invocations": 7
+            },
+            "realSqlAndDataApi": true,
+            "syntheticMatterOnly": true,
+            "cleanup": "passed"
+          },
+          "preservation": null,
+          "streamPreservation": null,
+          "leasePreservation": null,
+          "pagePreservation": null,
+          "migrationHistory": [
+            "20260513000000",
+            "20260514000000",
+            "20260515000000",
+            "20260515010000",
+            "20260515020000",
+            "20260515030000",
+            "20260518000000",
+            "20260519090000",
+            "20260929000000",
+            "20260929010000",
+            "20261004000000",
+            "20261004010000",
+            "20261005000000",
+            "20261007085051",
+            "20261007132750",
+            "20261007145024"
+          ]
         },
         {
-          "component": "rest",
-          "stateAvailable": false,
-          "running": false,
-          "outOfMemory": false,
-          "exitCode": null,
-          "logsAvailable": false,
-          "errorCounts": {
-            "upstream": 0,
-            "workerConnections": 0,
-            "databaseConnections": 0,
-            "postgrest": 0
-          }
-        },
-        {
-          "component": "db",
-          "stateAvailable": false,
-          "running": false,
-          "outOfMemory": false,
-          "exitCode": null,
-          "logsAvailable": false,
-          "errorCounts": {
-            "upstream": 0,
-            "workerConnections": 0,
-            "databaseConnections": 0,
-            "postgrest": 0
-          }
+          "name": "upgrade",
+          "catalog": "passed",
+          "dataApi": "passed",
+          "gatewayTransport": {
+            "upstreamKeepalivePoolSize": 0,
+            "configuration": "verified",
+            "scope": "owned-disposable-only"
+          },
+          "accountLeaseSqlAndRuntime": "passed",
+          "leaseEvidence": {
+            "checks": [
+              "A: 24 concurrent Data API acquisitions admit exactly one owner",
+              "G: every lease table/RPC/helper grant denied to both browser roles; service controls succeed",
+              "C/D/E/F: renewal, invalid TTL, expiry recovery, every stale write, success/cooldown, and compare-release verified",
+              "A SQL: 12 concurrent psql transactions admit one owner",
+              "E SQL: protected RPC transaction serializes takeover through commit",
+              "B/H: production trigger exclusion, linked imports/rollup/tag deletion, and independent stream state verified",
+              "E/F: delayed success and 429 responses after takeover are fenced; cancellation releases own lease"
+            ],
+            "realSqlAndDataApi": true,
+            "syntheticMatterOnly": true
+          },
+          "atomicPageAndRollupRecovery": "passed",
+          "pageEvidence": {
+            "checks": [
+              "Both real import paths: preparation and checkpoint failures roll back all page effects; session SQL failure after item/tag/annotation writes is atomic",
+              "Rollup persistence failure preserves dirty work and committed cursor; later empty terminal page recovers and completes fixed watermark",
+              "Library path commits joins/receipt/checkpoint independently; lost real SQL response retries identical receipt without duplicate rows or cursor rewind",
+              "Exact page replay is read-only; delayed old page rejects; metadata dates dirty; older acknowledgement cannot clear newer same-lease revision",
+              "Updated sessions/annotations dirty old and new APP_TIMEZONE dates across UTC/local boundary; unchanged rows preserve pending revisions",
+              "Oversized/unknown-field payloads reject without writes; expiry/takeover rejects stale page and rollup acknowledgement without changing successor state",
+              "Real anon/authenticated deny reads/writes and all four exact RPCs; intended service page/marker/helper operations succeed",
+              "Interrupted acknowledgement retains dirty revision; bounded production recovery processes 32 dates and retains remaining 8 for next call",
+              "Both SQL acknowledgements lost: later invocation recovers durable dirty work and resumes committed cursor without duplicate sessions/joins",
+              "Real embedded items, optional 403/404, insert-only placeholders, unlinked sessions and sanitized per-row skips preserve accepted import contract"
+            ],
+            "realSqlAndDataApi": true,
+            "syntheticMatterOnly": true,
+            "cleanup": "passed"
+          },
+          "boundedContinuationAndHistory": "passed",
+          "continuationEvidence": {
+            "checks": [
+              "A/B/C: 5000 documented sessions, ties/multiple years, independent SQL raw reference, 51 exact pages, bounded fresh processes/daily cron, pinned contract/watermark, pending library fairness, completed replay/overlap idempotence and bounded post-exhaustion cron recovery",
+              "D/G: counted me/list/item/all annotation attempts; request/deadline stops and deterministic cancellation timers inside real preparation never commit a subset; fresh reservation completes a valid 100-annotation-page preparation",
+              "E/G: terminal history SQL response lost then exact receipt replay; 500/401 and me/item/annotation 429 stop without incomplete page effects; account cooldown blocks all Matter calls",
+              "F/H: real anon/authenticated CRUD and exact function denials; service controls including safeupdate-enabled cooldown SQL, invalid coverage, idempotent intent, expiry/takeover and stale intent/start/turn/release fences"
+            ],
+            "historyReference": {
+              "count": 5000,
+              "distinct": 5000,
+              "mismatches": 0,
+              "duration": 1460736,
+              "referenceDuration": 1460736,
+              "sessionPages": 51,
+              "invocations": 7
+            },
+            "realSqlAndDataApi": true,
+            "syntheticMatterOnly": true,
+            "cleanup": "passed"
+          },
+          "preservation": "passed",
+          "streamPreservation": "passed",
+          "leasePreservation": "passed",
+          "pagePreservation": "passed",
+          "migrationHistory": [
+            "20260513000000",
+            "20260514000000",
+            "20260515000000",
+            "20260515010000",
+            "20260515020000",
+            "20260515030000",
+            "20260518000000",
+            "20260519090000",
+            "20260929000000",
+            "20260929010000",
+            "20261004000000",
+            "20261004010000",
+            "20261005000000",
+            "20261007085051",
+            "20261007132750",
+            "20261007145024"
+          ]
         }
       ],
-      "cleanup": "pending"
+      "cleanup": "passed"
     },
-    "localCleanup": {
-      "gitSha": "120efb8eca1310ed549bd0ed766c6b24c163ca61",
+    "cleanup": {
+      "gitSha": "e900f57b0d9dca95a911c22b9d35ab6da2689444",
       "resources": [
+        {
+          "path": "upgrade",
+          "status": "stopped"
+        },
         {
           "path": "fresh",
           "status": "stopped"
         }
       ],
       "temporaryDirectoryRemoved": true
+    },
+    "ci": {
+      "gitSha": "e900f57b0d9dca95a911c22b9d35ab6da2689444",
+      "verificationOutcome": "success",
+      "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37650167397",
+      "runAttempt": "1"
     }
   },
   "githubIncident": "https://www.githubstatus.com/incidents/djlmxz2zd0j7",
@@ -673,5 +812,88 @@
         "temporaryDirectoryRemoved": true
       }
     }
-  ]
+  ],
+  "finalHeadPolicy": "This immutable checked-in snapshot names the accepted pre-final SHA. The final PR head must pass again; exact final-head CI, database artifact and cleanup links are retained in the draft PR and delivery record.",
+  "localEnvironmentAttempt": {
+    "gitSha": "120efb8eca1310ed549bd0ed766c6b24c163ca61",
+    "outcome": "blocked",
+    "reason": "GitHub outage delayed PR synchronization and Actions; local vfs provisioning exceeded the 32 GB workspace. No fresh/upgrade SQL acceptance claimed.",
+    "localFailure": {
+      "status": "failed",
+      "gitSha": "120efb8eca1310ed549bd0ed766c6b24c163ca61",
+      "failedPath": "fresh",
+      "paths": [],
+      "message": "Disposable verification failed; see the workflow job log.",
+      "disposableDiagnostics": [
+        {
+          "component": "kong",
+          "stateAvailable": false,
+          "running": false,
+          "outOfMemory": false,
+          "exitCode": null,
+          "logsAvailable": false,
+          "errorCounts": {
+            "upstream": 0,
+            "workerConnections": 0,
+            "databaseConnections": 0,
+            "postgrest": 0
+          }
+        },
+        {
+          "component": "rest",
+          "stateAvailable": false,
+          "running": false,
+          "outOfMemory": false,
+          "exitCode": null,
+          "logsAvailable": false,
+          "errorCounts": {
+            "upstream": 0,
+            "workerConnections": 0,
+            "databaseConnections": 0,
+            "postgrest": 0
+          }
+        },
+        {
+          "component": "db",
+          "stateAvailable": false,
+          "running": false,
+          "outOfMemory": false,
+          "exitCode": null,
+          "logsAvailable": false,
+          "errorCounts": {
+            "upstream": 0,
+            "workerConnections": 0,
+            "databaseConnections": 0,
+            "postgrest": 0
+          }
+        }
+      ],
+      "cleanup": "pending"
+    },
+    "localCleanup": {
+      "gitSha": "120efb8eca1310ed549bd0ed766c6b24c163ca61",
+      "resources": [
+        {
+          "path": "fresh",
+          "status": "stopped"
+        }
+      ],
+      "temporaryDirectoryRemoved": true
+    }
+  },
+  "standardCi": {
+    "gitSha": "e900f57b0d9dca95a911c22b9d35ab6da2689444",
+    "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37650167397",
+    "jobId": 112891113568,
+    "conclusion": "success",
+    "tests": {
+      "total": 242,
+      "passed": 239,
+      "failed": 0,
+      "todo": 3,
+      "skipped": 0
+    },
+    "auditArtifactId": 11495903259
+  },
+  "r3Activation": "R3 activated only after both fresh and upgrade real SQL/Data API paths passed the independent 5000-session reference on e900f57b0d9dca95a911c22b9d35ab6da2689444. R4 and R5 TODOs remain."
 }
