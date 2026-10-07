@@ -47,6 +47,34 @@ function dockerAvailable() {
   return !result.error && result.status === 0;
 }
 
+// Failure-only disposable diagnostics. Never retain raw logs, environment,
+// container identifiers or generated local credentials in evidence artifacts.
+function disposableDiagnostics(projectId) {
+  return ["kong", "rest", "db"].map((component) => {
+    const container = `supabase_${component}_${projectId}`;
+    const options = { encoding:"utf8", env:sanitizedEnvironment(), timeout:5000, maxBuffer:1024*1024 };
+    const inspected = spawnSync("docker",["inspect","--format","{{json .State}}",container],options);
+    let state;
+    try { state=JSON.parse(inspected.stdout); } catch { /* unavailable remains explicit */ }
+    const logged = spawnSync("docker",["logs","--tail","500",container],options);
+    const lines = `${logged.stdout ?? ""}\n${logged.stderr ?? ""}`.split(/\r?\n/);
+    return {
+      component,
+      stateAvailable:inspected.status===0 && Boolean(state),
+      running:state?.Running===true,
+      outOfMemory:state?.OOMKilled===true,
+      exitCode:Number.isInteger(state?.ExitCode)?state.ExitCode:null,
+      logsAvailable:logged.status===0,
+      errorCounts:{
+        upstream:lines.filter((line)=>/upstream.*(?:invalid|timed out|closed|refused|error)|no live upstream/i.test(line)).length,
+        workerConnections:lines.filter((line)=>/worker_connections|too many open files/i.test(line)).length,
+        databaseConnections:lines.filter((line)=>/too many clients|remaining connection slots|connection pool.*(?:timeout|exhaust)/i.test(line)).length,
+        postgrest:lines.filter((line)=>/PGRST[0-9]{3}/.test(line)).length,
+      },
+    };
+  });
+}
+
 async function configureStack(workdir, { projectId, apiPort, dbPort, shadowPort, studioPort, inbucketPort, analyticsPort }) {
   assertDisposableDirectory(workdir);
   await mkdir(workdir, { recursive: true });
@@ -282,6 +310,7 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
       // Subprocess stderr can contain generated local credentials. Keep it in
       // the job diagnostic, never copy arbitrary error text into an artifact.
       message: "Disposable verification failed; see the workflow job log.",
+      disposableDiagnostics: started.length ? disposableDiagnostics(started.at(-1).projectId) : [],
       cleanup: "pending",
     }, null, 2)}\n`);
     throw error;

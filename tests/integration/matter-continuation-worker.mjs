@@ -24,6 +24,8 @@ const runtime = require(path.join(root, ".test-build/lib/matter-sync.js"));
 const { handleRecentActivityCron } = require(path.join(root, ".test-build/lib/cron-sync.js"));
 const originalFetch = globalThis.fetch;
 const requests = [];
+const databaseEvents = [];
+const recordDatabaseEvent = (event) => { databaseEvents.push(event); if (databaseEvents.length>20) databaseEvents.shift(); };
 let lostSqlResponses = 0;
 let lostBody;
 let replayVerified = false;
@@ -31,7 +33,18 @@ const page = (results, next = null) => ({ object: "list", results, has_more: nex
 globalThis.fetch = async (input, init) => {
   const url = new URL(String(input));
   if (url.hostname !== "api.getmatter.com") {
-    const response = await originalFetch(input, init);
+    let response;
+    try { response = await originalFetch(input, init); }
+    catch (error) {
+      recordDatabaseEvent({ endpoint:url.pathname, transportFailure:["AbortError","TimeoutError","TypeError"].includes(error?.name)?error.name:"other" });
+      throw error;
+    }
+    let postgresCode=null;
+    if (!response.ok) {
+      const error = await response.clone().json().catch(()=>null);
+      if (/^[A-Z0-9]{5}$/.test(error?.code)) postgresCode=error.code;
+    }
+    recordDatabaseEvent({ endpoint:url.pathname,status:response.status,postgresCode });
     if (url.pathname.endsWith("/rpc/commit_matter_page")) {
       const payload = JSON.parse(init.body);
       if (lostBody && payload.p_receipt_id === lostBody.p_receipt_id) { assert.deepEqual(payload,lostBody); replayVerified = true; }
@@ -70,8 +83,8 @@ if (config.mode === "cron") {
   const response = await handleRecentActivityCron(new Request("https://synthetic.invalid/api/cron/sync-recent-activity", { headers: { authorization: "Bearer synthetic-cron" } }), {
     cronSecret: "synthetic-cron", syncRecentActivity: () => runtime.syncMatterData("recent_activity_scheduled", {}, deps),
   });
-  assert.equal(response.status, 200);
   result = await response.json();
+  assert.equal(response.status, 200,JSON.stringify({mode:config.mode,now:config.now,result,databaseEvents}));
 } else result = await runtime.syncMatterData(config.mode, {}, deps);
-assert.equal(result.ok, true);
+assert.equal(result.ok, true,JSON.stringify({mode:config.mode,now:config.now,result,databaseEvents}));
 console.log(JSON.stringify({ result, requests, lostSqlResponses, replayVerified }));

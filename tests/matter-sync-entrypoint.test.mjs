@@ -265,6 +265,10 @@ test("explicit full history bypasses a completed narrow watermark and repeats id
   const calls = h.calls.length;
   const repeated = await syncMatterData("backfill_sessions", {}, h.deps);
   assert.equal(repeated.historyStatus, "complete"); assert.equal(h.calls.length, calls);
+  h.deps.listSessions = async (params) => { assert.equal(params.since,"2026-05-25T00:00:00.000Z"); return page(); };
+  const incremental = await syncMatterData("recent_activity_scheduled",{},h.deps);
+  assert.equal(incremental.historyStatus,"complete");
+  assert.equal(h.states.get("recent_sessions").coverage_window,"current_year");
 });
 
 test("history request queues behind an active narrow cycle without altering its cursor/coverage", async () => {

@@ -44,6 +44,7 @@ import {
   buildMatterSyncMessage,
   createEmptyMatterBatchCounts,
   buildMatterRateLimitMessage,
+  DEFAULT_RECENT_ACTIVITY_WINDOW,
   getMatterSyncItemsLimit,
   getMatterSyncSessionsLimit,
   getRecentActivityWindowStart,
@@ -257,7 +258,7 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
       activeCycle = startOrResumeMatterCycle({ stream, stored, now: invocationNow,
         configuredLimit: stream === "recent_sessions" ? getMatterSyncSessionsLimit() : getMatterSyncItemsLimit(),
         initialSince: stream === "recent_sessions" ? getRecentActivityWindowStart(invocationNow, requestedWindow) : null,
-        requestedWindow: requestedWindow ?? null });
+        requestedWindow: stream === "recent_sessions" ? requestedWindow ?? DEFAULT_RECENT_ACTIVITY_WINDOW : null });
       try { budget.admitPage(activeCycle.pageLimit); }
       catch (error) { if (error instanceof MatterBudgetStop && error.reason !== "timeout") { stop = error; break; } throw error; }
       if (!stored?.cycle_active) await deps.upsertStream(persistActiveMatterCycle(activeCycle, activeCycle.cursor), lease);
