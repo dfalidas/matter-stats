@@ -431,7 +431,7 @@ export type Database = {
     Views: Record<string, never>;
     Functions: {
       commit_matter_page: {
-        Args: LeaseRpcArgs & { p_receipt_id: string; p_expected: TablesInsert<"matter_sync_streams">; p_plan: import("./matter-page-plan").MatterPagePlan; p_has_more: boolean; p_next_cursor: string | null; p_timezone: string };
+        Args: LeaseRpcArgs & { p_receipt_id: string; p_previous_receipt_id: string | null; p_expected: TablesInsert<"matter_sync_streams">; p_plan: import("./matter-page-plan").MatterPagePlan; p_has_more: boolean; p_next_cursor: string | null; p_timezone: string };
         Returns: MatterSyncStream;
       };
       validate_matter_page_rows: { Args: { p_rows: Json; p_kind: string }; Returns: undefined };

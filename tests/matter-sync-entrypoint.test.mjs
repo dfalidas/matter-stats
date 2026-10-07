@@ -56,6 +56,7 @@ function harness({ sessions = [], items = [], now = [], legacyCooldown = null } 
     listSessions: async (params) => { calls.push(["sessions", { ...params }]); const page = sessions.shift(); if (page instanceof Error) throw page; return page; },
     listItems: async (params) => { calls.push(["items", { ...params }]); const page = items.shift(); if (page instanceof Error) throw page; return page; },
     recoverRollups: async () => 0,
+    getPageReceipt: async () => null,
     commitPage: async ({ expected, hasMore, nextCursor }) => {
       return deps.upsertStream({ ...expected, cursor: nextCursor, cycle_active: hasMore,
         cycle_started_at: hasMore ? expected.cycle_started_at : null,

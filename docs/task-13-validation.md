@@ -86,3 +86,7 @@ Sources: [functions](https://supabase.com/docs/guides/database/functions),
 [exposure change](https://supabase.com/changelog/45329-breaking-change-tables-not-exposed-to-data-and-graphql-api-automatically),
 [Postgres notice](https://supabase.com/changelog/postgres-15-19-17-11-breaking-changes),
 [changelog](https://supabase.com/changelog).
+
+Replay also compares the receipt that preceded preparation, so an old page cannot
+be accepted if an opaque cursor value recurs within the same cycle. The latest
+receipt remains bounded; a reused-cursor SQL regression verifies this guard.

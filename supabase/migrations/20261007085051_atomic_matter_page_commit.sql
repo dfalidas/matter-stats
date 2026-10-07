@@ -42,7 +42,7 @@ end;
 $$;
 
 create function public.commit_matter_page(p_account_scope text, p_owner uuid, p_generation bigint,
-  p_receipt_id uuid, p_expected jsonb, p_plan jsonb, p_has_more boolean, p_next_cursor text, p_timezone text)
+  p_receipt_id uuid, p_previous_receipt_id uuid, p_expected jsonb, p_plan jsonb, p_has_more boolean, p_next_cursor text, p_timezone text)
 returns jsonb language plpgsql volatile security invoker set search_path = '' as $$
 declare
   current_stream public.matter_sync_streams; expected public.matter_sync_streams;
@@ -81,13 +81,13 @@ begin
   end if;
   select * into current_stream from public.matter_sync_streams where stream=expected.stream for update;
   if not found then raise exception 'Missing stream' using errcode = '40001'; end if;
-  fingerprint := md5(jsonb_build_object('expected',p_expected,'plan',p_plan,'more',p_has_more,'next',p_next_cursor,'timezone',p_timezone)::text);
+  fingerprint := md5(jsonb_build_object('previous',p_previous_receipt_id,'expected',p_expected,'plan',p_plan,'more',p_has_more,'next',p_next_cursor,'timezone',p_timezone)::text);
   select * into receipt from public.matter_page_receipts where stream=expected.stream;
   if receipt.receipt_id = p_receipt_id then
     if receipt.fingerprint is distinct from fingerprint then raise exception 'Divergent page receipt' using errcode = '22023'; end if;
     return to_jsonb(current_stream); -- durable state, with no writes or new markers
   end if;
-  if current_stream.cycle_active is distinct from true or
+  if receipt.receipt_id is distinct from p_previous_receipt_id or current_stream.cycle_active is distinct from true or
     row(current_stream.endpoint,current_stream.filters,current_stream.page_limit,current_stream.cursor,current_stream.cycle_started_at,current_stream.cycle_generation,current_stream.completed_watermark,current_stream.coverage_window,current_stream.transition_status)
     is distinct from row(expected.endpoint,expected.filters,expected.page_limit,expected.cursor,expected.cycle_started_at,expected.cycle_generation,expected.completed_watermark,expected.coverage_window,expected.transition_status) then
     raise exception 'Stale or divergent page transition' using errcode = '40001';
@@ -203,5 +203,5 @@ begin
   return true;
 end;
 $$;
-revoke all on function public.validate_matter_page_rows(jsonb,text), public.commit_matter_page(text,uuid,bigint,uuid,jsonb,jsonb,boolean,text,text), public.pending_matter_rollups(text,uuid,bigint,integer), public.ack_matter_rollup(text,uuid,bigint,date,uuid,text,jsonb) from public, anon, authenticated;
-grant execute on function public.validate_matter_page_rows(jsonb,text), public.commit_matter_page(text,uuid,bigint,uuid,jsonb,jsonb,boolean,text,text), public.pending_matter_rollups(text,uuid,bigint,integer), public.ack_matter_rollup(text,uuid,bigint,date,uuid,text,jsonb) to service_role;
+revoke all on function public.validate_matter_page_rows(jsonb,text), public.commit_matter_page(text,uuid,bigint,uuid,uuid,jsonb,jsonb,boolean,text,text), public.pending_matter_rollups(text,uuid,bigint,integer), public.ack_matter_rollup(text,uuid,bigint,date,uuid,text,jsonb) from public, anon, authenticated;
+grant execute on function public.validate_matter_page_rows(jsonb,text), public.commit_matter_page(text,uuid,bigint,uuid,uuid,jsonb,jsonb,boolean,text,text), public.pending_matter_rollups(text,uuid,bigint,integer), public.ack_matter_rollup(text,uuid,bigint,date,uuid,text,jsonb) to service_role;

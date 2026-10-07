@@ -73,7 +73,11 @@ const snapshot = async () => {
   }
   return result;
 };
-const commitArgs = (lease, state, plan, receipt = crypto.randomUUID(), next = "direct-next") => ({ ...leaseArgs(lease), p_receipt_id: receipt, p_expected: expected(state), p_plan: plan, p_has_more: next !== null, p_next_cursor: next, p_timezone: "Europe/Athens" });
+const commitArgs = async (lease, state, plan, receipt = crypto.randomUUID(), next = "direct-next") => ({
+  ...leaseArgs(lease), p_receipt_id: receipt,
+  p_previous_receipt_id: (await read("matter_page_receipts")).find((r) => r.stream === state.stream)?.receipt_id ?? null,
+  p_expected: expected(state), p_plan: plan, p_has_more: next !== null, p_next_cursor: next, p_timezone: "Europe/Athens",
+});
 const seedCycle = async (name) => {
   const lease = await acquire();
   try {
@@ -111,9 +115,16 @@ try {
   // No domain writes during failed preparation, SQL writes or checkpoint update.
   for (const mode of ["recent_activity_scheduled", "backfill_library"]) {
     await seedCycle(mode === "backfill_library" ? "library_items" : "recent_sessions");
-    for (const stage of ["preparation", "annotations", "rows", "checkpoint"]) {
+    for (const stage of ["continuation", "oversized", "preparation", "annotations", "rows", "checkpoint"]) {
       const normal = upstream;
-      if (stage === "preparation") upstream = (request) => new URL(request).pathname.endsWith("/annotations") ? Promise.reject(new Error("synthetic enrichment failure")) : normal(request);
+      if (["continuation", "oversized"].includes(stage)) upstream = (request) => {
+        const endpoint = mode === "backfill_library" ? "/items" : "/reading_sessions";
+        if (!new URL(request).pathname.endsWith(endpoint)) return normal(request);
+        return Response.json(stage === "continuation"
+          ? { object: "list", results: [], has_more: true, next_cursor: null }
+          : page(Array(101).fill(mode === "backfill_library" ? item : session)));
+      };
+      else if (stage === "preparation") upstream = (request) => new URL(request).pathname.endsWith("/annotations") ? Promise.reject(new Error("synthetic enrichment failure")) : normal(request);
       else await trap(stage === "rows" && mode === "backfill_library" ? "annotations" : stage);
       const before = await snapshot();
       assert.equal((await runtime.syncMatterData(mode, {}, deps)).ok, false);
@@ -174,14 +185,14 @@ try {
   const plan = emptyPlan();
   plan.sessions = [];
   plan.items = [{ id: item.id, source: "changed.example", status: "archive", progress: 1 }];
-  const first = commitArgs(activeLease, stateNow, plan);
+  const first = await commitArgs(activeLease, stateNow, plan);
   await rpc("commit_matter_page", first);
   const marker1 = (await read("matter_dirty_rollups")).find((r) => r.date === date);
   assert.ok(marker1, "metadata change dirties existing local session date");
   const replayBefore = await snapshot(); await rpc("commit_matter_page", first); assert.deepEqual(await snapshot(), replayBefore);
   const nextState = (await read("matter_sync_streams")).find((s) => s.stream === "library_items");
   const changed = emptyPlan(); changed.items = [{ id: item.id, source: "newer.example", status: "queue", progress: 0 }];
-  const second = commitArgs(activeLease, nextState, changed, crypto.randomUUID(), "newer-next");
+  const second = await commitArgs(activeLease, nextState, changed, crypto.randomUUID(), "newer-next");
   await rpc("commit_matter_page", second);
   const marker2 = (await read("matter_dirty_rollups")).find((r) => r.date === date);
   assert.notEqual(marker2.revision, marker1.revision, "multiple pages within SAME lease need different revisions");
@@ -189,6 +200,11 @@ try {
   assert.equal(await rpc("ack_matter_rollup", { ...leaseArgs(activeLease), p_date: date, p_revision: marker1.revision, p_timezone: marker1.timezone, p_row: dailyRow }), false);
   assert.equal((await read("matter_dirty_rollups")).find((r) => r.date === date).revision, marker2.revision);
   const staleBefore = await snapshot(); assert.equal((await service.rpc("commit_matter_page", first)).error?.code, "40001"); assert.deepEqual(await snapshot(), staleBefore);
+  const loopState = (await read("matter_sync_streams")).find((s) => s.stream === "library_items");
+  await rpc("commit_matter_page", await commitArgs(activeLease, loopState, emptyPlan(), crypto.randomUUID(), stateNow.cursor));
+  const loopBefore = await snapshot();
+  assert.equal((await service.rpc("commit_matter_page", first)).error?.code, "40001", "reused opaque cursor must not admit delayed old page");
+  assert.deepEqual(await snapshot(), loopBefore);
   checks.push("Exact page replay is read-only; delayed old page rejects; metadata dates dirty; older acknowledgement cannot clear newer same-lease revision");
 
   // Both old and new dates are computed inside SQL, across Athens local midnight.
@@ -198,12 +214,12 @@ try {
   const moved = emptyPlan();
   moved.sessions = [{ id: session.id, item_id: item.id, started_at: "2300-01-02T22:30:00Z", ended_at: "2300-01-02T22:31:00Z", duration_seconds: 60, words_estimated: 225 }];
   moved.annotations = [{ id: annotation.id, item_id: item.id, created_at_matter: "2300-01-03T22:30:00Z", text: "moved" }];
-  await rpc("commit_matter_page", commitArgs(activeLease, activeState, moved));
+  await rpc("commit_matter_page", await commitArgs(activeLease, activeState, moved));
   const markers = await read("matter_dirty_rollups");
   assert.ok(["2300-01-02", "2300-01-03", "2300-01-04"].every((d) => markers.some((r) => r.date === d)));
   const unchangedState = (await read("matter_sync_streams")).find((s) => s.stream === "recent_sessions");
   const unchangedBefore = await read("matter_dirty_rollups");
-  await rpc("commit_matter_page", commitArgs(activeLease, unchangedState, moved, crypto.randomUUID(), "unchanged-next"));
+  await rpc("commit_matter_page", await commitArgs(activeLease, unchangedState, moved, crypto.randomUUID(), "unchanged-next"));
   assert.deepEqual(await read("matter_dirty_rollups"), unchangedBefore, "unchanged rows must not replace pending revisions");
   checks.push("Updated sessions/annotations dirty old and new APP_TIMEZONE dates across UTC/local boundary; unchanged rows preserve pending revisions");
 
@@ -214,11 +230,11 @@ try {
     { ...emptyPlan(), items: [{ id: item.id, secret_column: "disallowed" }] },
     { ...emptyPlan(), items: [{ id: item.id, title: "x".repeat(4194304) }] },
   ]) {
-    const before = await snapshot(); assert.equal((await service.rpc("commit_matter_page", commitArgs(activeLease, freshState, invalid))).error?.code, "22023"); assert.deepEqual(await snapshot(), before);
+    const before = await snapshot(); assert.equal((await service.rpc("commit_matter_page", await commitArgs(activeLease, freshState, invalid))).error?.code, "22023"); assert.deepEqual(await snapshot(), before);
   }
   const beforeFence = await snapshot();
   await expire(activeLease); const successor = await acquire();
-  assert.equal((await service.rpc("commit_matter_page", commitArgs(activeLease, freshState, emptyPlan()))).error?.code, "55000");
+  assert.equal((await service.rpc("commit_matter_page", await commitArgs(activeLease, freshState, emptyPlan()))).error?.code, "55000");
   assert.equal((await service.rpc("ack_matter_rollup", { ...leaseArgs(activeLease), p_date: date, p_revision: marker2.revision, p_timezone: "Europe/Athens", p_row: dailyRow })).error?.code, "55000");
   assert.deepEqual(await snapshot(), beforeFence); await release(successor); activeLease = await acquire();
   checks.push("Oversized/unknown-field payloads reject without writes; expiry/takeover rejects stale page and rollup acknowledgement without changing successor state");
@@ -232,7 +248,7 @@ try {
   assertSuccessful(await authenticated.auth.signInWithPassword({ email: `${prefix}@example.invalid`, password }), "sign in fixture");
   const rpcPayloads = {
     validate_matter_page_rows: { p_rows: [], p_kind: "items" },
-    commit_matter_page: commitArgs(activeLease, freshState, emptyPlan()),
+    commit_matter_page: await commitArgs(activeLease, freshState, emptyPlan()),
     pending_matter_rollups: { ...leaseArgs(activeLease), p_limit: 32 },
     ack_matter_rollup: { ...leaseArgs(activeLease), p_date: date, p_revision: marker2.revision, p_timezone: "Europe/Athens", p_row: dailyRow },
   };

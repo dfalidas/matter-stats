@@ -50,7 +50,7 @@ order by signature::text;
 select p.oid::regprocedure, p.prosecdef, p.proconfig, p.proacl
 from pg_catalog.pg_proc p where p.oid in (
   'public.validate_matter_page_rows(jsonb,text)'::regprocedure,
-  'public.commit_matter_page(text,uuid,bigint,uuid,jsonb,jsonb,boolean,text,text)'::regprocedure,
+  'public.commit_matter_page(text,uuid,bigint,uuid,uuid,jsonb,jsonb,boolean,text,text)'::regprocedure,
   'public.pending_matter_rollups(text,uuid,bigint,integer)'::regprocedure,
   'public.ack_matter_rollup(text,uuid,bigint,date,uuid,text,jsonb)'::regprocedure
 ) order by p.oid::regprocedure::text;

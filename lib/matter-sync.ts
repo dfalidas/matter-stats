@@ -14,6 +14,7 @@ import {
 } from "@/lib/matter-api";
 import {
   commitMatterPage,
+  getMatterPageReceipt,
   createSyncRun,
   getMatterSyncStream,
   getMatterSyncStreams,
@@ -99,6 +100,7 @@ export type MatterSyncRuntimeDeps = {
   listItems: typeof listMatterItems;
   recoverRollups: typeof processPendingDailyStats;
   commitPage: typeof commitMatterPage;
+  getPageReceipt: typeof getMatterPageReceipt;
   importSessions: typeof importMatterSessionPage;
   importItems: typeof importMatterItemPage;
 };
@@ -119,6 +121,7 @@ export const productionSyncDeps: MatterSyncRuntimeDeps = {
   listItems: listMatterItems,
   recoverRollups: processPendingDailyStats,
   commitPage: commitMatterPage,
+  getPageReceipt: getMatterPageReceipt,
   importSessions: importMatterSessionPage,
   importItems: importMatterItemPage,
 };
@@ -228,6 +231,7 @@ export async function syncMatterData(
     });
     // Persist the complete request contract before making any upstream call.
     await deps.upsertStream(persistActiveMatterCycle(activeCycle, activeCycle.cursor), lease);
+    const previousReceiptId = await deps.getPageReceipt(activeCycle.stream);
     await deps.renewLease(lease);
     await deps.getAccount(() => deps.renewLease(lease!));
     await deps.renewLease(lease);
@@ -237,7 +241,7 @@ export async function syncMatterData(
     validateMatterPagePlan(plan);
     await deps.renewLease(lease);
     const persistedState = await deps.commitPage({
-      receiptId: randomUUID(), expected: persistActiveMatterCycle(activeCycle, activeCycle.cursor),
+      receiptId: randomUUID(), previousReceiptId, expected: persistActiveMatterCycle(activeCycle, activeCycle.cursor),
       plan, hasMore, nextCursor, timezone: getAppTimezone(),
     }, lease);
     // Checkpoint durability never depends on this calculation succeeding.

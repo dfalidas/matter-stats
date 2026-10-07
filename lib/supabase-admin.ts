@@ -159,6 +159,7 @@ export async function updateSyncRun(id: string, syncRun: TablesUpdate<"sync_runs
 
 export type MatterPageCommit = {
   receiptId: string;
+  previousReceiptId: string | null;
   expected: TablesInsert<"matter_sync_streams">;
   plan: import("./matter-page-plan").MatterPagePlan;
   hasMore: boolean;
@@ -166,7 +167,7 @@ export type MatterPageCommit = {
   timezone: string;
 };
 export async function commitMatterPage(page: MatterPageCommit, lease: MatterSyncLease): Promise<import("./supabase-types").MatterSyncStream> {
-  const args = { ...leaseRpcArgs(lease), p_receipt_id: page.receiptId, p_expected: page.expected,
+  const args = { ...leaseRpcArgs(lease), p_receipt_id: page.receiptId, p_previous_receipt_id: page.previousReceiptId, p_expected: page.expected,
     p_plan: page.plan, p_has_more: page.hasMore, p_next_cursor: page.nextCursor, p_timezone: page.timezone };
   // Retry once with the same immutable identity. The database receipt handles
   // a committed transaction whose response was lost; no table-write fallback.
@@ -204,4 +205,10 @@ export async function acknowledgeDailyStat(marker: import("./supabase-types").Di
   if (error) throw error;
   if (typeof data !== "boolean") throw new Error("Missing rollup acknowledgement response");
   return data;
+}
+
+export async function getMatterPageReceipt(stream: "recent_sessions" | "library_items"): Promise<string | null> {
+  const { data, error } = await getSupabaseAdminClient().from("matter_page_receipts").select("receipt_id").eq("stream", stream).maybeSingle();
+  if (error) throw error;
+  return data?.receipt_id ?? null;
 }

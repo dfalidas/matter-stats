@@ -232,7 +232,7 @@ there is no truncation or checkpoint advancement to hide omitted work.
 
 `matter_page_receipts` retains only the latest receipt per stream (at most two
 rows). A page request has one UUID and a database fingerprint of its immutable
-contract/plan/transition/timezone. An identical retry under a valid lease returns
+preceding receipt/contract/plan/transition/timezone. An identical retry under a valid lease returns
 the durable stream without writes; a changed payload with that UUID is rejected.
 After a newer receipt replaces it, an old request must pass the current stream
 comparison and therefore cannot rewind a cursor or overwrite a newer cycle.
@@ -261,3 +261,7 @@ evidence and [deployment.md](deployment.md#task-13-release-order-and-rollback)
 for migration-before-code and old-writer handling. This supersedes Task 12's
 separate-page-transaction boundary; it does not certify analytics completeness,
 add continuation/backfill, or repair historical data.
+
+Replay also compares the receipt that preceded preparation, so an old page cannot
+be accepted if an opaque cursor value recurs within the same cycle. The latest
+receipt remains bounded; a reused-cursor SQL regression verifies this guard.
