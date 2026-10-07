@@ -242,7 +242,7 @@ try {
   const safeupdateFixture = `task14_safeupdate_${crypto.randomUUID().replaceAll("-","")}`;
   await sql(`create function public.${safeupdateFixture}(p_owner uuid,p_generation bigint) returns text language plpgsql volatile security invoker set search_path='' as $control$ begin
     perform public.assert_matter_sync_lease('matter',p_owner,p_generation);
-    perform set_config('safeupdate.enabled','on',true);
+    if current_setting('safeupdate.enabled',true) is distinct from 'on' then raise exception 'service safeupdate guard is not enabled'; end if;
     begin update public.matter_sync_continuation set next_stream=next_stream; raise exception 'safeupdate guard was not enforced'; exception when cardinality_violation then null; end;
     perform public.cooldown_matter_account('matter',p_owner,p_generation,'2027-03-01T00:01:00Z');
     return current_setting('safeupdate.enabled'); end; $control$;
