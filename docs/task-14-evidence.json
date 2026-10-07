@@ -371,6 +371,144 @@
         ],
         "temporaryDirectoryRemoved": true
       }
+    },
+    {
+      "gitSha": "f33176d03a9ea0e1f19f18ba89a67386f267d23b",
+      "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37645114650",
+      "databaseArtifactId": 11493638738,
+      "gateOutcome": "failed",
+      "reason": "Disposable gateway returned HTTP 502 on an exact-revision rollup acknowledgement during bounded cron recovery. Root cause not established; failure retained, no application retries or weakened assertions.",
+      "failure": {
+        "status": "failed",
+        "gitSha": "f33176d03a9ea0e1f19f18ba89a67386f267d23b",
+        "failedPath": "fresh",
+        "paths": [],
+        "message": "Disposable verification failed; see the workflow job log.",
+        "disposableDiagnostics": [
+          {
+            "component": "kong",
+            "stateAvailable": true,
+            "running": true,
+            "outOfMemory": false,
+            "exitCode": 0,
+            "logsAvailable": true,
+            "errorCounts": {
+              "upstream": 0,
+              "workerConnections": 0,
+              "databaseConnections": 0,
+              "postgrest": 0
+            }
+          },
+          {
+            "component": "rest",
+            "stateAvailable": true,
+            "running": true,
+            "outOfMemory": false,
+            "exitCode": 0,
+            "logsAvailable": true,
+            "errorCounts": {
+              "upstream": 0,
+              "workerConnections": 0,
+              "databaseConnections": 0,
+              "postgrest": 0
+            }
+          },
+          {
+            "component": "db",
+            "stateAvailable": true,
+            "running": true,
+            "outOfMemory": false,
+            "exitCode": 0,
+            "logsAvailable": true,
+            "errorCounts": {
+              "upstream": 0,
+              "workerConnections": 0,
+              "databaseConnections": 0,
+              "postgrest": 0
+            }
+          }
+        ],
+        "cleanup": "pending"
+      },
+      "cleanup": {
+        "gitSha": "f33176d03a9ea0e1f19f18ba89a67386f267d23b",
+        "resources": [
+          {
+            "path": "fresh",
+            "status": "stopped"
+          }
+        ],
+        "temporaryDirectoryRemoved": true
+      }
+    },
+    {
+      "gitSha": "1be0f47bd80cfe4adb83e7802d7f973a2ce3a968",
+      "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/37646326552",
+      "databaseArtifactId": 11494503969,
+      "gateOutcome": "failed",
+      "reason": "A second disposable gateway HTTP 502 occurred on a rollup acknowledgement during bounded cron recovery. Added only sanitized known-message/error counts for diagnosis; no failure accepted or application retry added.",
+      "failure": {
+        "status": "failed",
+        "gitSha": "1be0f47bd80cfe4adb83e7802d7f973a2ce3a968",
+        "failedPath": "fresh",
+        "paths": [],
+        "message": "Disposable verification failed; see the workflow job log.",
+        "disposableDiagnostics": [
+          {
+            "component": "kong",
+            "stateAvailable": true,
+            "running": true,
+            "outOfMemory": false,
+            "exitCode": 0,
+            "logsAvailable": true,
+            "errorCounts": {
+              "upstream": 1,
+              "workerConnections": 0,
+              "databaseConnections": 0,
+              "postgrest": 0
+            }
+          },
+          {
+            "component": "rest",
+            "stateAvailable": true,
+            "running": true,
+            "outOfMemory": false,
+            "exitCode": 0,
+            "logsAvailable": true,
+            "errorCounts": {
+              "upstream": 0,
+              "workerConnections": 0,
+              "databaseConnections": 0,
+              "postgrest": 0
+            }
+          },
+          {
+            "component": "db",
+            "stateAvailable": true,
+            "running": true,
+            "outOfMemory": false,
+            "exitCode": 0,
+            "logsAvailable": true,
+            "errorCounts": {
+              "upstream": 0,
+              "workerConnections": 0,
+              "databaseConnections": 0,
+              "postgrest": 0
+            }
+          }
+        ],
+        "cleanup": "pending"
+      },
+      "cleanup": {
+        "gitSha": "1be0f47bd80cfe4adb83e7802d7f973a2ce3a968",
+        "resources": [
+          {
+            "path": "fresh",
+            "status": "stopped"
+          }
+        ],
+        "temporaryDirectoryRemoved": true
+      }
     }
   ]
 }

@@ -66,7 +66,10 @@ function disposableDiagnostics(projectId) {
       exitCode:Number.isInteger(state?.ExitCode)?state.ExitCode:null,
       logsAvailable:logged.status===0,
       errorCounts:{
-        upstream:lines.filter((line)=>/upstream.*(?:invalid|timed out|closed|refused|error)|no live upstream/i.test(line)).length,
+        upstream:lines.filter((line)=>/upstream.*(?:invalid|timed out|closed|refused|error)|(?:invalid|failed|reset|closed).*upstream|no live upstream/i.test(line)).length,
+        connectionReset:lines.filter((line)=>/connection reset by peer|recv\(\) failed|upstream prematurely closed|upstream sent invalid/i.test(line)).length,
+        processCrash:lines.filter((line)=>/segmentation|SIGSEGV|SIGABRT|panic|terminated by signal|exited on signal/i.test(line)).length,
+        databaseError:lines.filter((line)=>/\b(?:ERROR|FATAL|PANIC):/.test(line)).length,
         workerConnections:lines.filter((line)=>/worker_connections|too many open files/i.test(line)).length,
         databaseConnections:lines.filter((line)=>/too many clients|remaining connection slots|connection pool.*(?:timeout|exhaust)/i.test(line)).length,
         postgrest:lines.filter((line)=>/PGRST[0-9]{3}/.test(line)).length,

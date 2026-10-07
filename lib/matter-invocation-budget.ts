@@ -32,7 +32,9 @@ export class MatterInvocationBudget {
   check() {
     if (this.clock() - this.started >= this.limits.upstreamMs) throw new MatterBudgetStop("deadline");
   }
-  remainingTotalMs = () => Math.max(1, this.limits.totalMs - (this.clock() - this.started));
+  // performance.now() has fractional milliseconds; AbortSignal.timeout requires
+  // an integer even when final logging/release uses the remaining time margin.
+  remainingTotalMs = () => Math.max(1, Math.floor(this.limits.totalMs - (this.clock() - this.started)));
   canRecover = () => this.clock() - this.started < this.limits.totalMs - 10_000;
   admitPage(limit: number) {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new Error("Invalid Matter page limit");

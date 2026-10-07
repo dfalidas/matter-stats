@@ -39,12 +39,16 @@ globalThis.fetch = async (input, init) => {
       recordDatabaseEvent({ endpoint:url.pathname, transportFailure:["AbortError","TimeoutError","TypeError"].includes(error?.name)?error.name:"other" });
       throw error;
     }
-    let postgresCode=null;
+    let postgresCode=null, gatewayFailure=null;
     if (!response.ok) {
       const error = await response.clone().json().catch(()=>null);
       if (/^[A-Z0-9]{5}$/.test(error?.code)) postgresCode=error.code;
+      // Known public gateway messages only; never copy arbitrary response data.
+      for (const known of ["An invalid response was received from the upstream server", "The upstream server is timing out", "The upstream server is not available"]) {
+        if (error?.message === known) gatewayFailure=known;
+      }
     }
-    recordDatabaseEvent({ endpoint:url.pathname,status:response.status,postgresCode });
+    recordDatabaseEvent({ endpoint:url.pathname,status:response.status,postgresCode, ...(gatewayFailure ? { gatewayFailure } : {}) });
     if (url.pathname.endsWith("/rpc/commit_matter_page")) {
       const payload = JSON.parse(init.body);
       if (lostBody && payload.p_receipt_id === lostBody.p_receipt_id) { assert.deepEqual(payload,lostBody); replayVerified = true; }

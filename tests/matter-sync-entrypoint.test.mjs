@@ -94,7 +94,7 @@ function harness({ sessions = [], items = [], now = [], legacyCooldown = null } 
 const page = (results = [], next = null) => ({ object: "list", results, has_more: next !== null, next_cursor: next });
 
 test("busy account lease denies all trigger modes before any reads, writes or Matter", async () => {
-  for (const mode of ["recent_activity_manual", "recent_activity_scheduled", "backfill_library"]) {
+  for (const mode of ["recent_activity_manual", "recent_activity_scheduled", "backfill_library", "backfill_sessions"]) {
     const touched = [];
     const deps = new Proxy({ acquireLease: async () => null, budgetClock: undefined }, {
       get: (target, key) => key in target ? target[key] : async () => { touched.push(key); throw new Error("unexpected work"); },

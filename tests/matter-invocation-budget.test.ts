@@ -23,6 +23,13 @@ test("request and deadline stops include preparation and discard late results", 
   });
   const timed = new MatterInvocationBudget(MATTER_INVOCATION_LIMITS, () => now);
   await assert.rejects(timed.attempt(async () => { now += 90_000; return "late response"; }), (e: unknown) => e instanceof MatterBudgetStop && e.reason === "deadline");
+  const finalizing = new MatterInvocationBudget(MATTER_INVOCATION_LIMITS, () => now);
+  now += 140_000.75;
+  assert.equal(finalizing.canRecover(), false);
+  assert.equal(finalizing.remainingTotalMs(), 9_999);
+  assert.doesNotThrow(() => AbortSignal.timeout(finalizing.remainingTotalMs()));
+  now += 10_000;
+  assert.equal(finalizing.remainingTotalMs(), 1);
   assert.equal(getMatterInvocationBudget(), undefined);
 });
 test("timeout cancels actual preparation with deterministic timers", async (t) => {
