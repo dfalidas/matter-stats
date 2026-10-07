@@ -207,31 +207,22 @@ test("reports partial session skips without hiding successful imports", () => {
 });
 
 
-test("imports linked matter_items before upserting reading_sessions", () => {
+test("page persistence uses one atomic boundary after bounded preparation", () => {
   const source = readFileSync("lib/matter-sync.ts", "utf8");
-  const sessionImportStart = source.indexOf("async function importMatterSessionPage");
-  const linkedImportIndex = source.indexOf("await importLinkedMatterItems", sessionImportStart);
-  const sessionUpsertIndex = source.indexOf("await upsertInBatches(sessionRows, upsertReadingSessions, lease)", sessionImportStart);
-  const linkedImportStart = source.indexOf("async function importLinkedMatterItems");
-  const placeholderUpsertIndex = source.indexOf("await upsertInBatches(placeholderRows, upsertMatterItems, lease)", linkedImportStart);
-  const metadataFetchIndex = source.indexOf("await getOptionalMatterItem(itemId, lease)", linkedImportStart);
-
-  assert.notEqual(sessionImportStart, -1);
-  assert.ok(linkedImportIndex > sessionImportStart);
-  assert.ok(sessionUpsertIndex > linkedImportIndex);
-  assert.ok(placeholderUpsertIndex > linkedImportStart);
-  assert.ok(metadataFetchIndex > placeholderUpsertIndex);
+  const prepared = source.indexOf("await prepareNextMatterBatch");
+  const committed = source.indexOf("await deps.commitPage", prepared);
+  assert.ok(committed > prepared);
+  assert.doesNotMatch(source, /await upsertInBatches|await replaceItemTags/);
 });
 
 test("live sync path handles Matter session object mapping and explicit skip reasons", () => {
   const source = readFileSync("lib/matter-sync.ts", "utf8");
 
-  assert.match(source, /extractMatterReadingSessionItemId\(session\)/);
   assert.match(source, /normalizeReadingSession\(session/);
     assert.match(source, /invalid_date/);
   assert.match(source, /invalid_seconds_read/);
-  assert.match(source, /database_upsert_error/);
-  assert.match(source, /objectSamplePrefix/);
+  assert.match(source, /missing_session_id/);
+  assert.doesNotMatch(source, /objectSamplePrefix/);
   assert.match(source, /secondsReadType/);
   assert.match(source, /dateType/);
 });

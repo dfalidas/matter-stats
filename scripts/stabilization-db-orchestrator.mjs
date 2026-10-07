@@ -13,7 +13,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const migrationsSource = path.join(repoRoot, "supabase/migrations");
 
 export function sanitizedEnvironment(extra = {}) {
-  const keep = ["PATH", "HOME", "USER", "TMPDIR", "TEMP", "TMP", "SystemRoot", "COMSPEC", "NODE_EXTRA_CA_CERTS", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"];
+  const keep = ["PATH", "HOME", "USER", "TMPDIR", "TEMP", "TMP", "SystemRoot", "COMSPEC", "NODE_EXTRA_CA_CERTS", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "npm_config_cache", "npm_config_https_proxy"];
   return Object.fromEntries([...keep.filter((key) => process.env[key]).map((key) => [key, process.env[key]]), ...Object.entries(extra)]);
 }
 
@@ -146,6 +146,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   if (!upgrade) cli(["db", "reset", "--local", "--workdir", workdir], { env: sanitizedEnvironment() });
   let preservation = null;
   let streamPreservation = null;
+  let leasePreservation = null;
   const ownershipMarker = `task05-${projectId}`;
   if (upgrade) {
     containerPsql(projectId, legacySeedSql(ownershipMarker));
@@ -159,10 +160,19 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
       cycle_generation=41, page_limit=17, completed_watermark='2026-09-01T00:00:00Z',
       retry_at='2099-01-01T00:00:00Z';`);
     const streamsBeforeLease = containerPsql(projectId, streamSnapshotSql);
-    await copyMigrations(workdir, (filename) => filename.slice(0, 14) >= "20261005000000");
+    await copyMigrations(workdir, (filename) => filename.slice(0, 14) === "20261005000000");
     cli(["migration", "up", "--local", "--workdir", workdir], { env: sanitizedEnvironment() });
     assert.deepEqual(JSON.parse(containerPsql(projectId, streamSnapshotSql)), JSON.parse(streamsBeforeLease), "lease migration changed Task 11 active contracts, generations, watermarks or cooldowns");
     streamPreservation = "passed";
+    const leaseOwner = "00000000-0000-4000-8000-000000000081";
+    containerPsql(projectId, `update public.matter_sync_leases set owner='${leaseOwner}', generation=81, expires_at=clock_timestamp()+interval '120 seconds' where account_scope='matter';`);
+    const task12SnapshotSql = "select jsonb_build_object('streams',(select jsonb_agg(to_jsonb(s) order by stream) from public.matter_sync_streams s),'leases',(select jsonb_agg(to_jsonb(l)) from public.matter_sync_leases l))::text;";
+    const beforeTask13 = containerPsql(projectId, task12SnapshotSql);
+    await copyMigrations(workdir, (filename) => filename.slice(0, 14) > "20261005000000");
+    cli(["migration", "up", "--local", "--workdir", workdir], { env: sanitizedEnvironment() });
+    assert.deepEqual(JSON.parse(containerPsql(projectId, task12SnapshotSql)), JSON.parse(beforeTask13), "Task 13 changed active Task 11 contracts, cooldowns or Task 12 lease generation/expiry");
+    assert.equal(containerPsql(projectId, `select public.release_matter_sync_lease('matter','${leaseOwner}',81);`).trim(), "t");
+    leasePreservation = "passed";
     // Restore only the two synthetic contracts this path owns, after verifying
     // preservation. No unrelated row is overwritten for integration fixtures.
     for (const seed of streamSeeds) {
@@ -182,6 +192,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   const status = parseStatusEnv(cli(["status", "--workdir", workdir, "-o", "env"], { env: sanitizedEnvironment() }));
   const versions = await catalog(projectId, path.join(workdir, "supabase/migrations"));
   let leaseEvidence;
+  let pageEvidence;
   const runIntegration = () => {
     command(process.execPath, [path.join(repoRoot, "node_modules/typescript/bin/tsc"), "-p", "tests/tsconfig.json"], { env: sanitizedEnvironment() });
     const env = integrationEnvironment(status, projectId);
@@ -194,11 +205,18 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     assert.ok(Array.isArray(report.checks) && report.checks.every((check) => typeof check === "string"));
     // Copy only the integration report's known, credential-free evidence fields.
     leaseEvidence = { checks: report.checks, realSqlAndDataApi: true, syntheticMatterOnly: true };
+    const pageOutput = command(process.execPath, [path.join(repoRoot, "tests/integration/matter-page-commit.mjs")], { env });
+    const pageReport = JSON.parse(pageOutput.trim().split(/\r?\n/).at(-1));
+    assert.equal(pageReport.status, "passed");
+    assert.equal(pageReport.realSqlAndDataApi, true);
+    assert.equal(pageReport.syntheticMatterOnly, true);
+    assert.equal(pageReport.cleanup, "passed");
+    pageEvidence = { checks: pageReport.checks, realSqlAndDataApi: true, syntheticMatterOnly: true, cleanup: "passed" };
   };
   if (upgrade) {
     await removeOwnedLegacySingleton({ query: (sql) => Promise.resolve(containerPsql(projectId, sql)), ownershipMarker, runIntegration });
   } else runIntegration();
-  return { name, catalog: "passed", dataApi: "passed", accountLeaseSqlAndRuntime: "passed", leaseEvidence, preservation, streamPreservation, migrationHistory: versions };
+  return { name, catalog: "passed", dataApi: "passed", accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, preservation, streamPreservation, leasePreservation, migrationHistory: versions };
 }
 
 export async function runStabilizationDatabases({ evidenceRoot = path.join(repoRoot, "artifacts/stabilization-db"), hasDocker = dockerAvailable } = {}) {

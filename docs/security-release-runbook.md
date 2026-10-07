@@ -270,3 +270,31 @@ Official mechanisms reviewed for this change: [Supabase database functions](http
 and [PostgREST request transactions](https://docs.postgrest.org/en/stable/references/transactions.html).
 The Supabase changelog index was unavailable; the official changelog page and the
 current functions/grants documentation were inspected instead.
+
+## Task 13 page/recovery verification
+
+The gate additionally runs `tests/integration/matter-page-commit.mjs` after the
+Task 12 concurrency/row-lock suite on both disposable stacks. Only Matter HTTP
+and lost/interrupted response transport are synthetic; the application imports,
+Data API, SQL transactions, rollup calculations and role denials are real.
+Postgres triggers that raise after row writes or at checkpoint/daily persistence
+exist only in runner-owned disposable databases and are dropped in finally.
+No production fault-injection route or delay-based concurrency assertion exists.
+
+`matter_page_receipts` and `matter_dirty_rollups`, plus all four new exact RPC/helper
+signatures, are catalog-inventoried for RLS, effective PUBLIC/browser denial,
+service grants, invoker security and empty search_path. Browser clients perform
+real object-specific 42501 reads/writes/execute checks; service controls verify
+CRUD and intended RPC operation. The upgrade path first verifies Task 12 preserves
+Task 11 state, then seeds an active Task 12 owner/generation/expiry and compares
+its full lease/stream snapshot across Task 13 migration. It releases only that
+synthetic owner and retains its generation for subsequent concurrency tests.
+
+Retain the tested SHA, complete migration histories, sanitized page/lease assertions
+and owned-stack cleanup in `artifacts/stabilization-db/<tested-sha>/results.json`.
+A failed or blocked path cannot establish release readiness. Consult
+[task-13-validation.md](task-13-validation.md) for actual checks and blockers, and
+[deployment.md](deployment.md#task-13-release-order-and-rollback) for stopping old
+writers/previews, migration-before-code order and checkpoint/marker-preserving
+rollback. No merge, deployment, production migration or personal-data mutation is
+authorized by these tests.

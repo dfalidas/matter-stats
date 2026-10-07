@@ -1,40 +1,34 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
+import { emptyMatterPagePlan, validateMatterPage, validateMatterPagePlan, MatterPageValidationError, MATTER_ENRICHMENT_MAX_ROWS, type MatterPagePlan } from "./matter-page-plan";
 
 import {
   getMatterAccount,
   getMatterItem,
   listMatterAnnotations,
-  paginateMatter,
   listMatterItems,
   listMatterReadingSessions,
-  logMatterApiError,
   MatterApiError,
   MatterRateLimitError,
   type MatterListResponse,
 } from "@/lib/matter-api";
 import {
+  commitMatterPage,
   createSyncRun,
   getMatterSyncStream,
   getMatterSyncStreams,
   getMatterSyncState,
-  getSupabaseAdminClient,
   updateSyncRun,
-  upsertAnnotations,
-  replaceMatterItemTags,
-  upsertMatterItems,
   upsertMatterSyncStream,
-  upsertMatterTags,
-  upsertReadingSessions,
 } from "@/lib/supabase-admin";
 import { acquireMatterSyncLease, renewMatterSyncLease, releaseMatterSyncLease } from "@/lib/matter-sync-lease";
 import { leaseRpcArgs, MatterSyncLeaseLostError, type MatterSyncLease } from "@/lib/matter-sync-lease-context";
-import { recalculateDailyStats } from "@/lib/daily-stats";
-import { getAppTimezone, timestampToCalendarDate } from "@/lib/calendar";
+import { processPendingDailyStats } from "@/lib/daily-stats";
+import { getAppTimezone } from "@/lib/calendar";
 import type { Json, MatterSyncStream, TablesInsert } from "@/lib/supabase-types";
 import {
   createPlaceholderMatterItem,
   extractEmbeddedMatterItem,
-  extractMatterReadingSessionItemId,
   normalizeAnnotation,
   normalizeMatterItem,
   normalizeMatterItemTags,
@@ -45,27 +39,23 @@ import {
 } from "@/lib/matter-normalizers";
 import {
   buildMatterSyncMessage,
-  collectLinkedMatterItemIds,
   createEmptyMatterBatchCounts,
   buildMatterRateLimitMessage,
   getMatterSyncItemsLimit,
   getMatterSyncSessionsLimit,
   getRecentActivityWindowStart,
   isMatterRateLimitActive,
-  matterPageHasMore,
   type MatterBatchCounts,
   type MatterRecentActivityWindow,
   type MatterSyncMode,
 } from "@/lib/matter-sync-progress";
 
 import {
-  completeMatterCycle,
   persistActiveMatterCycle,
   startOrResumeMatterCycle,
   type ActiveMatterCycle,
 } from "@/lib/matter-sync-cycle";
 
-const UPSERT_BATCH_SIZE = 100;
 const OPTIONAL_MATTER_STATUSES = new Set([403, 404]);
 
 export type MatterSyncResult = {
@@ -79,10 +69,6 @@ export type MatterSyncResult = {
   tagsSynced?: number;
   hasMore?: boolean;
   rateLimitedUntil?: string | null;
-};
-
-type SyncCheckpoint = {
-  next: string | null;
 };
 
 type MatterSyncDiagnostics = {
@@ -111,7 +97,8 @@ export type MatterSyncRuntimeDeps = {
   getAccount: typeof getMatterAccount;
   listSessions: typeof listMatterReadingSessions;
   listItems: typeof listMatterItems;
-  recalculate: typeof recalculateDailyStats;
+  recoverRollups: typeof processPendingDailyStats;
+  commitPage: typeof commitMatterPage;
   importSessions: typeof importMatterSessionPage;
   importItems: typeof importMatterItemPage;
 };
@@ -130,7 +117,8 @@ export const productionSyncDeps: MatterSyncRuntimeDeps = {
   getAccount: getMatterAccount,
   listSessions: listMatterReadingSessions,
   listItems: listMatterItems,
-  recalculate: recalculateDailyStats,
+  recoverRollups: processPendingDailyStats,
+  commitPage: commitMatterPage,
   importSessions: importMatterSessionPage,
   importItems: importMatterItemPage,
 };
@@ -202,6 +190,8 @@ export async function syncMatterData(
     lease = await deps.acquireLease();
     if (!lease) return { ok: false, skippedReason: "busy", message: "Matter sync is already running for this account. Try again shortly." };
     leaseRpcArgs(lease);
+    // Recovery is independent of upstream availability, cooldowns and empty pages.
+    await deps.recoverRollups(lease);
     const invocationNow = deps.now();
     const stream = mode === "backfill_library" ? "library_items" : "recent_sessions";
     const rateLimitedUntil = await loadActiveMatterCooldown(deps, invocationNow);
@@ -243,18 +233,15 @@ export async function syncMatterData(
     await deps.renewLease(lease);
     const counts = createEmptyMatterBatchCounts();
     const diagnostics = createEmptyMatterSyncDiagnostics();
-    const affectedDates = new Set<string>();
-    const checkpoint: SyncCheckpoint = { next: null };
-    const nextCursor = await importNextMatterBatch({ cycle: activeCycle, counts, affectedDates, checkpoint, diagnostics, deps, lease });
-    const hasMore = nextCursor !== undefined;
-    const persistedState = hasMore
-      ? persistActiveMatterCycle(activeCycle, nextCursor ?? null)
-      : completeMatterCycle(activeCycle);
-
+    const { plan, hasMore, nextCursor } = await prepareNextMatterBatch({ cycle: activeCycle, counts, diagnostics, deps, lease });
+    validateMatterPagePlan(plan);
     await deps.renewLease(lease);
-    await deps.recalculate({ affectedDates }, lease);
-
-    await deps.upsertStream(persistedState, lease);
+    const persistedState = await deps.commitPage({
+      receiptId: randomUUID(), expected: persistActiveMatterCycle(activeCycle, activeCycle.cursor),
+      plan, hasMore, nextCursor, timezone: getAppTimezone(),
+    }, lease);
+    // Checkpoint durability never depends on this calculation succeeding.
+    await deps.recoverRollups(lease);
     const finishedRun = await deps.updateRun(syncRunId, {
       status: "success",
       finished_at: new Date().toISOString(),
@@ -341,194 +328,118 @@ export async function syncMatterData(
   }
 }
 
-async function importNextMatterBatch({
-  cycle,
-  counts,
-  affectedDates,
-  checkpoint,
-  diagnostics,
-  deps,
-  lease,
-}: {
-  cycle: ActiveMatterCycle;
-  counts: MatterBatchCounts;
-  affectedDates: Set<string>;
-  checkpoint: SyncCheckpoint;
-  diagnostics: MatterSyncDiagnostics;
-  deps: MatterSyncRuntimeDeps;
-  lease: MatterSyncLease;
-}): Promise<string | null | undefined> {
+async function prepareNextMatterBatch({ cycle, counts, diagnostics, deps, lease }: {
+  cycle: ActiveMatterCycle; counts: MatterBatchCounts; diagnostics: MatterSyncDiagnostics;
+  deps: MatterSyncRuntimeDeps; lease: MatterSyncLease;
+}): Promise<{ plan: MatterPagePlan; hasMore: boolean; nextCursor: string | null }> {
   await deps.renewLease(lease);
   diagnostics.requestCount += 1;
-
   if (cycle.stream === "library_items") {
-    const itemPage = await deps.listItems({
-      status: cycle.filters.status === "all" ? "all" : undefined,
-      order: cycle.filters.order === "updated" ? "updated" : undefined,
-      updatedSince: cycle.filters.updated_since,
-      cursor: cycle.cursor ?? undefined,
-      limit: cycle.pageLimit,
-    }, () => deps.renewLease(lease));
+    const page = await deps.listItems({ status: "all", order: "updated", updatedSince: cycle.filters.updated_since,
+      cursor: cycle.cursor ?? undefined, limit: cycle.pageLimit }, () => deps.renewLease(lease));
     await deps.renewLease(lease);
-    diagnostics.itemsReturned += itemPage.results.length;
-    recordMatterPageDiagnostics(diagnostics, itemPage);
-    const imported = await deps.importItems(itemPage, affectedDates, checkpoint, lease);
-    counts.items += imported.itemCount;
-    counts.tags += imported.tagCount;
-    counts.annotations += imported.annotationCount;
-    return matterPageHasMore(itemPage) ? requireNextCursor(itemPage.next_cursor) : undefined;
+    validateMatterPage(page, cycle.pageLimit, cycle.cursor);
+    diagnostics.itemsReturned += page.results.length;
+    recordMatterPageDiagnostics(diagnostics, page);
+    const prepared = await deps.importItems(page, lease);
+    counts.items += prepared.itemCount;
+    counts.tags += prepared.tagCount;
+    counts.annotations += prepared.annotationCount;
+    return { plan: prepared.plan, hasMore: page.has_more, nextCursor: page.next_cursor };
   }
-
-  const sessionPage = await deps.listSessions({
-    since: cycle.filters.since,
-    cursor: cycle.cursor ?? undefined,
-    limit: cycle.pageLimit,
-  }, () => deps.renewLease(lease));
+  const page = await deps.listSessions({ since: cycle.filters.since, cursor: cycle.cursor ?? undefined,
+    limit: cycle.pageLimit }, () => deps.renewLease(lease));
   await deps.renewLease(lease);
-  diagnostics.sessionsReturned += sessionPage.results.length;
-  recordMatterPageDiagnostics(diagnostics, sessionPage);
-  const imported = await deps.importSessions(sessionPage, affectedDates, checkpoint, diagnostics, lease);
-  counts.sessions += imported.sessions;
-  counts.items += imported.items;
-  counts.tags += imported.tags;
-  counts.annotations += imported.annotations;
-  return matterPageHasMore(sessionPage) ? requireNextCursor(sessionPage.next_cursor) : undefined;
+  validateMatterPage(page, cycle.pageLimit, cycle.cursor);
+  diagnostics.sessionsReturned += page.results.length;
+  recordMatterPageDiagnostics(diagnostics, page);
+  const prepared = await deps.importSessions(page, diagnostics, lease);
+  counts.sessions += prepared.sessions;
+  counts.items += prepared.items;
+  counts.tags += prepared.tags;
+  counts.annotations += prepared.annotations;
+  return { plan: prepared.plan, hasMore: page.has_more, nextCursor: page.next_cursor };
 }
 
-function requireNextCursor(cursor: string | null): string {
-  if (!cursor?.trim()) throw new Error("Matter reported more pages without an opaque next cursor.");
-  return cursor;
-}
-
-async function importMatterItemPage(
-  itemPage: MatterListResponse<NormalizableMatterItem>,
-  affectedDates: Set<string>,
-  checkpoint: SyncCheckpoint,
-  lease: MatterSyncLease
-): Promise<{ itemCount: number; tagCount: number; annotationCount: number }> {
-  const syncedAt = new Date().toISOString();
-  const itemRows: MatterItemRow[] = [];
-  const tagRowsById = new Map<string, TablesInsert<"matter_tags">>();
-  const itemTagRowsByKey = new Map<string, TablesInsert<"item_tags">>();
-  const itemIds = new Set<string>();
-
-  for (const item of itemPage.results) {
-    const itemRow = normalizeMatterItem(item, syncedAt);
-    itemRows.push(itemRow);
-    itemIds.add(itemRow.id);
-    advanceCheckpoint(checkpoint, itemRow.updated_at_matter);
-
-    const normalizedTags = normalizeMatterItemTags(item);
-    for (const tagRow of normalizedTags.matterTags) {
-      tagRowsById.set(tagRow.id, tagRow);
+// Preparation performs upstream reads and normalization only. Old-row effects
+// and all database writes belong to commit_matter_page's transaction.
+async function importMatterItemPage(page: MatterListResponse<NormalizableMatterItem>, lease: MatterSyncLease) {
+  const plan = emptyMatterPagePlan();
+  const items = new Map<string, MatterItemRow>();
+  const tags = new Map<string, TablesInsert<"matter_tags">>();
+  const links = new Map<string, TablesInsert<"item_tags">>();
+  for (const item of page.results) {
+    if (!item || typeof item.id !== "string" || !item.id.trim()) throw new MatterPageValidationError("invalid_item_id");
+    items.set(item.id, normalizeMatterItem(item, new Date().toISOString()));
+    if (item.tags !== undefined && !Array.isArray(item.tags)) throw new MatterPageValidationError("invalid_tags");
+    for (const tag of item.tags ?? []) {
+      if (!tag || typeof tag.id !== "string" || !tag.id.trim()) throw new MatterPageValidationError("invalid_tag_id");
     }
-    for (const itemTagRow of normalizedTags.itemTags) {
-      itemTagRowsByKey.set(`${itemTagRow.item_id}:${itemTagRow.tag_id}`, itemTagRow);
-    }
+    const normalized = normalizeMatterItemTags(item);
+    for (const tag of normalized.matterTags) tags.set(tag.id, tag);
+    for (const link of normalized.itemTags) links.set(JSON.stringify([link.item_id, link.tag_id]), link);
+    if (tags.size > MATTER_ENRICHMENT_MAX_ROWS || links.size > MATTER_ENRICHMENT_MAX_ROWS) throw new MatterPageValidationError("enrichment_bound_exceeded");
   }
-
-  for (const affectedDate of await getReadingSessionDatesForItems([...itemIds])) {
-    affectedDates.add(affectedDate);
-  }
-
-  await upsertInBatches([...tagRowsById.values()], upsertMatterTags, lease);
-  await upsertInBatches(itemRows, upsertMatterItems, lease);
-  await replaceItemTags([...itemIds], [...itemTagRowsByKey.values()], lease);
-
-  const annotationRows: TablesInsert<"annotations">[] = [];
-  for (const itemId of itemIds) {
-    for await (const annotation of iterateOptionalMatterAnnotations(itemId, lease)) {
-      const annotationRow = normalizeAnnotation(annotation);
-      if (!annotationRow) {
+  plan.items = [...items.values()]; plan.tags = [...tags.values()];
+  plan.itemTagIds = [...items.keys()]; plan.itemTags = [...links.values()];
+  const annotations = new Map<string, TablesInsert<"annotations">>();
+  const enrichmentBudget = { rows: 0, pages: 0 };
+  for (const id of items.keys()) {
+    for await (const annotation of iterateOptionalMatterAnnotations(id, lease, enrichmentBudget)) {
+      if (!annotation || typeof annotation.id !== "string" || !annotation.id.trim() || !annotation.item_id) {
+        console.info("Matter sync row skipped", { operation: "annotation", reason: "missing_identity" });
         continue;
       }
-
-      annotationRows.push(annotationRow);
-      addDateFromTimestamp(affectedDates, annotationRow.created_at_matter);
-      advanceCheckpoint(checkpoint, annotationRow.updated_at_matter);
+      const row = normalizeAnnotation(annotation);
+      if (!row) { console.info("Matter sync row skipped", { operation: "annotation", reason: "missing_item_id" }); continue; }
+      annotations.set(row.id!, row);
+      if (annotations.size > MATTER_ENRICHMENT_MAX_ROWS) throw new MatterPageValidationError("enrichment_bound_exceeded");
+      // Accepted annotation links can differ from the parent endpoint item.
+      if (!items.has(row.item_id)) {
+        if (!plan.placeholders.some((r) => r.id === row.item_id)) plan.placeholders.push(normalizeMatterItem(createPlaceholderMatterItem(row.item_id)));
+      }
     }
   }
-
-  for (const affectedDate of await getAnnotationDatesForAnnotationIds(annotationRows.map((annotation) => annotation.id))) {
-    affectedDates.add(affectedDate);
-  }
-
-  await upsertInBatches(annotationRows, upsertAnnotations, lease);
-
-  return {
-    itemCount: itemRows.length,
-    tagCount: tagRowsById.size,
-    annotationCount: annotationRows.length,
-  };
+  plan.annotations = [...annotations.values()];
+  validateMatterPagePlan(plan);
+  return { plan, itemCount: items.size, tagCount: tags.size, annotationCount: annotations.size };
 }
 
-async function importMatterSessionPage(
-  sessionPage: Awaited<ReturnType<typeof listMatterReadingSessions>>,
-  affectedDates: Set<string>,
-  checkpoint: SyncCheckpoint,
-  diagnostics: MatterSyncDiagnostics,
-  lease: MatterSyncLease
-): Promise<{ sessions: number; items: number; tags: number; annotations: number }> {
+async function importMatterSessionPage(page: Awaited<ReturnType<typeof listMatterReadingSessions>>, diagnostics: MatterSyncDiagnostics, lease: MatterSyncLease) {
+  const sessionRows = new Map<string, TablesInsert<"reading_sessions">>();
   let firstSkippedSession: unknown = null;
-
-  const embeddedItems = sessionPage.results.map(extractEmbeddedMatterItem).filter((item): item is NonNullable<typeof item> => item !== null);
-  const linkedItemIds = collectLinkedMatterItemIds(sessionPage.results);
-  const linkedItemCounts = await importLinkedMatterItems(linkedItemIds, embeddedItems, affectedDates, checkpoint, diagnostics, lease);
-  const sessionRows: TablesInsert<"reading_sessions">[] = [];
-  const matterItemLookup = new Map<string, MatterItemRow | null>();
-
-  for (const session of sessionPage.results) {
-    const itemId = extractMatterReadingSessionItemId(session);
+  for (const session of page.results) {
     const skipReason = classifySessionSkipReason(session);
     if (skipReason) {
       diagnostics.sessionsSkipped += 1;
-      if (diagnostics.firstSkipReason === null) {
-        diagnostics.firstSkipReason = skipReason;
-        firstSkippedSession = session;
-      }
+      console.info("Matter sync row skipped", { operation: "session", reason: skipReason });
+      if (diagnostics.firstSkipReason === null) { diagnostics.firstSkipReason = skipReason; firstSkippedSession = session; }
       continue;
     }
-    if (!itemId) {
-      diagnostics.sessionsWithoutLinkedItem += 1;
+    const row = normalizeReadingSession(session)!;
+    if (!row.item_id) diagnostics.sessionsWithoutLinkedItem += 1;
+    sessionRows.set(row.id!, row);
+  }
+  if (page.results.length > 0) diagnostics.firstSessionShape = summarizeReadingSessionShapeWithSkip(page.results[0], diagnostics.firstSkipReason, firstSkippedSession) as Json;
+  const linkedIds = [...new Set([...sessionRows.values()].flatMap((r) => r.item_id ? [r.item_id] : []))];
+  const embedded = new Map(page.results.map(extractEmbeddedMatterItem).filter((i): i is NonNullable<typeof i> => i !== null).map((i) => [i.id, i]));
+  const results: NormalizableMatterItem[] = [];
+  for (const id of linkedIds) {
+    const item = embedded.get(id) ?? await getOptionalMatterItem(id, lease);
+    if (!embedded.has(id)) diagnostics.requestCount += 1;
+    if (item) {
+      if (item.id !== id) throw new MatterPageValidationError("divergent_linked_item");
+      results.push(item);
     }
-    const sessionRow = normalizeReadingSession(session, {
-      item: itemId ? await getMatterItemById(itemId, matterItemLookup) : extractEmbeddedMatterItem(session),
-    });
-    if (!sessionRow) {
-      diagnostics.sessionsSkipped += 1;
-      if (diagnostics.firstSkipReason === null) {
-        diagnostics.firstSkipReason = "database_upsert_error";
-        firstSkippedSession = session;
-      }
-      continue;
-    }
-
-    sessionRows.push(sessionRow);
-    addDateFromTimestamp(affectedDates, sessionRow.started_at);
-    advanceCheckpoint(checkpoint, sessionRow.started_at);
-    advanceCheckpoint(checkpoint, sessionRow.ended_at);
   }
-
-  for (const affectedDate of await getReadingSessionDatesForSessionIds(sessionRows.map((session) => session.id))) {
-    affectedDates.add(affectedDate);
-  }
-
-  if (sessionPage.results.length > 0 && diagnostics.firstSessionShape === null) {
-    diagnostics.firstSessionShape = summarizeReadingSessionShapeWithSkip(sessionPage.results[0], diagnostics.firstSkipReason, firstSkippedSession) as Json;
-  } else if (diagnostics.firstSessionShape && diagnostics.firstSkipReason) {
-    diagnostics.firstSessionShape = {
-      ...(diagnostics.firstSessionShape as Record<string, unknown>),
-      skipReason: diagnostics.firstSkipReason,
-    } as Json;
-  }
-
-  try {
-    await upsertInBatches(sessionRows, upsertReadingSessions, lease);
-  } catch (error) {
-    diagnostics.firstSkipReason ??= "database_upsert_error";
-    throw error;
-  }
-  return { sessions: sessionRows.length, items: linkedItemCounts.itemCount, tags: linkedItemCounts.tagCount, annotations: linkedItemCounts.annotationCount };
+  diagnostics.itemsReturned += results.length;
+  const prepared = await importMatterItemPage({ object: "list", results, has_more: false, next_cursor: null }, lease);
+  const plan = prepared.plan;
+  const known = new Set([...plan.items, ...plan.placeholders].map((r) => r.id));
+  for (const id of linkedIds) if (!known.has(id)) plan.placeholders.push(normalizeMatterItem(createPlaceholderMatterItem(id)));
+  plan.sessions = [...sessionRows.values()];
+  validateMatterPagePlan(plan);
+  return { plan, sessions: sessionRows.size, items: linkedIds.length, tags: prepared.tagCount, annotations: prepared.annotationCount };
 }
 
 function classifySessionSkipReason(session: unknown): string | null {
@@ -562,66 +473,9 @@ function summarizeReadingSessionShapeWithSkip(session: unknown, skipReason: stri
     ...summary,
     objectType: typeof objectValue,
     objectLooksLikeItemId: typeof objectText === "string" && objectText.trim().length > 0 && objectText !== "reading_session",
-    objectSamplePrefix: typeof objectText === "string" ? objectText.trim().slice(0, 12) : null,
     dateType: typeof first.date,
     secondsReadType: typeof first.seconds_read,
     skipReason: skipReason ?? classifySessionSkipReason(skipTarget),
-  };
-}
-
-async function importLinkedMatterItems(
-  itemIds: string[],
-  embeddedItems: Array<NonNullable<ReturnType<typeof extractEmbeddedMatterItem>>>,
-  affectedDates: Set<string>,
-  checkpoint: SyncCheckpoint,
-  diagnostics: MatterSyncDiagnostics,
-  lease: MatterSyncLease
-): Promise<{ itemCount: number; tagCount: number; annotationCount: number }> {
-  if (itemIds.length === 0) {
-    return { itemCount: 0, tagCount: 0, annotationCount: 0 };
-  }
-
-  const syncedAt = new Date().toISOString();
-  const placeholderRows = itemIds.map((itemId) => normalizeMatterItem(createPlaceholderMatterItem(itemId), syncedAt));
-  await upsertInBatches(placeholderRows, upsertMatterItems, lease);
-
-  const embeddedItemsById = new Map(embeddedItems.map((item) => [item.id, item]));
-  const results = [];
-  let returnedItemObjects = 0;
-
-  for (const itemId of itemIds) {
-    const embeddedItem = embeddedItemsById.get(itemId);
-    if (embeddedItem) {
-      results.push(embeddedItem);
-      returnedItemObjects += 1;
-      continue;
-    }
-
-    diagnostics.requestCount += 1;
-    const fetchedItem = await getOptionalMatterItem(itemId, lease);
-    if (fetchedItem) {
-      results.push(fetchedItem);
-      returnedItemObjects += 1;
-    }
-  }
-  diagnostics.itemsReturned += returnedItemObjects;
-
-  const enrichedCounts = await importMatterItemPage(
-    {
-      object: "list",
-      results,
-      has_more: false,
-      next_cursor: null,
-    },
-    affectedDates,
-    checkpoint,
-    lease
-  );
-
-  return {
-    itemCount: itemIds.length,
-    tagCount: enrichedCounts.tagCount,
-    annotationCount: enrichedCounts.annotationCount,
   };
 }
 
@@ -633,7 +487,7 @@ async function getOptionalMatterItem(itemId: string, lease: MatterSyncLease): Pr
     return item;
   } catch (error) {
     if (isOptionalMatterEndpointError(error) || error instanceof MatterRateLimitError) {
-      logMatterApiError(error, `get optional Matter item ${itemId}`);
+      console.info("Matter optional endpoint unavailable", { operation: "item", status: (error as MatterApiError).status });
       return null;
     }
     throw error;
@@ -655,134 +509,26 @@ function getRateLimitedUntil(error: unknown): string | null {
   return new Date(Date.now() + retryAfterSeconds * 1_000).toISOString();
 }
 
-async function upsertInBatches<Row>(rows: Row[], upsert: (batch: Row[], lease: MatterSyncLease) => Promise<unknown>, lease: MatterSyncLease) {
-  leaseRpcArgs(lease);
-  for (let index = 0; index < rows.length; index += UPSERT_BATCH_SIZE) {
-    await renewMatterSyncLease(lease);
-    await upsert(rows.slice(index, index + UPSERT_BATCH_SIZE), lease);
-  }
-}
-
-async function replaceItemTags(itemIds: string[], itemTags: TablesInsert<"item_tags">[], lease: MatterSyncLease) {
-  leaseRpcArgs(lease);
-  for (let index = 0; index < itemIds.length; index += UPSERT_BATCH_SIZE) {
-    await renewMatterSyncLease(lease);
-    const batch = itemIds.slice(index, index + UPSERT_BATCH_SIZE);
-    const ids = new Set(batch);
-    await replaceMatterItemTags(batch, itemTags.filter((row) => ids.has(row.item_id)), lease);
-  }
-}
-
-async function getReadingSessionDatesForItems(itemIds: string[]): Promise<string[]> {
-  if (itemIds.length === 0) {
-    return [];
-  }
-
-  const dates = new Set<string>();
-  const client = getSupabaseAdminClient();
-
-  for (let index = 0; index < itemIds.length; index += UPSERT_BATCH_SIZE) {
-    const { data, error } = await client
-      .from("reading_sessions")
-      .select("started_at")
-      .in("item_id", itemIds.slice(index, index + UPSERT_BATCH_SIZE));
-
-    if (error) {
-      throw error;
-    }
-
-    for (const session of data ?? []) {
-      addDateFromTimestamp(dates, session.started_at);
-    }
-  }
-
-  return [...dates];
-}
-
-async function getReadingSessionDatesForSessionIds(sessionIds: Array<string | undefined>): Promise<string[]> {
-  const ids = sessionIds.filter(isNonEmptyString);
-  if (ids.length === 0) {
-    return [];
-  }
-
-  const dates = new Set<string>();
-  const client = getSupabaseAdminClient();
-
-  for (let index = 0; index < ids.length; index += UPSERT_BATCH_SIZE) {
-    const { data, error } = await client
-      .from("reading_sessions")
-      .select("started_at")
-      .in("id", ids.slice(index, index + UPSERT_BATCH_SIZE));
-
-    if (error) {
-      throw error;
-    }
-
-    for (const session of data ?? []) {
-      addDateFromTimestamp(dates, session.started_at);
-    }
-  }
-
-  return [...dates];
-}
-
-async function getAnnotationDatesForAnnotationIds(annotationIds: Array<string | undefined>): Promise<string[]> {
-  const ids = annotationIds.filter(isNonEmptyString);
-  if (ids.length === 0) {
-    return [];
-  }
-
-  const dates = new Set<string>();
-  const client = getSupabaseAdminClient();
-
-  for (let index = 0; index < ids.length; index += UPSERT_BATCH_SIZE) {
-    const { data, error } = await client
-      .from("annotations")
-      .select("created_at_matter")
-      .in("id", ids.slice(index, index + UPSERT_BATCH_SIZE));
-
-    if (error) {
-      throw error;
-    }
-
-    for (const annotation of data ?? []) {
-      addDateFromTimestamp(dates, annotation.created_at_matter);
-    }
-  }
-
-  return [...dates];
-}
-
-async function getMatterItemById(itemId: string, cache: Map<string, MatterItemRow | null>): Promise<MatterItemRow | null> {
-  if (cache.has(itemId)) {
-    return cache.get(itemId) ?? null;
-  }
-
-  const { data, error } = await getSupabaseAdminClient()
-    .from("matter_items")
-    .select("id, word_count, progress")
-    .eq("id", itemId)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  const item = data ? { id: data.id, word_count: data.word_count, progress: data.progress } : null;
-  cache.set(itemId, item);
-  return item;
-}
-
-async function* iterateOptionalMatterAnnotations(itemId: string, lease: MatterSyncLease) {
+async function* iterateOptionalMatterAnnotations(itemId: string, lease: MatterSyncLease, budget: { rows: number; pages: number }) {
+  let cursor: string | null = null;
+  const cursors = new Set<string>();
   try {
-    yield* paginateMatter(async (cursor) => {
+    do {
+      if (++budget.pages > 100) throw new MatterPageValidationError("annotation_page_bound_exceeded");
       await renewMatterSyncLease(lease);
-      const page = await listMatterAnnotations(itemId, { limit: 100, cursor }, () => renewMatterSyncLease(lease));
+      const page = await listMatterAnnotations(itemId, { limit: 100, cursor: cursor ?? undefined }, () => renewMatterSyncLease(lease));
       await renewMatterSyncLease(lease);
-      return page;
-    });
+      validateMatterPage(page, 100, cursor);
+      budget.rows += page.results.length;
+      if (budget.rows > MATTER_ENRICHMENT_MAX_ROWS) throw new MatterPageValidationError("enrichment_bound_exceeded");
+      if (page.next_cursor && cursors.has(page.next_cursor)) throw new MatterPageValidationError("annotation_cursor_loop");
+      if (page.next_cursor) cursors.add(page.next_cursor);
+      yield* page.results;
+      cursor = page.has_more ? page.next_cursor : null;
+    } while (cursor);
   } catch (error) {
     if (isOptionalMatterEndpointError(error)) {
+      console.info("Matter optional endpoint unavailable", { operation: "annotations", status: (error as MatterApiError).status });
       return;
     }
     throw error;
@@ -795,6 +541,7 @@ function isOptionalMatterEndpointError(error: unknown): boolean {
 
 function sanitizeSyncError(error: unknown): string {
   if (error instanceof MatterSyncLeaseLostError) return error.message;
+  if (error instanceof MatterPageValidationError) return `Matter page rejected (${error.reason}); no page writes were applied.`;
   if (error instanceof MatterApiError) {
     return `Matter API request failed during sync (status ${error.status}${error.code ? `, code ${error.code}` : ""}).`;
   }
@@ -803,6 +550,7 @@ function sanitizeSyncError(error: unknown): string {
 }
 
 function sanitizeLogError(error: unknown): { name: string; message: string; status?: number; code?: string | null } {
+  if (error instanceof MatterPageValidationError) return { name: error.name, message: error.reason };
   if (error instanceof MatterApiError) {
     return {
       name: error.name,
@@ -823,33 +571,6 @@ function sanitizeLogError(error: unknown): { name: string; message: string; stat
     name: "UnknownError",
     message: "Matter sync failed because the local database update could not be completed.",
   };
-}
-
-function addDateFromTimestamp(dates: Set<string>, timestamp: string | null | undefined) {
-  if (!timestamp) {
-    return;
-  }
-
-  const date = new Date(timestamp);
-  if (Number.isFinite(date.getTime())) {
-    dates.add(timestampToCalendarDate(date, getAppTimezone()));
-  }
-}
-
-function advanceCheckpoint(checkpoint: SyncCheckpoint, candidate: string | null | undefined) {
-  checkpoint.next = maxIsoTimestamp(checkpoint.next, candidate);
-}
-
-function maxIsoTimestamp(current: string | null, candidate: string | null | undefined): string | null {
-  if (!candidate) {
-    return current;
-  }
-
-  if (!current || Date.parse(candidate) > Date.parse(current)) {
-    return candidate;
-  }
-
-  return current;
 }
 
 function isRecentActivityMode(mode: MatterSyncMode): boolean {

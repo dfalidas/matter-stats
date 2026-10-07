@@ -146,8 +146,8 @@ exposed-schema table has RLS enabled and browser/PUBLIC access revoked. See the
 catalog inventory in `scripts/matter-sync-lease-inventory.mjs` and the release
 runbook for real permission-denial evidence requirements.
 
-**Known boundary:** fencing protects each existing mutation transaction, not an
-entire page. Items, tags, annotations, sessions, rollups, stream state and run
+**Task 12 boundary (superseded by Task 13 below):** fencing protected each
+existing mutation transaction, not an entire page. Items, tags, annotations, sessions, rollups, stream state and run
 status still commit separately. Earlier committed work may remain after failure;
 retries resume/replay the durable cycle. Task 13 must implement an entire page
 plus checkpoint and dirty-rollup marker atomically. Tasks 14–15 retain the
@@ -191,3 +191,73 @@ The merged interface redesign does not complete the stabilization plan. Remainin
 ## Verification boundaries
 
 Repository inspection can confirm code, migration text, and deterministic local checks. It cannot by itself confirm the deployed commit, environment values, migration history, production RLS/grants, Supabase Security Advisor state, live Matter response shapes, actual RPC concurrency, cron delivery, or stored-data correctness. Record those as external verification evidence rather than marking them complete from implementation alone.
+
+## Atomic pages and durable rollup recovery (Task 13)
+
+The Task 13 runtime prepares a complete normalized mutation plan before page
+persistence. It validates the list envelope and continuation before enrichment;
+optional item 403/404/429 and annotation 403/404 retain their existing behavior
+with operation/status diagnostics. Invalid sessions and unlinked annotations are
+skipped with reason identifiers. Required placeholders are insert-only, so a
+missing optional item cannot erase previously imported metadata. Embedded items,
+tags, complete item-tag replacements and accepted annotations are included.
+Preparation performs no database mutations. Network calls and daily calculations
+remain outside SQL transactions.
+
+`commit_matter_page` is the only page persistence RPC. It locks/asserts the Task
+12 owner, generation and database expiry, then locks the selected stream and
+compares its cycle generation, endpoint, filters, page limit, cursor, fixed start,
+watermark, coverage and transition status. These two generations remain distinct.
+All normalized rows and joins, dirty dates, checkpoint/completion and receipt
+commit in that transaction. Empty terminal pages complete it; only validated
+exhaustion promotes the fixed cycle start. Other streams and stored cooldowns
+are preserved. The older fenced row RPCs are called internally in this same
+transaction; they are no longer separate client page requests. Run creation,
+logging, cycle start/resume and cooldown writes still use Task 12 fencing.
+
+The SQL derives old and new session/annotation local dates before replacing rows.
+Changes in item source/status/progress dirty existing session dates because those
+fields affect daily metrics. Dates use the validated APP_TIMEZONE; raw IDs,
+durations and UTC timestamps retain the existing normalization/metric contract.
+Unchanged normalized rows do not replace pending marker revisions. Placeholders
+never update existing rows.
+
+Bounds are explicit: 100 page sessions/items/placeholders/replacement item IDs;
+10,000 tags, links and annotations; 4 MiB serialized page/normalized plan; 4,096
+cursor characters; 100 annotation requests and 10,000 raw annotation rows across
+one page's enrichment. Metadata effects examine at most 10,001 matching session
+rows and reject when more than 10,000 require dirty work. SQL accepts only known
+row fields, streams and operations. Exceeding any bound rejects the whole page;
+there is no truncation or checkpoint advancement to hide omitted work.
+
+`matter_page_receipts` retains only the latest receipt per stream (at most two
+rows). A page request has one UUID and a database fingerprint of its immutable
+contract/plan/transition/timezone. An identical retry under a valid lease returns
+the durable stream without writes; a changed payload with that UUID is rejected.
+After a newer receipt replaces it, an old request must pass the current stream
+comparison and therefore cannot rewind a cursor or overwrite a newer cycle.
+The client retries uncertain transport outcomes once with the exact same request.
+If the process stops or uncertainty remains, the next invocation resumes from
+the durable stream, never an assumed client checkpoint.
+
+`matter_dirty_rollups` stores one pending row per local date, its timezone and a
+fresh database UUID revision for each page commit. That revision is independent
+of the lease generation and distinguishes successive pages under the same lease.
+Every invocation first recovers up to 32 dates under its lease, even during an
+upstream cooldown. After a page commits it processes another bounded snapshot.
+For each marker, calculation uses its recorded timezone outside SQL;
+`ack_matter_rollup` atomically fences, locks/compares that exact revision/timezone,
+writes daily_stats and deletes only that marker. A stale acknowledgement returns
+false without even writing an older rollup. Calculation/write/interruption/lease
+loss retains pending work. Work beyond each bound remains durable. Page checkpoint
+durability is independent of rollup success; run status may report an error even
+when the page itself committed.
+
+The two new RLS tables and four invoker RPCs/helpers use object-scoped service-role
+grants, no PUBLIC/browser privileges and empty search_path with qualified objects.
+Catalog and Data API inventories are in `scripts/matter-page-inventory.mjs` and
+the disposable gate. See [task-13-validation.md](task-13-validation.md) for actual
+evidence and [deployment.md](deployment.md#task-13-release-order-and-rollback)
+for migration-before-code and old-writer handling. This supersedes Task 12's
+separate-page-transaction boundary; it does not certify analytics completeness,
+add continuation/backfill, or repair historical data.

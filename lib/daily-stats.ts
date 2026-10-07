@@ -1,6 +1,6 @@
 import { renewMatterSyncLease } from "./matter-sync-lease";
 import { leaseRpcArgs, type MatterSyncLease } from "./matter-sync-lease-context";
-import { getSupabaseAdminClient, upsertDailyStats } from "./supabase-admin";
+import { getSupabaseAdminClient, upsertDailyStats, getPendingDailyStats, acknowledgeDailyStat } from "./supabase-admin";
 import type { TablesInsert } from "./supabase-types";
 import { buildDailyStat, type DailyStatsSession } from "./daily-stat-builder";
 import { addCalendarDays, calendarDayBounds, getAppTimezone, isCalendarDate } from "./calendar";
@@ -32,13 +32,13 @@ export async function recalculateDailyStatsForDateRange(startDate: string, endDa
   await recalculateDailyStats({ affectedDates: new Set(dates) }, lease);
 }
 
-export async function calculateDailyStat(date: string): Promise<TablesInsert<"daily_stats">> {
+export async function calculateDailyStat(date: string, timezone: string = getAppTimezone()): Promise<TablesInsert<"daily_stats">> {
   if (!isValidDateString(date)) {
     throw new Error(`Invalid daily stats date: ${date}`);
   }
 
   const client = getSupabaseAdminClient();
-  const bounds = calendarDayBounds(date, getAppTimezone());
+  const bounds = calendarDayBounds(date, timezone);
   const start = bounds.start.toISOString();
   const end = bounds.end.toISOString();
 
@@ -92,4 +92,18 @@ function getDateRange(startDate: string, endDate: string): string[] {
 
 function isValidDateString(value: string): boolean {
   return isCalendarDate(value);
+}
+
+// One bounded snapshot per call. Newer work survives exact-revision acknowledgement.
+export const PENDING_ROLLUP_WORK_LIMIT = 32;
+export async function processPendingDailyStats(lease: MatterSyncLease): Promise<number> {
+  leaseRpcArgs(lease);
+  const pending = await getPendingDailyStats(PENDING_ROLLUP_WORK_LIMIT, lease);
+  let acknowledged = 0;
+  for (const marker of pending) {
+    await renewMatterSyncLease(lease);
+    const row = await calculateDailyStat(marker.date, marker.timezone);
+    if (await acknowledgeDailyStat(marker, row, lease)) acknowledged++;
+  }
+  return acknowledged;
 }
