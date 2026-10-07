@@ -60,7 +60,17 @@ let upstream = (request) => {
   if (p.endsWith(`/items/${item.id}`)) return Response.json(item);
   return Response.json({}, { status: 404 });
 };
-let transport = (request, init) => originalFetch(request, init);
+const databaseFetch = async (request, init) => {
+  const response = await originalFetch(request, init);
+  if (!response.ok) {
+    const error = await response.clone().json().catch(() => ({}));
+    if (error.code !== "42501") console.error("Disposable Data API failure", {
+      operation: new URL(String(request)).pathname, code: error.code, message: error.message,
+    });
+  }
+  return response;
+};
+let transport = databaseFetch;
 const snapshot = async () => {
   const result = {};
   for (const table of ["matter_items", "matter_tags", "reading_sessions", "annotations", "item_tags", ...PAGE_TABLES, "daily_stats", "matter_sync_streams"]) {
@@ -158,7 +168,7 @@ try {
   upstream = (request) => new URL(request).pathname.endsWith("/items")
     ? Response.json(page([{ ...item, site_name: "library.example" }], "library-next")) : beforeLibraryUpstream(request);
   transport = async (request, init) => {
-    const result = await originalFetch(request, init);
+    const result = await databaseFetch(request, init);
     if (String(request).endsWith("/rpc/commit_matter_page")) {
       attempts.push(JSON.parse(init.body));
       if (!lost) {
@@ -176,7 +186,7 @@ try {
   assert.equal(attempts.length, 2); assert.deepEqual(attempts[0], attempts[1]);
   state = await snapshot(); assert.equal(state.item_tags.length, 1); assert.equal(state.reading_sessions.length, 1);
   assert.deepEqual(state.matter_sync_streams.find((s) => s.stream === "recent_sessions"), sessionsBeforeLibrary);
-  transport = (request, init) => originalFetch(request, init);
+  transport = databaseFetch;
   checks.push("Library path commits joins/receipt/checkpoint independently; lost real SQL response retries identical receipt without duplicate rows or cursor rewind");
 
   upstream = beforeLibraryUpstream;
@@ -292,7 +302,7 @@ try {
   };
   await assert.rejects(runtime.productionSyncDeps.recoverRollups(activeLease));
   assert.deepEqual(await read("matter_dirty_rollups"), pendingBefore);
-  transport = (request, init) => originalFetch(request, init);
+  transport = databaseFetch;
   assert.equal(await runtime.productionSyncDeps.recoverRollups(activeLease), 32);
   assert.equal((await read("matter_dirty_rollups")).length, 8);
   assert.equal(await runtime.productionSyncDeps.recoverRollups(activeLease), 8);
@@ -302,7 +312,7 @@ try {
   await seedCycle("recent_sessions");
   let uncertainResponses = 0;
   transport = async (request, init) => {
-    const response = await originalFetch(request, init);
+    const response = await databaseFetch(request, init);
     if (String(request).endsWith("/rpc/commit_matter_page")) {
       assert.equal(response.ok, true); await response.text(); uncertainResponses++;
       throw new TypeError("synthetic both acknowledgements lost");
@@ -313,7 +323,7 @@ try {
   assert.equal(uncertainResponses, 2);
   assert.equal((await read("matter_sync_streams")).find((s) => s.stream === "recent_sessions").cursor, "session-next");
   assert.ok((await read("matter_dirty_rollups")).length > 0);
-  transport = (request, init) => originalFetch(request, init);
+  transport = databaseFetch;
   upstream = (request) => new URL(request).pathname.endsWith("/reading_sessions") ? Response.json(page()) : normal(request);
   assert.equal((await runtime.syncMatterData("recent_activity_scheduled", {}, deps)).ok, true);
   assert.equal((await read("matter_dirty_rollups")).length, 0);
