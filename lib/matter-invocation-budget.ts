@@ -15,13 +15,18 @@ export class MatterInvocationBudget {
   requests = 0;
   pages = 0;
   private readonly started: number;
-  constructor(readonly limits: MatterInvocationLimits = MATTER_INVOCATION_LIMITS, private readonly clock = () => performance.now()) {
-    for (const [key, value] of Object.entries(limits)) {
+  readonly limits: MatterInvocationLimits;
+  constructor(limits: MatterInvocationLimits = MATTER_INVOCATION_LIMITS, private readonly clock = () => performance.now()) {
+    const keys = Object.keys(MATTER_INVOCATION_LIMITS) as (keyof MatterInvocationLimits)[];
+    if (!limits || Object.keys(limits).length !== keys.length) throw new Error("Invalid Matter invocation budget");
+    for (const key of keys) {
+      const value = limits[key];
       if (!Number.isSafeInteger(value) || value < 1 || value > MATTER_INVOCATION_LIMITS[key as keyof MatterInvocationLimits]) {
         throw new Error("Invalid Matter invocation budget");
       }
     }
     if (limits.totalMs < limits.upstreamMs || limits.requestMs > limits.upstreamMs) throw new Error("Invalid Matter deadline");
+    this.limits = Object.freeze({ ...limits });
     this.started = clock();
   }
   check() {
@@ -30,6 +35,7 @@ export class MatterInvocationBudget {
   remainingTotalMs = () => Math.max(1, this.limits.totalMs - (this.clock() - this.started));
   canRecover = () => this.clock() - this.started < this.limits.totalMs - 10_000;
   admitPage(limit: number) {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new Error("Invalid Matter page limit");
     this.check();
     if (this.pages >= this.limits.pages) throw new MatterBudgetStop("pages");
     // First page receives a fresh invocation. Later pages reserve the maximum

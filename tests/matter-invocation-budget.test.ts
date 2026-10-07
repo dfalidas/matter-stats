@@ -4,6 +4,8 @@ import { MatterInvocationBudget, MatterBudgetStop, MATTER_INVOCATION_LIMITS, get
 
 test("invocation budgets validate finite bounds and reserve an entire expensive page", () => {
   for (const requests of [0, NaN, Infinity, 225, 1.5]) assert.throws(() => new MatterInvocationBudget({ ...MATTER_INVOCATION_LIMITS, requests }));
+  assert.throws(() => new MatterInvocationBudget({} as typeof MATTER_INVOCATION_LIMITS));
+  assert.throws(() => new MatterInvocationBudget({ ...MATTER_INVOCATION_LIMITS, pages: undefined } as unknown as typeof MATTER_INVOCATION_LIMITS));
   const budget = new MatterInvocationBudget();
   budget.pages = 1; budget.requests = 100;
   assert.throws(() => budget.admitPage(25), MatterBudgetStop);

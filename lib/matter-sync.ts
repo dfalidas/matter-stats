@@ -79,7 +79,6 @@ export type MatterSyncResult = {
 };
 
 type MatterSyncDiagnostics = {
-  requestCount: number;
   sessionsReturned: number;
   itemsReturned: number;
   lastHasMore: boolean;
@@ -143,7 +142,6 @@ export const productionSyncDeps: MatterSyncRuntimeDeps = {
 
 function createEmptyMatterSyncDiagnostics(): MatterSyncDiagnostics {
   return {
-    requestCount: 0,
     sessionsReturned: 0,
     itemsReturned: 0,
     lastHasMore: false,
@@ -259,7 +257,7 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
         initialSince: stream === "recent_sessions" ? getRecentActivityWindowStart(invocationNow, requestedWindow) : null,
         requestedWindow: requestedWindow ?? null });
       try { budget.admitPage(activeCycle.pageLimit); }
-      catch (error) { if (error instanceof MatterBudgetStop) { stop = error; break; } throw error; }
+      catch (error) { if (error instanceof MatterBudgetStop && error.reason !== "timeout") { stop = error; break; } throw error; }
       if (!stored?.cycle_active) await deps.upsertStream(persistActiveMatterCycle(activeCycle, activeCycle.cursor), lease);
       // Persist the next turn before reads: an expensive/failed page cannot starve
       // its sibling after process death or repeated small/time-limited invocations.
@@ -269,7 +267,7 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
       const pageCounts = createEmptyMatterBatchCounts();
       let prepared: Awaited<ReturnType<typeof prepareNextMatterBatch>>;
       try { prepared = await prepareNextMatterBatch({ cycle: activeCycle, counts: pageCounts, diagnostics, deps, lease }); budget.check(); }
-      catch (error) { if (error instanceof MatterBudgetStop) { stop = error; break; } throw error; }
+      catch (error) { if (error instanceof MatterBudgetStop && error.reason !== "timeout") { stop = error; break; } throw error; }
       validateMatterPagePlan(prepared.plan);
       const seen = cursors.get(stream) ?? new Set<string>(activeCycle.cursor ? [activeCycle.cursor] : []);
       if (prepared.nextCursor && seen.has(prepared.nextCursor)) throw new MatterPageValidationError("stream_cursor_loop");
@@ -313,17 +311,20 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
   } catch (error) {
     const rateLimitedUntil = getRateLimitedUntil(error, deps.now());
     const sanitizedError = sanitizeSyncError(error);
+    const budgetPartial = error instanceof MatterBudgetStop && error.reason !== "timeout";
     if (rateLimitedUntil && lease) {
       try { await deps.cooldownAccount(rateLimitedUntil, lease); }
       catch (stateError) { console.error("Matter cooldown persistence failed", { error: sanitizeLogError(stateError) }); }
     }
     if (syncRunId && lease) {
-      try { await deps.updateRun(syncRunId, { status: "error", finished_at: deps.now().toISOString(), error_message: sanitizedError,
-        sync_mode: runMode, matter_requests_count: budget.requests, checkpoint_timestamp: null }, lease); }
+      try { await deps.updateRun(syncRunId, { status: budgetPartial ? "success" : "error", finished_at: deps.now().toISOString(), error_message: budgetPartial ? null : sanitizedError,
+        sync_mode: runMode, matter_requests_count: budget.requests, checkpoint_timestamp: null, matter_has_more: true,
+        items_synced: counts.items, sessions_synced: counts.sessions, annotations_synced: counts.annotations, tags_synced: counts.tags }, lease); }
       catch (updateError) { console.error("Matter run update failed", { error: sanitizeLogError(updateError) }); }
     }
     console.error("Matter sync failed", { syncRunId, error: sanitizeLogError(error) });
-    return { ok: false, hasMore: true, pagesCommitted: budget.pages, requestsAttempted: budget.requests,
+    return { ok: budgetPartial, status: budgetPartial ? "partial" : undefined, hasMore: true, pagesCommitted: budget.pages, requestsAttempted: budget.requests,
+      itemsSynced: counts.items, sessionsSynced: counts.sessions, annotationsSynced: counts.annotations, tagsSynced: counts.tags,
       syncRunId: syncRunId ?? undefined, rateLimitedUntil,
       message: rateLimitedUntil ? buildMatterRateLimitMessage(rateLimitedUntil)
         : `Matter sync stopped safely. ${sanitizedError} Earlier committed work remains; continuation uses the stored contract.`,
