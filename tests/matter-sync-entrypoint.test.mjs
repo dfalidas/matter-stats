@@ -279,3 +279,15 @@ test("history request queues behind an active narrow cycle without altering its 
   assert.deepEqual(h.states.get("recent_sessions").filters,{});
   assert.equal(h.states.get("recent_sessions").cycle_generation,6);
 });
+
+test("library and scheduled triggers never create history intent from a session-window option", async () => {
+  for (const mode of ["backfill_library", "recent_activity_scheduled"]) {
+    const h = harness({ sessions: [page()], items: [page()] });
+    let requested = false;
+    h.deps.requestHistory = async () => { requested = true; throw new Error("unexpected history initiation"); };
+    const result = await runSync(mode,{ recentActivityWindow:"all" },h.deps);
+    assert.equal(result.ok,true); assert.equal(requested,false); assert.equal(result.historyStatus,"none");
+    if (mode === "recent_activity_scheduled") assert.equal(h.calls.find((call)=>Array.isArray(call)&&call[0]==="sessions")[1].since,"2026-01-01T00:00:00.000Z");
+    else assert.equal(h.states.get("recent_sessions").cycle_generation,0);
+  }
+});

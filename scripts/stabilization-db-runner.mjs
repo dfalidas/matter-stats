@@ -31,8 +31,8 @@ BEGIN
     END IF;
     FOREACH privilege_name IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE'] LOOP
       IF table_name IN ('matter_sync_leases','matter_sync_continuation') AND privilege_name IN ('INSERT', 'DELETE') THEN
-        IF has_table_privilege('service_role', 'public.matter_sync_leases', privilege_name) THEN
-          RAISE EXCEPTION 'service_role can reset durable lease via %', privilege_name;
+        IF has_table_privilege('service_role', format('public.%I', table_name), privilege_name) THEN
+          RAISE EXCEPTION 'service_role can reset durable lease/intent public.% via %', table_name, privilege_name;
         END IF;
         CONTINUE;
       END IF;

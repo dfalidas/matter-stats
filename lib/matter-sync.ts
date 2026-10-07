@@ -209,7 +209,8 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
   const diagnostics = createEmptyMatterSyncDiagnostics();
   // Retain existing DB run labels; history is a recent_activity invocation.
   const runMode = mode === "backfill_library" ? mode : "recent_activity";
-  const explicitHistory = mode === "backfill_sessions" || options.recentActivityWindow === "all";
+  const explicitHistory = mode === "backfill_sessions"
+    || ((mode === "recent_activity_manual" || mode === "recent_activity") && options.recentActivityWindow === "all");
   let stop: MatterBudgetStop | null = null;
   try {
     lease = await deps.acquireLease();
@@ -226,7 +227,8 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
       message: "The requested enumeration of all sessions available from Matter is complete. This does not establish retention or universal historical completeness.",
     };
     const states = new Map((await deps.getStreams()).map((state) => [state.stream, state]));
-    const requestedWindow = isRecentActivityMode(mode) && !explicitHistory ? options.recentActivityWindow : undefined;
+    const requestedWindow = isRecentActivityMode(mode) && mode !== "recent_activity_scheduled" && !explicitHistory
+      ? options.recentActivityWindow : undefined;
     const initialSession = states.get("recent_sessions");
     if (requestedWindow && initialSession?.cycle_active && initialSession.coverage_window
         && requestedWindow !== initialSession.coverage_window && intent.history_status !== "running") {

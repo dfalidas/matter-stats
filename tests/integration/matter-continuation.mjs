@@ -147,6 +147,37 @@ try {
     const result = await runtime.syncMatterData("recent_activity_scheduled", {}, deps);
     assert.equal(result.status,"partial"); assert.equal(result.pagesCommitted,0); await resetOwnedCycles();
   }
+  // Fire the actual invocation cancellation timer at a deterministic HTTP
+  // barrier. Database calls and the existing 250ms pacing retain real timers.
+  for (const endpoint of ["item", "annotations"]) {
+    tick = 0; const before = await snapshot();
+    const originalSetTimeout = globalThis.setTimeout;
+    let cancelAttempt;
+    globalThis.setTimeout = (callback, delay, ...rest) => {
+      const handle = originalSetTimeout(callback, delay, ...rest);
+      if (delay === limits.requestMs) cancelAttempt = callback;
+      return handle;
+    };
+    try {
+      upstream = (url, init) => {
+        if (url.pathname.endsWith("/me")) return Response.json({});
+        if (url.pathname.endsWith("/reading_sessions")) return Response.json(page([{ id: `${prefix}-budget`, item_id: fixtureItem.id, date: "2027-03-01T10:00:00Z", seconds_read: 61 }]));
+        if ((endpoint === "item" && url.pathname.endsWith(fixtureItem.id)) || (endpoint === "annotations" && url.pathname.endsWith("/annotations"))) {
+          assert.equal(typeof cancelAttempt,"function"); assert.equal(init.signal.aborted,false);
+          const interrupted = new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason), { once:true }));
+          cancelAttempt(); assert.equal(init.signal.aborted,true);
+          return interrupted;
+        }
+        return Response.json(fixtureItem);
+      };
+      const timedOut = await runtime.syncMatterData("recent_activity_scheduled",{},deps);
+      assert.equal(timedOut.ok,false); assert.match(timedOut.message,/timeout/); assert.equal(timedOut.pagesCommitted,0);
+      assert.equal(timedOut.requestsAttempted,endpoint==="item"?3:4);
+      const after = await snapshot(); assert.deepEqual(after.sessions,before.sessions); assert.deepEqual(after.receipts,before.receipts); assert.deepEqual(after.dirty,before.dirty);
+      assert.equal(after.streams.find((s)=>s.stream==="recent_sessions").cursor,null);
+    } finally { globalThis.setTimeout = originalSetTimeout; }
+    await resetOwnedCycles();
+  }
   // An expensive valid page receives a fresh invocation and completes in full.
   tick = 0; let annotationCalls = 0;
   upstream = (url) => {
@@ -157,7 +188,7 @@ try {
   };
   const expensive = await runtime.syncMatterData("recent_activity_scheduled", {}, deps);
   assert.equal(expensive.ok,true); assert.equal(expensive.pagesCommitted,1); assert.equal(expensive.requestsAttempted,103); assert.equal(annotationCalls,100);
-  checks.push("D: counted me/list/item/all annotation attempts; request and clock stops inside real preparation never commit a subset; fresh reservation completes a valid 100-annotation-page preparation");
+  checks.push("D/G: counted me/list/item/all annotation attempts; request/deadline stops and deterministic cancellation timers inside real preparation never commit a subset; fresh reservation completes a valid 100-annotation-page preparation");
 
   // HTTP failures retain the last committed cursor. 429 in optional paths is
   // account-wide persisted cooldown, including me before list preparation.
