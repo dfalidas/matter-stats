@@ -149,7 +149,7 @@ runbook for real permission-denial evidence requirements.
 **Task 12 boundary (superseded by Task 13 below):** fencing protected each
 existing mutation transaction, not an entire page. Items, tags, annotations, sessions, rollups, stream state and run
 status still commit separately. Earlier committed work may remain after failure;
-retries resume/replay the durable cycle. Task 13 must implement an entire page
+retries resume/replay the durable cycle. Task 13 implements an entire page
 plus checkpoint and dirty-rollup marker atomically. Tasks 14–15 retain the
 continuation/backfill/shared-quota work. No new queue, scheduler, historical
 repair, multi-tenant model or metric change is introduced.
@@ -265,3 +265,5 @@ add continuation/backfill, or repair historical data.
 Replay also compares the receipt that preceded preparation, so an old page cannot
 be accepted if an opaque cursor value recurs within the same cycle. The latest
 receipt remains bounded; a reused-cursor SQL regression verifies this guard.
+Permanent stale-contract conflicts return `PT409`; they do not use SQLSTATE
+`40001`, which can cause PostgREST to retry a deliberately rejected transaction.

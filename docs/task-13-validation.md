@@ -44,8 +44,40 @@ contracts/cursors/watermarks/coverage/cooldowns through Task 12, and active Task
 owner/expiry/generation plus stream state through Task 13. It does not reset
 production state or derive unsupported completion claims.
 
-Actual outcomes and tested SHA will be recorded here after the final gate runs.
-No release-ready claim is made while database or audit evidence is pending.
+Tested runtime SHA: `b6b53e56afc96653d85f03c0c92df6e89c451ae2`.
+The subsequent evidence/documentation commit changes no runtime, migration or
+test code. Permanent sanitized results, migration history and cleanup are retained
+in [task-13-evidence.json](task-13-evidence.json), copied from
+[CI run 37601808504](https://github.com/dfalidas/matter-stats/actions/runs/37601808504)
+(database artifact `11473063007`, attempt 1, completed 2026-10-07).
+
+| Check | Actual outcome |
+| --- | --- |
+| `npm ci` | Passed locally and in CI with the existing lockfile |
+| `npm run typecheck` | Passed after existing Next route type generation |
+| `npm run lint` | Passed; three unchanged Visual Explainer warnings |
+| `npm run test` | 232 passed, 0 failed, 3 existing TODOs (235 total) |
+| `npm run build` | Passed locally and in CI |
+| `npm run audit:ci` | Failed under the unchanged policy; see blocker below |
+| Disposable fresh database | Catalog, real Data API grants, Task 12 SQL/runtime concurrency and Task 13 page/recovery suite passed |
+| Disposable upgrade database | Same suites passed; full legacy rows, active Task 11 stream contracts/cooldowns and Task 12 lease owner/expiry/generation preservation passed |
+| Disposable cleanup | Both stacks stopped, temporary directory removed; atomic fixture/trigger/Auth cleanup passed |
+
+The hosted gate ran `DISPOSABLE_DB_ACK=yes npm run test`, which invokes the same
+disposable orchestrator as `DISPOSABLE_DB_ACK=yes npm run test:stabilization-db`,
+with runner-created synthetic databases and no normal production/Matter credentials.
+The separate local `test:stabilization-db` attempt was cancelled during slow
+provisioning before it established any pass; its owned stack was stopped and
+temporary directory removed. That attempt is explicitly **not** passing evidence.
+
+Release remains blocked: production audit reports high-severity
+[GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w), affecting
+the existing `sharp` 0.35.4 override (`<0.35.5`) and its dependent `next` entry
+(two affected production packages). No dependency, audit policy or exception was
+changed to obtain a pass. Resolve the dependency advisory separately and rerun
+the required audit before release; this PR is not release-ready. No production
+deployment, migration, real Matter sync, secret change or personal-data mutation
+was performed.
 
 ## Limits and operations
 
