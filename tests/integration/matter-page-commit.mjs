@@ -119,7 +119,7 @@ try {
     return originalResolve.call(this, request, parent, isMain, options);
   };
   runtime = createRequire(import.meta.url)(path.join(root, ".test-build/lib/matter-sync.js"));
-  deps = { ...runtime.productionSyncDeps, now: () => new Date("2300-02-01T00:00:00Z"), createRun: async (row, lease) => { ownedRuns.add(lease.owner); return runtime.productionSyncDeps.createRun(row, lease); } };
+  deps = { ...runtime.productionSyncDeps, now: () => new Date("2026-10-01T00:00:00Z"), createRun: async (row, lease) => { ownedRuns.add(lease.owner); return runtime.productionSyncDeps.createRun(row, lease); } };
   globalThis.fetch = async (request, init) => String(request).startsWith("https://api.getmatter.com/") ? upstream(String(request), init) : transport(request, init);
 
   // No domain writes during failed preparation, SQL writes or checkpoint update.
