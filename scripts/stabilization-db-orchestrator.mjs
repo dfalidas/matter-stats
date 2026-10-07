@@ -172,7 +172,6 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     await copyMigrations(workdir, (filename) => filename.slice(0, 14) > "20261005000000" && filename.slice(0,14) <= "20261007085051");
     cli(["migration", "up", "--local", "--workdir", workdir], { env: sanitizedEnvironment() });
     assert.deepEqual(JSON.parse(containerPsql(projectId, task12SnapshotSql)), JSON.parse(beforeTask13), "Task 13 changed active Task 11 contracts, cooldowns or Task 12 lease generation/expiry");
-    assert.equal(containerPsql(projectId, `select public.release_matter_sync_lease('matter','${leaseOwner}',81);`).trim(), "t");
     leasePreservation = "passed";
     const receiptId = "00000000-0000-4000-8000-000000000082";
     const dirtyRevision = "00000000-0000-4000-8000-000000000083";
@@ -184,6 +183,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     cli(["migration","up","--local","--workdir",workdir],{env:sanitizedEnvironment()});
     assert.deepEqual(JSON.parse(containerPsql(projectId,task13SnapshotSql)),JSON.parse(beforeTask14),"Task 14 changed Task 11/12/13 contracts, cooldowns, leases, receipts or dirty work");
     pagePreservation = "passed";
+    assert.equal(containerPsql(projectId, `select public.release_matter_sync_lease('matter','${leaseOwner}',81);`).trim(), "t");
     assert.equal(containerPsql(projectId,`delete from public.matter_page_receipts where receipt_id='${receiptId}' returning receipt_id;`).trim(),receiptId);
     assert.equal(containerPsql(projectId,`delete from public.matter_dirty_rollups where revision='${dirtyRevision}' returning revision;`).trim(),dirtyRevision);
 
