@@ -52,6 +52,8 @@ IDs, raw durations and timestamps. It checks pinned parameters and all 51 pages,
 partial/completed watermark boundaries, pending library fairness, completed repeat
 and overlap, terminal lost-response replay, expensive-page admission, real item/
 annotation request/time interruption, failures/cooldown and actual browser grants.
+Trigger-function EXECUTE denial uses real SQL browser roles because trigger-returning
+functions are intentionally absent from PostgREST RPC discovery.
 Existing deterministic lease/takeover barriers and atomic/dirty-recovery faults
 are retained. Upgrade compares Task 13 receipts/dirty revisions and all prior
 legacy/stream/cooldown/lease state across Task 14. Owned fixtures/Auth/stack cleanup

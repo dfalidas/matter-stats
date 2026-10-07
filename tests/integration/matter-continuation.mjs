@@ -186,7 +186,14 @@ try {
   const beforeDenied = await snapshot();
   for (const [role, client] of [["anon",anon],["authenticated",authenticated]]) {
     for (const [operation, query] of [["SELECT",client.from("matter_sync_continuation").select("*")],["INSERT",client.from("matter_sync_continuation").insert(originalIntent)],["UPDATE",client.from("matter_sync_continuation").update({ next_stream:"recent_sessions" }).eq("account_scope","matter")],["DELETE",client.from("matter_sync_continuation").delete().eq("account_scope","matter")]]) assertGrantDenied(await query,{ role,operation,kind:"table",name:"matter_sync_continuation" });
-    for (const signature of CONTINUATION_FUNCTION_SIGNATURES) { const name = signature.split("(")[0]; assertGrantDenied(await client.rpc(name,payloads[name]),{role,operation:"EXECUTE",kind:"function",name}); }
+    for (const signature of CONTINUATION_FUNCTION_SIGNATURES) {
+      const name = signature.split("(")[0];
+      if (name === "complete_matter_history") {
+        // Trigger-returning functions are intentionally absent from PostgREST's
+        // RPC cache. Verify the exact grant with the REAL database browser role.
+        await sql(`begin; set local role ${role}; do $denial$ begin perform public.complete_matter_history(); raise exception 'unexpected trigger function execution'; exception when insufficient_privilege then if sqlerrm <> 'permission denied for function complete_matter_history' then raise; end if; end; $denial$; rollback;`);
+      } else assertGrantDenied(await client.rpc(name,payloads[name]),{role,operation:"EXECUTE",kind:"function",name});
+    }
   }
   assert.deepEqual(await snapshot(),beforeDenied);
   assert.equal((await service.rpc("request_matter_history",{ ...args(activeLease),p_coverage:"since=2020" })).error.code,"22023");

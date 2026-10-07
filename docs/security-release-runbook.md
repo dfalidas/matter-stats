@@ -327,7 +327,9 @@ processes, daily authenticated cron, pending library work, request/time interrup
 inside enrichment, expensive-page admission, terminal receipt replay, cooldowns
 and stale intent/start/scheduling/cooldown mutations. Real signed-in `authenticated`
 and `anon` clients must get exact object-specific 42501 denials for new table CRUD
-and every exact function signature; invalid payload/cache/gateway errors never
+and every exposed RPC signature. The trigger-returning function is absent from
+PostgREST RPC discovery; its exact denial uses real SQL SET ROLE, with completion
+verified through the production page transaction. Invalid payload/cache/gateway errors never
 count as denials. Existing auth/cron, Task 12 barriers and Task 13 crash/rollup
 checks remain gates. The upgrade path additionally snapshots receipts and dirty
 revisions across Task 14, preserving prior stream/cooldown/lease/legacy state.
