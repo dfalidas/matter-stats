@@ -22,6 +22,11 @@ test("request and deadline stops include preparation and discard late results", 
     await assert.rejects(budget.attempt(async () => "annotation"), (e: unknown) => e instanceof MatterBudgetStop && e.reason === "requests");
   });
   const timed = new MatterInvocationBudget(MATTER_INVOCATION_LIMITS, () => now);
+  now = 89_999.75;
+  assert.equal(timed.canRecover(), true);
+  now = 90_000;
+  assert.equal(timed.canRecover(), false);
+  now = 0;
   await assert.rejects(timed.attempt(async () => { now += 90_000; return "late response"; }), (e: unknown) => e instanceof MatterBudgetStop && e.reason === "deadline");
   const finalizing = new MatterInvocationBudget(MATTER_INVOCATION_LIMITS, () => now);
   now += 140_000.75;

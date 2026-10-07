@@ -333,6 +333,10 @@ verified through the production page transaction. Invalid payload/cache/gateway 
 count as denials. Existing auth/cron, Task 12 barriers and Task 13 crash/rollup
 checks remain gates. The upgrade path additionally snapshots receipts and dirty
 revisions across Task 14, preserving prior stream/cooldown/lease/legacy state.
+The owned disposable Kong transport uses verified upstream keepalive pool size
+zero to avoid observed connection resets under the large fixture. Real gateway/
+Data API authentication and all SQL/RLS assertions remain required; failed HTTP
+responses still fail the gate. This setting is not applied to production.
 
 Retain exact tested SHA, results, complete migration histories and owned fixture/
 Auth/stack cleanup. Unavailable or failed execution is BLOCKED/FAILED, never passed.

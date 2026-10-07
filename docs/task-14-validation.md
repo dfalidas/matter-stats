@@ -19,8 +19,11 @@ No HTTP occurs inside SQL; recovery retains exact revisions and bounded work.
 
 Budgets: 8 committed pages, 224 Matter attempts, 90 seconds upstream preparation,
 150 seconds total, 10-second per-attempt cancellation and database HTTP timeout.
-Ingress maxDuration is 180 seconds on dashboard/Settings/cron. Existing page sizes
-are 1–100/default 25. Admission reserves the maximum later-page request cost;
+Ingress maxDuration is 180 seconds on dashboard/Settings/cron.
+Recovery admits no new marker with less than 60 seconds of the total budget,
+reserving one marker's three serial HTTP stages and progress/logging/release.
+Fractional clock remainders are rounded down for integer cancellation timers.
+Existing page sizes are 1–100/default 25. Admission reserves the maximum later-page request cost;
 fresh defaults fit a maximum valid page (201 preparation calls plus `/me`).
 All accepted enrichment belongs to the complete page plan, which is discarded on
 budget stop. Existing pacing remains; no sync retries/long sleeps/shared account
@@ -59,6 +62,16 @@ Existing deterministic lease/takeover barriers and atomic/dirty-recovery faults
 are retained. Upgrade compares Task 13 receipts/dirty revisions and all prior
 legacy/stream/cooldown/lease state across Task 14. Owned fixtures/Auth/stack cleanup
 must pass. No production or real Matter credentials are provided to test children.
+
+The large fixture exposed disposable Kong upstream connection resets (HTTP 502).
+The runner disables connection reuse only in its owned gateways using Kong's
+documented `KONG_UPSTREAM_KEEPALIVE_POOL_SIZE=0`, reloads the CLI's unchanged custom
+template, and asserts the effective setting. Each path records `gatewayTransport`.
+All requests still traverse the real gateway/Data API, grants and RLS. No failure
+is accepted, no retry or authentication bypass is added, and production gateway
+configuration remains a separate deployment concern. Sources: the pinned
+[Kong configuration](https://github.com/Kong/kong/blob/2.8.1/kong.conf.default#L771)
+and [CLI startup](https://github.com/supabase/cli/blob/v2.48.3/internal/start/start.go).
 
 ## Current evidence
 

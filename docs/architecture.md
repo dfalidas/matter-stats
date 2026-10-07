@@ -304,7 +304,9 @@ limiter, and Matter can return 429 before an invocation budget is consumed.
 
 Database HTTP is bounded to 10 seconds and the remaining total deadline. Rollup
 recovery retains two snapshots of at most 32 markers and checks remaining time
-before each marker; exact-revision acknowledgement remains atomic. Commits,
+before each marker; it stops admission with 60 seconds remaining for one marker
+(renew, parallel reads, acknowledgement) and progress read/logging/release, each
+database step capped at 10 seconds. Exact-revision acknowledgement remains atomic. Commits,
 logging/release and recovery have a 60-second application margin after upstream
 preparation, plus 30 seconds below the explicit 180-second function cap. Deploy
 on the documented Node.js/Fluid Compute runtime (300-second default); verify the

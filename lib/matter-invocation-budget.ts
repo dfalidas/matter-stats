@@ -35,7 +35,9 @@ export class MatterInvocationBudget {
   // performance.now() has fractional milliseconds; AbortSignal.timeout requires
   // an integer even when final logging/release uses the remaining time margin.
   remainingTotalMs = () => Math.max(1, Math.floor(this.limits.totalMs - (this.clock() - this.started)));
-  canRecover = () => this.clock() - this.started < this.limits.totalMs - 10_000;
+  // Reserve one in-flight marker (renew, parallel reads, ack: <=30s) and
+  // continuation read, run logging and release (<=30s) at their HTTP ceilings.
+  canRecover = () => this.clock() - this.started < this.limits.totalMs - 60_000;
   admitPage(limit: number) {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new Error("Invalid Matter page limit");
     this.check();

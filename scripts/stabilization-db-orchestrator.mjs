@@ -170,6 +170,21 @@ function integrationEnvironment(status, projectId) {
   });
 }
 
+function configureDisposableGateway(projectId) {
+  assert.match(projectId, /^matter-stats-(fresh|upgrade)-[a-z0-9-]+$/);
+  // The CLI's Kong can reuse a socket closed by its upstream under the large
+  // fixture's burst of real Data API calls. Disable only this owned gateway's
+  // connection reuse, using Kong's supported setting. No retry or auth bypass.
+  const gateway = `supabase_kong_${projectId}`;
+  command("docker", ["exec", "-e", "KONG_UPSTREAM_KEEPALIVE_POOL_SIZE=0", gateway,
+    "kong", "reload", "--nginx-conf", "/home/kong/custom_nginx.template"]);
+  const setting = command("docker", ["exec", gateway, "sh", "-c",
+    "sed -n '/^upstream_keepalive_pool_size *=/p' /usr/local/kong/.kong_env"]);
+  assert.match(setting.trim(), /^upstream_keepalive_pool_size\s*=\s*0$/,
+    "owned gateway did not retain the supported transport setting");
+  return { upstreamKeepalivePoolSize: 0, configuration: "verified", scope: "owned-disposable-only" };
+}
+
 async function verifyPath({ name, workdir, projectId, upgrade }) {
   if (upgrade) await copyMigrations(workdir, (filename) => filename.slice(0, 14) <= UPGRADE_BASELINE);
   else await copyMigrations(workdir);
@@ -234,6 +249,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     assertLegacyPreserved(JSON.parse(before), JSON.parse(after));
     preservation = "passed";
   }
+  const gatewayTransport = configureDisposableGateway(projectId);
   const status = parseStatusEnv(cli(["status", "--workdir", workdir, "-o", "env"], { env: sanitizedEnvironment() }));
   const versions = await catalog(projectId, path.join(workdir, "supabase/migrations"));
   let leaseEvidence;
@@ -273,7 +289,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   if (upgrade) {
     await removeOwnedLegacySingleton({ query: (sql) => Promise.resolve(containerPsql(projectId, sql)), ownershipMarker, runIntegration });
   } else runIntegration();
-  return { name, catalog: "passed", dataApi: "passed", accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, boundedContinuationAndHistory: "passed", continuationEvidence, preservation, streamPreservation, leasePreservation, pagePreservation, migrationHistory: versions };
+  return { name, catalog: "passed", dataApi: "passed", gatewayTransport, accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, boundedContinuationAndHistory: "passed", continuationEvidence, preservation, streamPreservation, leasePreservation, pagePreservation, migrationHistory: versions };
 }
 
 export async function runStabilizationDatabases({ evidenceRoot = path.join(repoRoot, "artifacts/stabilization-db"), hasDocker = dockerAvailable } = {}) {

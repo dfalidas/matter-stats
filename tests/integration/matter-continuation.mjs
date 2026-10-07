@@ -131,7 +131,7 @@ try {
     return response;
   };
   const deps = { ...runtime.productionSyncDeps, now: () => new Date("2027-03-01T00:00:00Z"), budgetClock: () => tick,
-    createRun: async (row, lease) => { ownedRuns.add(lease.owner); return runtime.productionSyncDeps.createRun(row,lease); } };
+    createRun: async (row, lease) => { const created = await runtime.productionSyncDeps.createRun(row,lease); ownedRuns.add(created.id); return created; } };
   await resetOwnedCycles();
   // Request stops occur in the REAL linked-item and annotation preparation paths.
   for (const stopAt of [2, 3, 5]) {
