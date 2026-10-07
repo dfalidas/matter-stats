@@ -235,7 +235,31 @@ try {
   const password = `S-${crypto.randomUUID()}-aA1!`; assertSuccessful(await service.auth.admin.updateUserById(authUser,{ password }),"synthetic password");
   assertSuccessful(await authenticated.auth.signInWithPassword({ email: created.data.user.email,password }),"browser role session");
   activeLease = await acquire();
-  await sql(`begin; load 'safeupdate'; set local safeupdate.enabled=on; set local role service_role; select public.cooldown_matter_account('matter','${activeLease.owner}',${activeLease.generation},'2027-03-01T00:01:00Z'); rollback;`);
+  // Exercise the actual PostgREST session, whose preload enforces safeupdate.
+  // The managed postgres role cannot LOAD its library directly. This owned,
+  // service-only fixture proves the guard rejects an unfiltered no-op UPDATE
+  // before invoking the production bounded cooldown in the same transaction.
+  const safeupdateFixture = `task14_safeupdate_${crypto.randomUUID().replaceAll("-","")}`;
+  await sql(`create function public.${safeupdateFixture}(p_owner uuid,p_generation bigint) returns text language plpgsql volatile security invoker set search_path='' as $control$ begin
+    perform public.assert_matter_sync_lease('matter',p_owner,p_generation);
+    perform set_config('safeupdate.enabled','on',true);
+    begin update public.matter_sync_continuation set next_stream=next_stream; raise exception 'safeupdate guard was not enforced'; exception when cardinality_violation then null; end;
+    perform public.cooldown_matter_account('matter',p_owner,p_generation,'2027-03-01T00:01:00Z');
+    return current_setting('safeupdate.enabled'); end; $control$;
+    revoke all on function public.${safeupdateFixture}(uuid,bigint) from public,anon,authenticated;
+    grant execute on function public.${safeupdateFixture}(uuid,bigint) to service_role; notify pgrst,'reload schema';`);
+  try {
+    const controlArgs = { p_owner:activeLease.owner,p_generation:activeLease.generation };
+    let control;
+    for (let attempt=0; attempt<40; attempt++) {
+      control = await service.rpc(safeupdateFixture,controlArgs);
+      if (control.error?.code!=="PGRST202") break;
+      // Bounded fixture schema discovery only; no application/Matter retries.
+      await new Promise((resolve)=>setTimeout(resolve,25));
+    }
+    assertSuccessful(control,"service-role safeupdate control"); assert.equal(control.data,"on");
+    for (const [role,browser] of [["anon",anon],["authenticated",authenticated]]) assertGrantDenied(await browser.rpc(safeupdateFixture,controlArgs),{role,operation:"EXECUTE",kind:"function",name:safeupdateFixture});
+  } finally { await sql(`drop function public.${safeupdateFixture}(uuid,bigint); notify pgrst,'reload schema';`); }
   const payloads = {
     cooldown_matter_account: { ...args(activeLease),p_retry_at:"2027-03-01T00:01:00Z" },
     request_matter_history: { ...args(activeLease),p_coverage:"all" },
