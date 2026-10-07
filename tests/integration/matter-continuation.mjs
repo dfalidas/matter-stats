@@ -36,6 +36,7 @@ const originalResolve = Module._resolveFilename;
 const originalFetch = globalThis.fetch;
 const checks = [];
 const ownedRuns = new Set();
+const databaseErrors = [];
 let originalStreams, originalIntent, originalDailyStats, initialRuns, authUser, activeLease, ready = false;
 let runtime, upstream;
 const page = (results = [], next = null) => ({ object: "list", results, has_more: next !== null, next_cursor: next });
@@ -117,7 +118,16 @@ try {
     return originalResolve.call(this,request,parent,isMain,options);
   };
   runtime = createRequire(import.meta.url)(path.join(root,".test-build/lib/matter-sync.js"));
-  globalThis.fetch = async (input, init) => String(input).startsWith("https://api.getmatter.com/") ? upstream(new URL(String(input)), init) : originalFetch(input, init);
+  globalThis.fetch = async (input, init) => {
+    if (String(input).startsWith("https://api.getmatter.com/")) return upstream(new URL(String(input)), init);
+    const response = await originalFetch(input, init);
+    if (!response.ok) {
+      const body = await response.clone().json().catch(()=>null);
+      databaseErrors.push({endpoint:new URL(String(input)).pathname,status:response.status,code:/^[A-Z0-9]{5,8}$/.test(body?.code)?body.code:null});
+      if (databaseErrors.length>10) databaseErrors.shift();
+    }
+    return response;
+  };
   const deps = { ...runtime.productionSyncDeps, now: () => new Date("2027-03-01T00:00:00Z"), budgetClock: () => tick,
     createRun: async (row, lease) => { ownedRuns.add(lease.owner); return runtime.productionSyncDeps.createRun(row,lease); } };
   await resetOwnedCycles();
@@ -205,10 +215,14 @@ try {
     };
     const failed = await runtime.syncMatterData("recent_activity_scheduled",{},deps);
     assert.equal(failed.ok,false); assert.equal(failed.pagesCommitted,0);
+    const expectedAttempts = endpoint==="me"?1:endpoint==="item"?3:endpoint==="annotations"?4:2;
+    assert.equal(failed.requestsAttempted,expectedAttempts,JSON.stringify({endpoint,status,failed}));
+    if (status!==429) assert.match(failed.message,new RegExp(`status ${status}`),JSON.stringify({endpoint,status,failed}));
     const after = await snapshot(); assert.deepEqual(after.sessions,before.sessions); assert.deepEqual(after.receipts,before.receipts); assert.deepEqual(after.dirty,before.dirty);
     assert.equal(after.streams.find((s)=>s.stream==="recent_sessions").cursor,null);
     if (status===429) {
-      assert.ok(after.streams.every((s)=>Date.parse(s.retry_at)===Date.parse("2027-03-01T00:01:00Z")));
+      assert.equal(failed.rateLimitedUntil,"2027-03-01T00:01:00.000Z",JSON.stringify({endpoint,status,failed}));
+      assert.ok(after.streams.every((s)=>Date.parse(s.retry_at)===Date.parse("2027-03-01T00:01:00Z")),JSON.stringify({endpoint,failed,cooldowns:after.streams.map((s)=>({stream:s.stream,retryAt:s.retry_at})),databaseErrors}));
       let calls=0; upstream=()=>{calls++;throw new Error("cooldown must prevent upstream");};
       assert.equal((await runtime.syncMatterData("recent_activity_scheduled",{},deps)).skippedReason,"rate_limited"); assert.equal(calls,0);
     }
