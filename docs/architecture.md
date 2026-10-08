@@ -333,3 +333,23 @@ endpoint failure. Lost SQL responses retain exact receipt replay; cooldown write
 cannot rewind a cursor. Authentication, raw UTC values, `APP_TIMEZONE`, per-session
 metric formulas and bounded Task 13 SQL transactions remain unchanged. Imported
 history is not an analytics cap fix or historical recompute/cutover (Tasks 16–20).
+
+## Task 15 request admission and durable preparation
+
+Every Matter HTTP attempt reserves shared rolling quota through service-only
+Supabase RPC before HTTP, including `/me` and all retries. The single-account
+`matter` scope spans bootstrap, streams, trigger modes and server processes.
+Quota feedback only tightens capacity and persisted 429 cooldown is maximum-only.
+Transient GET retry identities/counts/eligibility persist across invocations;
+exhaustion needs deliberate manual recovery after 15 minutes. Invocation/ingress
+ceilings, daily UTC cron, authentication and independent stream contracts remain
+unchanged. No HTTP is performed inside a database transaction.
+
+Each stream has bounded fenced preparation separate from ingestion. Previously
+validated reads survive deferral and are reused for the pinned page; only a full
+validated plan reaches Task 13 atomic commit. The same transaction clears that
+page preparation and records bounded durable cursor history. Cursor loops or
+invalid envelopes roll back/no-op ingestion and cannot complete history. Existing
+receipt reconciliation and dirty-rollup recovery remain the only ingestion and
+recovery boundaries. See [Task 15](task-15-validation.md) for policy, tests and the
+external-token-consumer limitation.

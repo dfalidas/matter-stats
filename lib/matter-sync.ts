@@ -60,6 +60,9 @@ import {
   type ActiveMatterCycle,
 } from "@/lib/matter-sync-cycle";
 
+import { prepareMatterRequestWork, withMatterRequestContext } from "./matter-request-coordinator";
+import { MatterRequestDeferred, matterCooldownDeadline } from "./matter-request-policy";
+
 const OPTIONAL_MATTER_STATUSES = new Set([403, 404]);
 
 export type MatterSyncResult = {
@@ -91,6 +94,7 @@ type MatterSyncDiagnostics = {
 };
 
 export type MatterSyncRuntimeDeps = {
+  prepareRequestWork?: typeof prepareMatterRequestWork;
   cooldownAccount: typeof cooldownMatterAccount;
   getContinuation: typeof getMatterContinuation;
   requestHistory: typeof requestMatterHistory;
@@ -118,6 +122,7 @@ export type MatterSyncRuntimeDeps = {
 };
 
 export const productionSyncDeps: MatterSyncRuntimeDeps = {
+  prepareRequestWork: prepareMatterRequestWork,
   cooldownAccount: cooldownMatterAccount,
   getContinuation: getMatterContinuation, requestHistory: requestMatterHistory,
   beginHistory: beginMatterHistory, turnContinuation: turnMatterContinuation,
@@ -243,7 +248,8 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
     const run = await deps.createRun({ status: "running", started_at: startedAt, sync_mode: runMode }, lease);
     syncRunId = run.id;
     await deps.renewLease(lease);
-    await deps.getAccount(() => deps.renewLease(lease!));
+    await withMatterRequestContext({ slot: "bootstrap", lease, recover: mode !== "recent_activity_scheduled" },
+      () => deps.getAccount(() => deps.renewLease(lease!)));
     await deps.renewLease(lease);
     let checkpoint: string | null = null;
     const cursors = new Map<string, Set<string>>();
@@ -269,7 +275,12 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
       const previousReceiptId = await deps.getPageReceipt(stream);
       const pageCounts = createEmptyMatterBatchCounts();
       let prepared: Awaited<ReturnType<typeof prepareNextMatterBatch>>;
-      try { prepared = await prepareNextMatterBatch({ cycle: activeCycle, counts: pageCounts, diagnostics, deps, lease }); budget.check(); }
+      try {
+        await deps.prepareRequestWork?.(persistActiveMatterCycle(activeCycle, activeCycle.cursor), lease);
+        prepared = await withMatterRequestContext({ slot: stream, lease, recover: mode !== "recent_activity_scheduled" },
+          () => prepareNextMatterBatch({ cycle: activeCycle!, counts: pageCounts, diagnostics, deps, lease: lease! }));
+        budget.check();
+      }
       catch (error) { if (error instanceof MatterBudgetStop && error.reason !== "timeout") { stop = error; break; } throw error; }
       validateMatterPagePlan(prepared.plan);
       const seen = cursors.get(stream) ?? new Set<string>(activeCycle.cursor ? [activeCycle.cursor] : []);
@@ -312,7 +323,7 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
       }) + (stop ? ` Invocation ${stop.reason} budget reached; the last committed checkpoint is retained.` : ""),
     };
   } catch (error) {
-    const rateLimitedUntil = getRateLimitedUntil(error, deps.now());
+    const rateLimitedUntil = error instanceof MatterRequestDeferred && error.reason === "quota" ? error.nextAt : getRateLimitedUntil(error, deps.now());
     const sanitizedError = sanitizeSyncError(error);
     const budgetPartial = error instanceof MatterBudgetStop && error.reason !== "timeout";
     if (rateLimitedUntil && lease) {
@@ -513,10 +524,7 @@ function getRateLimitedUntil(error: unknown, now: Date): string | null {
     return null;
   }
 
-  const retryAfterSeconds = error.rateLimit.retryAfterSeconds;
-  const resetAt = error.rateLimit.reset === null ? null : error.rateLimit.reset * 1_000;
-  const retryMs = retryAfterSeconds === null ? (resetAt && resetAt > now.getTime() ? resetAt - now.getTime() : 60_000) : Math.max(retryAfterSeconds * 1_000, 1_000);
-  return new Date(now.getTime() + retryMs).toISOString();
+  return new Date(matterCooldownDeadline(error.rateLimit.retryAfterSeconds, error.rateLimit.reset, now.getTime())).toISOString();
 }
 
 async function* iterateOptionalMatterAnnotations(itemId: string, lease: MatterSyncLease, budget: { rows: number; pages: number }) {
@@ -552,6 +560,7 @@ function isOptionalMatterEndpointError(error: unknown): boolean {
 }
 
 function sanitizeSyncError(error: unknown): string {
+  if (error instanceof MatterRequestDeferred) return error.message;
   if (error instanceof MatterBudgetStop) return error.message;
   if (error instanceof MatterSyncLeaseLostError) return error.message;
   if (error instanceof MatterPageValidationError) return `Matter page rejected (${error.reason}); no page writes were applied.`;

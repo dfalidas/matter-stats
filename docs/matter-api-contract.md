@@ -41,3 +41,25 @@ retrieved during implementation; no real Matter calls were made. An exhausted
 enumeration is not a retention guarantee or proof of universal historical
 completeness. Budgets count every HTTP attempt including enrichment; a failed or
 budget-exhausted preparation cannot commit its accepted subset.
+
+## Task 15 shared request coordinator (reviewed 2026-10-08)
+
+All actual Matter GET attempts, including bootstrap `/me` and transient retries,
+require atomic durable admission in the same server-only `matter` scope. Exact
+rolling windows enforce 120 GET/60s, 5 requests/1s and 20 markdown GET/60s; markdown
+also reserves GET capacity. Header feedback only restricts capacity, and persisted
+429 not-before deadlines survive fresh processes. Generic 400/422 never restart
+cursors. Invalid JSON/envelopes/advancing cursors never certify exhaustion.
+
+Application retries allow three attempts total for classified transport/timeouts
+and 500/502/503/504, with 500ms exponential backoff, 0–250ms jitter, 2s cap/short
+wait and persisted exhaustion. Manual recovery is eligible after 15 minutes,
+without clearing the active cycle. Fenced durable preparation makes valid expensive
+pages resumable under the quota while retaining the atomic commit boundary.
+Optional endpoints and absent session linkage retain their previous semantics.
+See [Task 15 policy and validation](task-15-validation.md) for exact bounds,
+header validation, migration/rollback and acceptance evidence.
+
+This coordinates participating Matter Stats instances only; other applications or
+the private Matter MCP using the token are outside its coordination. They are not
+modified, and upstream feedback remains authoritative.

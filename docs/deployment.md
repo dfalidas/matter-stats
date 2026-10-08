@@ -235,3 +235,26 @@ sync writers disabled until compatible Task 14 code is restored; a read-only app
 rollback can leave pending work safely. Task 12/older writers also lack atomic
 page recovery. Do not reset cursors, delete intent/receipt/dirty rows, re-import by
 destructive reset, remove RLS or apply production SQL as part of these tests.
+
+## Task 15 release order and rollback
+
+Apply `20261008095102_matter_shared_quota_retry_preparation.sql` after Task 14 and
+before deploying Task 15 code. Disable and drain all writers/previews first: older
+HTTP clients do not reserve the new quota. The migration creates server-only RLS
+quota/preparation state and invoker RPCs/trigger, preserves existing progress and
+seeds the account cooldown. Exact inventory: `scripts/matter-request-inventory.mjs`.
+No new environment variable, secret, dependency, provider or cron cadence is added.
+The existing daily `0 6 * * *` UTC schedule and ingress/auth/page limits remain.
+
+Final-head fresh AND upgrade SQL/Data API evidence, grants/catalog, concurrency,
+cleanup and runtime checks are prerequisites to a separately approved release.
+See [Task 15 validation](task-15-validation.md). The quota coordinates participating
+Matter Stats consumers only; other apps/private Matter MCP using the token remain
+external, and upstream 429/headers remain authoritative.
+
+Rollback disables/drains ingress and retains all quota, backoff, preparation,
+stream/history, receipt/dirty and lease-generation state. Keep older sync writers
+disabled; prefer compatible roll-forward or a read-only rollback. Do not delete
+retry identities, reset cycles/cursors, drop additive objects, disable RLS or run a
+production sync as rollback. Migration-before-code can coexist with drained old
+code; its presence alone does not grant older consumers shared quota coordination.

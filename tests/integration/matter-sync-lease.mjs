@@ -1,3 +1,4 @@
+import { requestFixture } from "./matter-request-fixture.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import Module, { createRequire } from "node:module";
@@ -95,6 +96,7 @@ let authUser;
 let runtimeLoaded = false;
 let fixturesReady = false;
 const originalFetch = globalThis.fetch;
+let requestState;
 const originalResolve = Module._resolveFilename;
 let matterRequests = 0;
 let upstream = async (request) => {
@@ -223,6 +225,8 @@ try {
   await rpc("release_matter_sync_lease", args(b));
   checks.push("E SQL: protected RPC transaction serializes takeover through commit");
 
+  requestState=await requestFixture(sql);
+  await requestState.reset();
   // Load the real imports/enrichment/recalculation code. Data API remains real;
   // only Matter HTTP is synthetic. No installed dependencies or auth changes.
   process.env.SUPABASE_URL = url;
@@ -267,6 +271,7 @@ try {
 
   // Delayed Matter responses after takeover: success and 429/catch paths.
   for (const status of [200, 429]) {
+    await requestState.reset();
     let unblock; let reached;
     const barrier = new Promise((resolve) => { reached = resolve; });
     const pending = new Promise((resolve) => { unblock = resolve; });
@@ -299,6 +304,7 @@ try {
     assert.equal(await rpc("release_matter_sync_lease", args(b)), true);
     upstream = normalUpstream;
   }
+  await requestState.reset();
   const normalUpstream = upstream;
   upstream = async () => { throw Object.assign(new Error("synthetic cancellation"), { name: "AbortError" }); };
   assert.equal((await syncMatterData("backfill_library", {}, deps)).ok, false);
@@ -326,6 +332,7 @@ try {
       for (const [table, key, values] of [["annotations", "id", [annotation.id]], ["reading_sessions", "id", [session.id, `${prefix}-delayed-session`]], ["item_tags", "item_id", [item.id]], ["matter_items", "id", [item.id, `${prefix}-delayed-item`]], ["matter_tags", "id", [tag.id]], ["daily_stats", "date", [daily.date]], ["sync_runs", "id", [...ownedRuns]]]) assertSuccessful(await service.from(table).delete().in(key, values), `cleanup ${table}`);
     } finally { assert.equal(await rpc("release_matter_sync_lease", args(cleanupLease)), true); }
   });
+  if (requestState) await cleanup(()=>requestState.restore());
   if (authUser) await cleanup(async () => assertSuccessful(await service.auth.admin.deleteUser(authUser), "auth cleanup"));
   if (failures.length) throw new AggregateError(failures, "Disposable lease fixture cleanup failed");
 }

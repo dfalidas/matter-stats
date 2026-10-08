@@ -436,6 +436,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      prepare_matter_request_work: { Args: LeaseRpcArgs & { p_expected: Json }; Returns: undefined };
+      admit_matter_request: { Args: { p_slot: string; p_key: string; p_markdown: boolean; p_recover: boolean; p_lease: Json | null }; Returns: Json };
+      finish_matter_request: { Args: { p_slot: string; p_key: string; p_sequence: string; p_entry: Json; p_lease: Json | null }; Returns: undefined };
+      feedback_matter_request: { Args: { p_sequence: string; p_limit: number | null; p_remaining: number | null; p_reset: string | null; p_cooldown: string | null }; Returns: undefined };
       cooldown_matter_account: { Args: LeaseRpcArgs & { p_retry_at: string }; Returns: undefined };
       request_matter_history: { Args: LeaseRpcArgs & { p_coverage: string }; Returns: MatterContinuation };
       begin_matter_history: { Args: LeaseRpcArgs & { p_limit: number; p_started_at: string }; Returns: MatterSyncStream };

@@ -145,17 +145,16 @@ export function parseRetryAfterHeader(value: string | null, now: number = Date.n
     return null;
   }
 
-  const seconds = Number.parseInt(value, 10);
-  if (Number.isFinite(seconds)) {
-    return Math.max(seconds, 0);
+  if (/^\d+$/.test(value)) {
+    const seconds = Number(value);
+    return Number.isSafeInteger(seconds) && seconds >= 0 && Number.isFinite(new Date(now + seconds * 1000).getTime()) && now + seconds * 1000 <= 253402300799000 ? seconds : null;
   }
-
+  // Accept only canonical IMF-fixdate, rejecting Date.parse's numeric and
+  // overflowing-calendar permissiveness. Stale dates do not grant eligibility.
+  if (!/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/.test(value)) return null;
   const retryAt = Date.parse(value);
-  if (Number.isFinite(retryAt)) {
-    return Math.max(Math.ceil((retryAt - now) / 1_000), 0);
-  }
-
-  return null;
+  if (!Number.isFinite(retryAt) || new Date(retryAt).toUTCString() !== value || retryAt > 253402300799000) return null;
+  return Math.max(Math.ceil((retryAt - now) / 1000), 0);
 }
 
 

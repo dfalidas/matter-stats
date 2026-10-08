@@ -1,25 +1,22 @@
 import "server-only";
 
-import { getMatterInvocationBudget } from "./matter-invocation-budget";
+import { validateMatterPage, MatterPageValidationError } from "./matter-page-plan";
+import { admitMatterRequest, getMatterRequestRuntime, matterRequestIdentity } from "./matter-request-coordinator";
+import { strictMatterInteger, strictMatterReset, matterCooldownDeadline, isTransientMatterFailure, matterRetryDelay } from "./matter-request-policy";
+import type { Json } from "./supabase-types";
+import { MatterBudgetStop, getMatterInvocationBudget } from "./matter-invocation-budget";
 
 import { serverEnv } from "@/lib/env";
 import { parseRetryAfterHeader } from "@/lib/matter-sync-progress";
 
 const MATTER_API_BASE_URL = "https://api.getmatter.com/public/v1";
 const DEFAULT_PAGE_LIMIT = 100;
-const DEFAULT_MAX_RATE_LIMIT_RETRIES = 0;
-const MAX_RATE_LIMIT_DELAY_MS = 60_000;
-const MIN_MATTER_REQUEST_INTERVAL_MS = 250;
-
-let lastMatterRequestStartedAt = 0;
-
 type QueryValue = string | number | boolean | Date | null | undefined | readonly (string | number | boolean)[];
 
 type MatterFetchOptions = Omit<RequestInit, "body" | "headers"> & {
   body?: BodyInit | Record<string, unknown> | null;
   headers?: HeadersInit;
   query?: Record<string, QueryValue>;
-  maxRateLimitRetries?: number;
   beforeRequest?: () => Promise<void>;
 };
 
@@ -213,45 +210,86 @@ export class MatterRateLimitError extends MatterApiError {
 }
 
 export async function matterFetch<T>(path: string, options: MatterFetchOptions = {}): Promise<T> {
-  const { maxRateLimitRetries = DEFAULT_MAX_RATE_LIMIT_RETRIES, beforeRequest, ...fetchOptions } = options;
+  const { beforeRequest, ...fetchOptions } = options;
+  if (fetchOptions.method && fetchOptions.method.toUpperCase() !== "GET") throw new Error("Matter coordinator supports idempotent GET reads only");
+  const url = buildMatterUrl(path, fetchOptions.query);
   const budget = getMatterInvocationBudget();
-  // Sync's bounded invocations never add upstream retries or long sleeps.
-  const retries = budget ? 0 : maxRateLimitRetries;
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    budget?.check();
-    await paceMatterRequest();
-    budget?.check();
-    await beforeRequest?.();
+  const runtime = getMatterRequestRuntime();
+  const identity = matterRequestIdentity(url);
+  for (;;) {
+    const admission = await admitMatterRequest(url, beforeRequest, fetchOptions.signal ?? undefined);
+    if (admission.reason === "cached") {
+      await beforeRequest?.();
+      if (admission.entry?.protocol) throw new MatterPageValidationError("persisted_protocol_failure");
+      if (admission.entry?.status) throw new MatterApiError({ status: admission.entry.status, message: "Previously unavailable Matter endpoint", path, rateLimit: emptyRateLimit() });
+      validateReadResponse(url, admission.entry?.value);
+      return admission.entry?.value as T;
+    }
+    const sequence = admission.sequence!;
+    const localTimeout = budget ? null : AbortSignal.timeout(10_000);
+    const finish = (entry: Json) => runtime.store.finish({ p_slot: identity.p_slot, p_key: identity.p_key, p_sequence: sequence, p_entry: entry, p_lease: identity.p_lease });
     const readResponse = async (signal?: AbortSignal): Promise<T> => {
-      const response = await fetch(buildMatterUrl(path, fetchOptions.query), {
+      fetchOptions.signal?.throwIfAborted();
+      await beforeRequest?.();
+      const response = await fetch(url, {
         ...fetchOptions,
-        ...(signal ? { signal: fetchOptions.signal ? AbortSignal.any([signal, fetchOptions.signal]) : signal } : {}),
-        headers: buildHeaders(fetchOptions.headers, fetchOptions.body),
-        body: buildBody(fetchOptions.body),
+        ...(signal ? { signal: fetchOptions.signal ? AbortSignal.any([signal, fetchOptions.signal]) : signal } : { signal: fetchOptions.signal ? AbortSignal.any([fetchOptions.signal, localTimeout!]) : localTimeout! }),
+        headers: buildHeaders(fetchOptions.headers, fetchOptions.body), body: buildBody(fetchOptions.body),
       });
-      const rateLimit = parseRateLimitHeaders(response.headers);
+      const now = runtime.now();
+      const rateLimit = parseRateLimitHeaders(response.headers, now);
+      const cooldown = response.status === 429 ? matterCooldownDeadline(rateLimit.retryAfterSeconds, rateLimit.reset, now) : null;
+      // This feedback can only restrict shared account capacity, so a stale lease
+      // cannot replenish quota. Sync-owned preparation still requires its fence.
+      try { await runtime.store.feedback({ p_sequence: sequence, p_limit: rateLimit.limit, p_remaining: rateLimit.remaining,
+        p_reset: rateLimit.reset === null ? null : new Date(rateLimit.reset * 1000).toISOString(), p_cooldown: cooldown === null ? null : new Date(cooldown).toISOString() }); }
+      catch { throw new Error("Matter shared feedback could not be verified"); }
+      await beforeRequest?.();
       if (!response.ok) {
         const errorBody = await readErrorBody(response);
-        // Even optional failures validate the lease AFTER the upstream response.
-        await beforeRequest?.();
         if (response.status === 429) throw new MatterRateLimitError({ message: formatErrorMessage(response.status, errorBody, rateLimit), path, rateLimit });
         throw new MatterApiError({ status: response.status, code: errorBody.error?.code ?? null,
           message: formatErrorMessage(response.status, errorBody, rateLimit), field: errorBody.error?.field ?? null, path, rateLimit });
       }
-      const value = response.status === 204 ? undefined : await response.json();
+      let value: unknown;
+      try { value = await response.json(); }
+      catch (error) { if (signal?.aborted) throw signal.reason; if (fetchOptions.signal?.aborted) throw fetchOptions.signal.reason; if (isTransientMatterFailure(error)) throw error; throw new MatterPageValidationError("invalid_json"); }
+      validateReadResponse(url, value);
       await beforeRequest?.();
       return value as T;
     };
-    try { return budget ? await budget.attempt(readResponse) : await readResponse(); }
-    catch (error) {
-      if (error instanceof MatterRateLimitError && attempt < retries && error.rateLimit.retryAfterSeconds !== null) {
-        const delayMs = error.rateLimit.retryAfterSeconds * 1000;
-        if (delayMs > 0 && delayMs <= MAX_RATE_LIMIT_DELAY_MS) { await sleep(delayMs); continue; }
+    let value: T;
+    try {
+      value = budget ? await budget.attempt(readResponse) : await readResponse();
+    } catch (error) {
+      if (fetchOptions.signal?.aborted) throw fetchOptions.signal.reason;
+      if (localTimeout?.aborted) error = new MatterBudgetStop("timeout");
+      await beforeRequest?.();
+      if (error instanceof MatterRateLimitError) { await finish({ quota: true }); throw error; }
+      if (isTransientMatterFailure(error)) {
+        await finish({ transient_delay_ms: matterRetryDelay(admission.attempt!, runtime.random) });
+        budget?.check();
+        continue; // admission reads the persisted next eligibility and attempt count
       }
+      if (error instanceof MatterPageValidationError) await finish({ protocol: true });
+      if (error instanceof MatterApiError && [401, 403, 404, 400, 422].includes(error.status)) await finish({ status: error.status });
       throw error;
     }
+    fetchOptions.signal?.throwIfAborted();
+    await beforeRequest?.();
+    // Never classify or retry an ambiguous database outcome as HTTP failure.
+    await finish({ value: value as Json });
+    return value;
   }
-  throw new Error("Invalid Matter retry bound");
+}
+function emptyRateLimit(): MatterRateLimitHeaders { return { limit: null, remaining: null, reset: null, retryAfterSeconds: null }; }
+function validateReadResponse(url: URL, value: unknown) {
+  const path = url.pathname;
+  if (["/items", "/reading_sessions", "/tags"].some((endpoint) => path.endsWith(endpoint)) || path.endsWith("/annotations")) {
+    validateMatterPage(value as MatterListResponse<unknown>, Number(url.searchParams.get("limit") ?? 25), url.searchParams.get("cursor"));
+  } else if (!value || typeof value !== "object" || Array.isArray(value) || (path !== "/public/v1/me" && (typeof (value as { id?: unknown }).id !== "string" || !(value as { id: string }).id.trim()))) {
+    throw new MatterPageValidationError("invalid_envelope");
+  }
 }
 
 export function logMatterApiError(error: unknown, context: string): void {
@@ -328,9 +366,14 @@ export async function* paginateMatter<T>(
   fetchPage: (cursor?: string) => Promise<MatterListResponse<T>>
 ): AsyncGenerator<T, void, unknown> {
   let cursor: string | undefined;
-
+  const seen = new Set<string>();
   do {
     const page = await fetchPage(cursor);
+    validateMatterPage(page, 100, cursor ?? null);
+    if (page.next_cursor) {
+      if (seen.has(page.next_cursor) || seen.size >= 10000) throw new MatterPageValidationError("iterator_cursor_loop_or_bound");
+      seen.add(page.next_cursor);
+    }
 
     for (const result of page.results) {
       yield result;
@@ -474,37 +517,11 @@ function formatErrorMessage(status: number, body: MatterErrorBody, rateLimit: Ma
   return apiMessage ?? `Matter API request failed with HTTP ${status}.`;
 }
 
-export function parseRateLimitHeaders(headers: Headers): MatterRateLimitHeaders {
-  return {
-    limit: parseIntegerHeader(headers.get("X-RateLimit-Limit")),
-    remaining: parseIntegerHeader(headers.get("X-RateLimit-Remaining")),
-    reset: parseIntegerHeader(headers.get("X-RateLimit-Reset")),
-    retryAfterSeconds: parseRetryAfterHeader(headers.get("Retry-After")),
-  };
-}
-
-function parseIntegerHeader(value: string | null): number | null {
-  if (!value) {
-    return null;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-async function paceMatterRequest(): Promise<void> {
-  const now = Date.now();
-  const waitMs = Math.max(lastMatterRequestStartedAt + MIN_MATTER_REQUEST_INTERVAL_MS - now, 0);
-
-  if (waitMs > 0) {
-    await sleep(waitMs);
-  }
-
-  lastMatterRequestStartedAt = Date.now();
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
+export function parseRateLimitHeaders(headers: Headers, now = Date.now()): MatterRateLimitHeaders {
+  const limit = strictMatterInteger(headers.get("X-RateLimit-Limit"));
+  const remaining = strictMatterInteger(headers.get("X-RateLimit-Remaining"));
+  return { limit: limit && limit > 0 ? limit : null,
+    remaining: remaining !== null && remaining <= (limit ?? 120) ? remaining : null,
+    reset: strictMatterReset(headers.get("X-RateLimit-Reset"), now),
+    retryAfterSeconds: parseRetryAfterHeader(headers.get("Retry-After"), now) };
 }
