@@ -93,6 +93,24 @@ function harness({ sessions = [], items = [], now = [], legacyCooldown = null } 
 }
 const page = (results = [], next = null) => ({ object: "list", results, has_more: next !== null, next_cursor: next });
 
+test("manual/scheduled/manual retains independent cursors under the shared lease", async () => {
+  const h = harness({ sessions: [page([], "s1"), page([], "s2")], items: [page([], "i1")] });
+  h.states.set("recent_sessions", stream("recent_sessions", { cycle_active: true, cursor: "s0", cycle_started_at: "2026-05-01T00:00:00Z", cycle_generation: 7 }));
+  h.states.set("library_items", stream("library_items", { cycle_active: true, cursor: "i0", cycle_started_at: "2026-04-01T00:00:00Z", cycle_generation: 4 }));
+  await h.deps.turnContinuation("library_items");
+  for (const [mode, sessions, items] of [["recent_activity_manual", "s1", "i0"], ["recent_activity_scheduled", "s1", "i1"], ["recent_activity_manual", "s2", "i1"]]) {
+    const result = await syncMatterData(mode, {}, h.deps);
+    assert.equal(result.ok, true); assert.equal(result.pagesCommitted, 1);
+    assert.equal(h.states.get("recent_sessions").cursor, sessions); assert.equal(h.states.get("library_items").cursor, items);
+    assert.equal(h.states.get("recent_sessions").cycle_generation, 7); assert.equal(h.states.get("library_items").cycle_generation, 4);
+    assert.equal(h.states.get("recent_sessions").completed_watermark, null); assert.equal(h.states.get("library_items").completed_watermark, null);
+  }
+  const before = [...h.states].map(([name, state]) => [name, { ...state }]); const calls = h.calls.length;
+  h.deps.acquireLease = async () => null;
+  assert.equal((await syncMatterData("recent_activity_manual", {}, h.deps)).skippedReason, "busy");
+  assert.equal(h.calls.length, calls); assert.deepEqual([...h.states], before);
+});
+
 test("busy account lease denies all trigger modes before any reads, writes or Matter", async () => {
   for (const mode of ["recent_activity_manual", "recent_activity_scheduled", "backfill_library", "backfill_sessions"]) {
     const touched = [];

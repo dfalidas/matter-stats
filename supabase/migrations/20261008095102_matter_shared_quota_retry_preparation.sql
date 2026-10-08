@@ -40,6 +40,9 @@ begin
  if not s.cycle_active or row(s.endpoint,s.filters,s.page_limit,s.cursor,s.cycle_started_at,s.cycle_generation,s.completed_watermark,s.coverage_window,s.transition_status)
  is distinct from row(e.endpoint,e.filters,e.page_limit,e.cursor,e.cycle_started_at,e.cycle_generation,e.completed_watermark,e.coverage_window,e.transition_status)
  then raise exception 'Stale preparation' using errcode='PT409'; end if;
+ -- Compare typed immutable fields, not caller/PostgREST timestamp spellings.
+ -- Cooldown and row bookkeeping do not change the identity of a pinned page.
+ p_expected:=to_jsonb(e)-array['created_at','updated_at','retry_at'];
  select * into strict w from public.matter_request_work where slot=s.stream for update;
  if w.contract is distinct from p_expected then
   update public.matter_request_work set contract=p_expected,requests='{}',cursor_generation=s.cycle_generation,

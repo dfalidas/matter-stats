@@ -120,9 +120,9 @@ so rejection rolls back effects, receipt, watermark and history completion.
 ## Evidence and gates
 
 Local `npm ci`, CI-required `next typegen`, typecheck, lint, test, build and
-`audit:ci` have been executed. The updated suite reports **254 passed,
-0 failed, 2 TODO, 0 skipped (256 total)**; lint has the same three preexisting
-Visual Explainer warnings. Production audit: **0 findings**; full audit: **7 high,
+`audit:ci` have been executed. The updated suite reports **255 passed,
+0 failed, 2 TODO, 0 skipped (257 total)**; lint has the same three preexisting
+Visual Explainer warnings. Production audit: **0 findings**; full audit: **8 high,
 0 critical/moderate/low**, all within the unchanged development-only
 `GHSA-vfj7-8cjw-p6xm` policy. Final checks/results are retained in the PR.
 R4 remains TODO until final-head real acceptance; R5 is unrelated Task 16 work.
@@ -151,6 +151,11 @@ limiting. No fresh/upgrade pass is inferred. The runner stopped its owned fresh
 stack and removed its temporary directory; no database/containers remain. Initial
 local unit execution also encountered sandbox child-process restrictions; rerun
 with the authorized process access passed. These failed attempts remain evidence.
+An intermediate audit reported compatible remediation from cached npm metadata;
+the same policy passed with CI's Node 22.23.3 and an isolated metadata cache.
+Earlier real CI runs found the old fixture's intentionally looping cursor and
+a timestamp-spelling cache invalidation; both were corrected and strengthened
+with regression assertions. They are not final-head acceptance evidence.
 The pinned CLI's npm downloader ignored the managed proxy; its exact 2.48.3 binary
 was downloaded through that proxy, checksum-verified and used to generate the
 migration. No repository dependency/CLI pin changes were made.

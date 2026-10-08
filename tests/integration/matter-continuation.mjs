@@ -218,6 +218,7 @@ try {
   assert.deepEqual(pausedState.sessions,beforeExpensive.sessions); assert.deepEqual(pausedState.receipts,beforeExpensive.receipts); assert.deepEqual(pausedState.dirty,beforeExpensive.dirty);
   const pausedContract = pausedState.streams.find((s)=>s.stream==="recent_sessions");
   assert.equal(pausedContract.cursor,null); assert.equal(pausedContract.completed_watermark,beforeExpensive.streams.find((s)=>s.stream==="recent_sessions").completed_watermark);
+  assert.equal(await sql("select jsonb_object_length from (select count(*) jsonb_object_length from public.matter_request_work w, lateral jsonb_object_keys(w.requests) where w.slot='recent_sessions') c;"),"4","all four prepared reads survive the budget stop");
   annotationCalls = 0;
   await requestState.clearQuota();
   const expensive = await runtime.syncMatterData("recent_activity_scheduled", {}, { ...deps, now: () => new Date("2028-01-02T06:00:00Z") });
