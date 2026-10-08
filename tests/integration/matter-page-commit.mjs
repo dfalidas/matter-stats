@@ -227,8 +227,9 @@ try {
   assert.equal((await read("matter_dirty_rollups")).find((r) => r.date === date).revision, marker2.revision);
   const staleBefore = await snapshot(); assert.equal((await service.rpc("commit_matter_page", first)).error?.code, "PT409"); assert.deepEqual(await snapshot(), staleBefore);
   const loopState = (await read("matter_sync_streams")).find((s) => s.stream === "library_items");
-  await rpc("commit_matter_page", await commitArgs(activeLease, loopState, emptyPlan(), crypto.randomUUID(), stateNow.cursor));
   const loopBefore = await snapshot();
+  assert.equal((await service.rpc("commit_matter_page", await commitArgs(activeLease, loopState, emptyPlan(), crypto.randomUUID(), stateNow.cursor))).error?.code, "22023", "Task 15 rejects a cursor loop atomically");
+  assert.deepEqual(await snapshot(), loopBefore);
   assert.equal((await service.rpc("commit_matter_page", first)).error?.code, "PT409", "reused opaque cursor must not admit delayed old page");
   assert.deepEqual(await snapshot(), loopBefore);
   checks.push("Exact page replay is read-only; delayed old page rejects; metadata dates dirty; older acknowledgement cannot clear newer same-lease revision");

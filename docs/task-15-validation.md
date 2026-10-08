@@ -120,8 +120,8 @@ so rejection rolls back effects, receipt, watermark and history completion.
 ## Evidence and gates
 
 Local `npm ci`, CI-required `next typegen`, typecheck, lint, test, build and
-`audit:ci` have been executed. The first full updated suite reports **251 passed,
-0 failed, 2 TODO, 0 skipped (253 total)**; lint has the same three preexisting
+`audit:ci` have been executed. The updated suite reports **254 passed,
+0 failed, 2 TODO, 0 skipped (256 total)**; lint has the same three preexisting
 Visual Explainer warnings. Production audit: **0 findings**; full audit: **7 high,
 0 critical/moderate/low**, all within the unchanged development-only
 `GHSA-vfj7-8cjw-p6xm` policy. Final checks/results are retained in the PR.

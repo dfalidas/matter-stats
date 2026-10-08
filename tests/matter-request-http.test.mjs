@@ -78,7 +78,7 @@ test("Task 15: 429 feedback survives recreation; quota refusal makes zero HTTP c
  }
 });
 test("Task 15: authentication/validation errors never loop; optional endpoint errors retain classification",async(t)=>{
- for(const status of [400,401,403,404,422]) {const h=harness();let requests=0;
+ for(const status of [400,401,403,404,422,501]) {const h=harness();let requests=0;
   await synthetic(t,async()=>{requests++;return Response.json({}, {status});},async()=>{
    await assert.rejects(h.run(()=>api.getMatterItem("fixture")),(error)=>error.status===status);
    await assert.rejects(h.run(()=>api.getMatterItem("fixture")),(error)=>error.status===status);
@@ -104,4 +104,27 @@ test("Task 15: lease loss after short wait and caller cancellation prevent anoth
 test("Task 15: an ambiguous preparation database write is never automatically retried",async(t)=>{
  const h=harness();let requests=0;h.runtime.store.finish=async()=>{throw new TypeError("ambiguous DB response",{cause:{code:"ECONNRESET"}});};
  await synthetic(t,async()=>{requests++;return Response.json({object:"account",id:"synthetic-account"});},async()=>{await assert.rejects(h.run(()=>api.getMatterAccount()),/ambiguous DB/);assert.equal(requests,1);});
+});
+test("Task 15: quota verification and feedback write failures fail closed without HTTP retries",async(t)=>{
+ const h=harness();let requests=0;
+ await synthetic(t,async()=>{requests++;return Response.json({object:"account",id:"synthetic"});},async()=>{
+  h.runtime.store.admit=async()=>{throw new Error("unavailable admission");};
+  await assert.rejects(h.run(()=>api.getMatterAccount()),/unavailable admission/);assert.equal(requests,0);
+  h.runtime.store.admit=async()=>({admitted:true,sequence:"1",attempt:1});
+  h.runtime.store.feedback=async()=>{throw new TypeError("ambiguous feedback",{cause:{code:"ECONNRESET"}});};
+  await assert.rejects(h.run(()=>api.getMatterAccount()),/feedback could not be verified/);assert.equal(requests,1);
+ });
+});
+test("Task 15: malformed account and error envelopes cannot disguise authentication failure",async(t)=>{
+ const h=harness();let requests=0;
+ await synthetic(t,async()=>{requests++;return Response.json({});},async()=>{await assert.rejects(h.run(()=>api.getMatterAccount()),/page rejected/i);await assert.rejects(h.run(()=>api.getMatterAccount()),/page rejected/i);assert.equal(requests,1);});
+ const h2=harness();requests=0;
+ await synthetic(t,async()=>{requests++;return Response.json(null,{status:401});},async()=>{await assert.rejects(h2.run(()=>api.getMatterAccount()),e=>e.status===401);await assert.rejects(h2.run(()=>api.getMatterAccount()),e=>e.status===401);assert.equal(requests,1);});
+});
+test("Task 15: unclassified transport errors never become automatic retries after recreation",async(t)=>{
+ const h=harness();let requests=0;
+ await synthetic(t,async()=>{requests++;throw new TypeError("unclassified network failure");},async()=>{
+  await assert.rejects(h.run(()=>api.getMatterAccount()),/page rejected/i);h.advance(900001);
+  await assert.rejects(h.run(()=>api.getMatterAccount()),/page rejected/i);assert.equal(requests,1);
+ });
 });

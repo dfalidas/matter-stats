@@ -232,11 +232,19 @@ export async function matterFetch<T>(path: string, options: MatterFetchOptions =
     const readResponse = async (signal?: AbortSignal): Promise<T> => {
       fetchOptions.signal?.throwIfAborted();
       await beforeRequest?.();
-      const response = await fetch(url, {
+      let response: Response;
+      try { response = await fetch(url, {
         ...fetchOptions,
         ...(signal ? { signal: fetchOptions.signal ? AbortSignal.any([signal, fetchOptions.signal]) : signal } : { signal: fetchOptions.signal ? AbortSignal.any([fetchOptions.signal, localTimeout!]) : localTimeout! }),
         headers: buildHeaders(fetchOptions.headers, fetchOptions.body), body: buildBody(fetchOptions.body),
-      });
+      }); } catch (error) {
+        if (signal?.aborted) throw signal.reason;
+        if (fetchOptions.signal?.aborted) throw fetchOptions.signal.reason;
+        if (localTimeout?.aborted || isTransientMatterFailure(error)) throw error;
+        // Unknown transport outcomes cannot become eligible automatic retries
+        // merely because the next invocation has a fresh process.
+        throw new MatterPageValidationError("unclassified_transport_failure");
+      }
       const now = runtime.now();
       const rateLimit = parseRateLimitHeaders(response.headers, now);
       const cooldown = response.status === 429 ? matterCooldownDeadline(rateLimit.retryAfterSeconds, rateLimit.reset, now) : null;
@@ -273,7 +281,7 @@ export async function matterFetch<T>(path: string, options: MatterFetchOptions =
         continue; // admission reads the persisted next eligibility and attempt count
       }
       if (error instanceof MatterPageValidationError) await finish({ protocol: true });
-      if (error instanceof MatterApiError && [401, 403, 404, 400, 422].includes(error.status)) await finish({ status: error.status });
+      if (error instanceof MatterApiError) await finish({ status: error.status });
       throw error;
     }
     fetchOptions.signal?.throwIfAborted();
@@ -504,7 +512,12 @@ function formatDateParam(value: string | Date | undefined): string | undefined {
 
 async function readErrorBody(response: Response): Promise<MatterErrorBody> {
   try {
-    return (await response.json()) as MatterErrorBody;
+    const body: unknown = await response.json();
+    if (!body || typeof body !== "object" || !("error" in body) || !body.error || typeof body.error !== "object") return {};
+    const error = body.error as Record<string, unknown>;
+    return { error: { code: typeof error.code === "string" ? error.code : undefined,
+      message: typeof error.message === "string" ? error.message : undefined,
+      field: typeof error.field === "string" ? error.field : null } };
   } catch {
     return {};
   }

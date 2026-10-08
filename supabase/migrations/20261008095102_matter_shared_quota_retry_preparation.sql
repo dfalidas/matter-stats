@@ -81,7 +81,7 @@ begin
  if p_slot<>'bootstrap' and w.contract is null then raise exception 'Missing preparation' using errcode='PT409'; end if;
  select * into strict q from public.matter_quota where account_scope='matter' for update;
  n:=clock_timestamp(); r:=w.requests->p_key; tries:=coalesce((r->>'attempts')::integer,0);
- if p_recover and (r ? 'protocol' or (r ? 'status' and (r->>'status')::integer not in (403,404))) and (r->>'next_at')::timestamptz<=n then r:=null; tries:=0; end if;
+ if p_recover and (r ? 'protocol' or (r ? 'status' and (p_slot='bootstrap' or (r->>'status')::integer not in (403,404)))) and (r->>'next_at')::timestamptz<=n then r:=null; tries:=0; end if;
  if r ? 'value' or r ? 'status' or r ? 'protocol' then return jsonb_build_object('admitted',false,'reason','cached','entry',r); end if;
  -- In-flight attempts count even after a process dies. Recovery is deliberate,
  -- never automatic, and cannot erase the page/cycle or its preparation.
