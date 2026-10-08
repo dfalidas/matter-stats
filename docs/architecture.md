@@ -98,7 +98,7 @@ BIGINT as decimal text to avoid JavaScript integer precision loss. Stream
 The runtime TTL is **120 seconds**, with SQL input validation of **30–300
 seconds**, including explicit rejection of NULL. There is no new configuration
 variable. Renewal occurs before and after account/page/item/annotation requests,
-after Matter pacing and immediately before each actual HTTP fetch, before each
+after shared quota/retry waiting and immediately before each actual HTTP fetch, before each
 100-row mutation batch, before each rollup calculation and each rollup batch.
 Annotation pagination has a guarded request for every page. Renewal failure or
 infrastructure failure stops the invocation; a response arriving after expiry
@@ -292,15 +292,17 @@ Every invocation shares an AsyncLocalStorage budget: **8 committed pages, 224
 Matter HTTP attempts, 90 seconds upstream preparation, 150 seconds total**.
 `/me`, linked-item reads, all annotation pages and failed HTTP attempts count.
 Each HTTP attempt, response body and lease check is cancellable at 10 seconds or
-the remaining preparation deadline. Existing 250 ms pacing remains; sync adds no
-upstream retries. Before later pages, admission reserves `limit + 101` attempts
+the remaining preparation deadline. Task 15 admits every attempt through shared
+durable quota and permits only its classified bounded GET retries. Before later
+pages, invocation admission reserves `limit + 101` attempts
 (the maximum list + linked items + 100 annotation pages); a deferred expensive
 page gets a fresh invocation. The maximum valid Task 13 page requires 201
 preparation attempts, plus `/me`, below the fresh 224-attempt ceiling. A request
-or time stop discards the entire uncommitted plan. Sustained upstream slowness,
+or time stop discards the uncommitted ingestion plan while retaining fenced
+validated request preparation for that exact page. Sustained upstream slowness,
 cooldowns or errors can still delay completion; no finite invocation promises
-that an unavailable/slow upstream will finish. This is not Task 15's shared quota
-limiter, and Matter can return 429 before an invocation budget is consumed.
+that an unavailable/slow upstream will finish. Invocation budgets and shared
+rolling quotas both apply; upstream can return 429 before either is consumed.
 
 Database HTTP is bounded to 10 seconds and the remaining total deadline. Rollup
 recovery retains two snapshots of at most 32 markers and checks remaining time

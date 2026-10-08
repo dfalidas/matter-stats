@@ -12,6 +12,10 @@ test("Task 15: strict feedback rejects permissive numbers and invalid calendars"
   assert.equal(strictMatterReset(String(now / 1000), now), null);
   assert.equal(strictMatterReset(String(now / 1000 + 30), now), now / 1000 + 30);
   assert.equal(parseRetryAfterHeader("Thu, 08 Oct 2026 00:00:30 GMT", now), 30);
+  assert.equal(parseRetryAfterHeader("Thursday, 08-Oct-26 00:00:30 GMT", now), 30);
+  assert.equal(parseRetryAfterHeader("Thu Oct  8 00:00:30 2026", now), 30);
+  assert.equal(parseRetryAfterHeader("Saturday, 08-Oct-83 00:00:30 GMT", now), 0, "RFC 850 years beyond 50 years map into the past");
+  assert.equal(parseRetryAfterHeader("Friday, 08-Oct-26 00:00:30 GMT", now), null);
   assert.equal(parseRetryAfterHeader("Fri, 08 Oct 2026 00:00:30 GMT", now), null);
   assert.equal(parseRetryAfterHeader("Tue, 31 Feb 2026 00:00:00 GMT", now), null);
   assert.equal(parseRetryAfterHeader("86401", now), 86401, "long valid cooldown is honored without sleeping");

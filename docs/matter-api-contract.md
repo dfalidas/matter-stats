@@ -1,6 +1,6 @@
 # Matter API v1 contract and capability matrix
 
-**Reviewed:** 2026-10-07 against the official documentation links below. This is a documentation review, not a live account/API contract test.
+**Reviewed:** 2026-10-08 against the official documentation links below. This is a documentation review, not a live account/API contract test.
 
 Base URL: `https://api.getmatter.com/public/v1/`. Authentication is a server-side Bearer token for Matter Pro. The account has one active Matter token; generating another immediately invalidates the previous token. Unknown response fields are ignored while required fields are validated.
 
@@ -52,8 +52,9 @@ also reserves GET capacity. Header feedback only restricts capacity, and persist
 cursors. Invalid JSON/envelopes/advancing cursors never certify exhaustion.
 
 Application retries allow three attempts total for classified transport/timeouts
-and 500/502/503/504, with 500ms exponential backoff, 0–250ms jitter, 2s cap/short
-wait and persisted exhaustion. Manual recovery is eligible after 15 minutes,
+and 500/502/503/504, with 500ms exponential backoff, 0–250ms jitter, 2s delay cap
+and 2s cumulative short waiting per read, including quota waits. Exhaustion and
+unverified in-flight outcomes persist; manual recovery is eligible after 15 minutes,
 without clearing the active cycle. Fenced durable preparation makes valid expensive
 pages resumable under the quota while retaining the atomic commit boundary.
 Optional endpoints and absent session linkage retain their previous semantics.

@@ -53,7 +53,7 @@ end; $$;
 -- Pure rolling-window evaluator permits exact injected-clock SQL tests. It
 -- cannot reserve or mutate capacity; admission supplies locked state/DB time.
 create function public.evaluate_matter_quota(p_state jsonb,p_now timestamptz,p_markdown boolean)
-returns jsonb language plpgsql immutable security invoker set search_path='' as $$
+returns jsonb language plpgsql stable security invoker set search_path='' as $$
 declare q public.matter_quota; deadline timestamptz;
 begin
  if p_now is null or p_markdown is null or jsonb_typeof(p_state) is distinct from 'object' then raise exception 'Invalid quota evaluation' using errcode='22023'; end if;
@@ -86,6 +86,12 @@ begin
  n:=clock_timestamp(); r:=w.requests->p_key; tries:=coalesce((r->>'attempts')::integer,0);
  if p_recover and (r ? 'protocol' or (r ? 'status' and (p_slot='bootstrap' or (r->>'status')::integer not in (403,404)))) and (r->>'next_at')::timestamptz<=n then r:=null; tries:=0; end if;
  if r ? 'value' or r ? 'status' or r ? 'protocol' then return jsonb_build_object('admitted',false,'reason','cached','entry',r); end if;
+ -- No verified HTTP outcome means crash/cancellation/ambiguous local write,
+ -- not an explicitly classified transient failure. Only deliberate recovery
+ -- after its persisted deadline can resume this still-counted attempt chain.
+ if r->>'pending'='true' and (not p_recover or (r->>'next_at')::timestamptz>n) then
+  return jsonb_build_object('admitted',false,'reason','exhausted','next_at',r->>'next_at');
+ end if;
  -- In-flight attempts count even after a process dies. Recovery is deliberate,
  -- never automatic, and cannot erase the page/cycle or its preparation.
  if tries>=3 then
@@ -104,7 +110,7 @@ begin
   markdown_starts=case when p_markdown then array_append(q.markdown_starts,n) else q.markdown_starts end,sequence=seq,
   feedback_remaining=case when q.feedback_until>n then greatest(q.feedback_remaining-1,0) else null end,
   feedback_until=case when q.feedback_until>n then q.feedback_until else null end where account_scope='matter';
- update public.matter_request_work set requests=jsonb_set(requests,array[p_key],jsonb_build_object('attempts',tries+1,'failures',coalesce((r->>'failures')::integer,0),'sequence',seq::text,'next_at',n+interval '15 minutes')) where slot=p_slot;
+ update public.matter_request_work set requests=jsonb_set(requests,array[p_key],jsonb_build_object('attempts',tries+1,'failures',coalesce((r->>'failures')::integer,0),'pending',true,'sequence',seq::text,'next_at',n+interval '15 minutes')) where slot=p_slot;
  return jsonb_build_object('admitted',true,'sequence',seq::text,'attempt',tries+1);
 end; $$;
 
@@ -142,6 +148,7 @@ begin
  select * into strict w from public.matter_request_work where slot=p_slot for update;
  r:=w.requests->p_key; n:=clock_timestamp();
  if r is null or (r->>'sequence')::bigint is distinct from p_sequence then raise exception 'Stale request outcome' using errcode='PT409'; end if;
+ r:=r-'pending';
  if p_entry ? 'transient_delay_ms' then
   if (p_entry->>'transient_delay_ms')::integer not between 0 and 2000 then raise exception 'Invalid retry delay' using errcode='22023'; end if;
   r:=r || jsonb_build_object('failures',coalesce((r->>'failures')::integer,0)+1,'next_at',n+case when (r->>'attempts')::integer>=3 then interval '15 minutes' else make_interval(secs=>(p_entry->>'transient_delay_ms')::double precision/1000) end);

@@ -25,7 +25,8 @@ cannot create a parallel allowance within the same backend. A multi-account
 application would require a separately designed scope; it is outside this task.
 
 Admission locks the singleton, samples database time after lock acquisition,
-prunes timestamps outside `(now - window, now]`, checks the account not-before
+prunes timestamps at or before `now - window` (conservatively retaining future
+timestamps after clock rollback), checks the account not-before
 and feedback constraint, and atomically reserves one slot in each applicable
 window before HTTP. Every attempt, including `/me`, reads, annotations and
 retries, enters that RPC and consumes the unchanged invocation request budget.
@@ -44,7 +45,8 @@ Its evaluation cannot mutate/reserve capacity and is service-only.
 Header integers reject signs, whitespace, suffixes, fractions, exponent notation,
 unsafe numbers and inconsistent remaining/limit pairs. Unix resets must be future
 finite timestamps through year 9999. Retry-After accepts whole nonnegative seconds
-and canonical IMF-fixdate with validated calendar/weekday, including valid long
+and HTTP-date (IMF-fixdate plus RFC 850/asctime recipient formats) with validated
+calendar/weekday and the RFC 850 50-year rule, including valid long
 delays; past valid dates become zero and a 429 still defers at least one second.
 Missing/invalid Retry-After uses **60 seconds**. A later valid reset wins. Header
 feedback is consumed on successful and failed responses, with missing reset using
@@ -74,7 +76,10 @@ unchanged ceilings are **8 committed pages / 224 actual attempts / 90 seconds
 upstream / 150 seconds total / 10 seconds per request / 180 seconds ingress**.
 Long quota/retry waits return safely for the existing manual/daily continuation.
 Quota refusals perform no attempt or failure increment. HTTP 429 consumes its actual attempt but does not increase transient failure count; it returns to continuation rather than automatic HTTP retry. A reservation records
-its retry attempt before HTTP, so process death cannot replenish a chain.
+its retry attempt before HTTP, so process death cannot replenish a chain. An
+unverified in-flight outcome (crash/cancellation/ambiguous local write) requires
+deliberate recovery after that same 15-minute deadline; mere expiry never makes
+an unclassified outcome automatically retryable, and its attempt stays counted.
 Exhausted chains never reset automatically or by TTL. An intentional manual sync
 can start another bounded chain only after the persisted **15-minute** eligibility
 deadline; it keeps the cursor, active contract, generation and all prior prepared
@@ -120,12 +125,17 @@ so rejection rolls back effects, receipt, watermark and history completion.
 ## Evidence and gates
 
 Local `npm ci`, CI-required `next typegen`, typecheck, lint, test, build and
-`audit:ci` have been executed. The updated suite reports **255 passed,
-0 failed, 2 TODO, 0 skipped (257 total)**; lint has the same three preexisting
+`audit:ci` have been executed. The updated suite reports **256 passed,
+0 failed, 1 TODO, 0 skipped (257 total)**; lint has the same three preexisting
 Visual Explainer warnings. Production audit: **0 findings**; full audit: **8 high,
 0 critical/moderate/low**, all within the unchanged development-only
 `GHSA-vfj7-8cjw-p6xm` policy. Final checks/results are retained in the PR.
-R4 remains TODO until final-head real acceptance; R5 is unrelated Task 16 work.
+R4 was activated after both real migration paths passed at
+`2d19aba431a4d7a2c4236d1cb7b6008e39959bb5` in
+[run 37764780597](https://github.com/dfalidas/matter-stats/actions/runs/37764780597).
+This activation reference does not substitute for the final-head gate recorded
+in the PR. R3's existing 5,000-session target remains active; the sole R5 TODO
+is unrelated Task 16 work.
 
 The new deterministic HTTP/clock/randomness suite checks retries across recreated
 runtimes, exact timeout/5xx bounds, bootstrap admission, durable cooldown refusal,
@@ -156,6 +166,12 @@ the same policy passed with CI's Node 22.23.3 and an isolated metadata cache.
 Earlier real CI runs found the old fixture's intentionally looping cursor and
 a timestamp-spelling cache invalidation; both were corrected and strengthened
 with regression assertions. They are not final-head acceptance evidence.
+The managed proxy refuses Azure artifact downloads, while completed GitHub job
+logs and artifact identities/digests remain readable. Uploaded sanitized JSON
+is retained by CI for 14 days; the PR records the final run and artifact metadata.
+No deployment command or production action was run. The repository's existing
+Vercel GitHub integration independently reported automatic preview checks on
+branch pushes; its configuration was not changed or its previews exercised.
 The pinned CLI's npm downloader ignored the managed proxy; its exact 2.48.3 binary
 was downloaded through that proxy, checksum-verified and used to generate the
 migration. No repository dependency/CLI pin changes were made.

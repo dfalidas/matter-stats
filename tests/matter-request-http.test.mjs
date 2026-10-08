@@ -128,3 +128,12 @@ test("Task 15: unclassified transport errors never become automatic retries afte
   await assert.rejects(h.run(()=>api.getMatterAccount()),/page rejected/i);assert.equal(requests,1);
  });
 });
+test("Task 15: a timed-out authentication error body never triggers another request",async(t)=>{
+ for(const status of [400,401,403,422,429]) {const h=harness();let requests=0;
+  const budget=new MatterInvocationBudget({...require(path.join(root,".test-build/lib/matter-invocation-budget.js")).MATTER_INVOCATION_LIMITS,requestMs:5});
+  await synthetic(t,async()=>{requests++;return new Response(new ReadableStream({start(){}}),{status});},async()=>{
+   await assert.rejects(h.run(()=>api.getMatterAccount(),budget),e=>e.status===status);
+   await assert.rejects(h.run(()=>api.getMatterAccount()),e=>status===429?e.reason==="quota":e.status===status);assert.equal(requests,1);
+  });
+ }
+});

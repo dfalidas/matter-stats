@@ -228,6 +228,8 @@ export async function matterFetch<T>(path: string, options: MatterFetchOptions =
     }
     const sequence = admission.sequence!;
     const localTimeout = budget ? null : AbortSignal.timeout(10_000);
+    let responseStatus: number | null = null;
+    let responseRateLimit = emptyRateLimit();
     const finish = (entry: Json) => runtime.store.finish({ p_slot: identity.p_slot, p_key: identity.p_key, p_sequence: sequence, p_entry: entry, p_lease: identity.p_lease });
     const readResponse = async (signal?: AbortSignal): Promise<T> => {
       fetchOptions.signal?.throwIfAborted();
@@ -247,6 +249,8 @@ export async function matterFetch<T>(path: string, options: MatterFetchOptions =
       }
       const now = runtime.now();
       const rateLimit = parseRateLimitHeaders(response.headers, now);
+      responseStatus = response.status;
+      responseRateLimit = rateLimit;
       const cooldown = response.status === 429 ? matterCooldownDeadline(rateLimit.retryAfterSeconds, rateLimit.reset, now) : null;
       // This feedback can only restrict shared account capacity, so a stale lease
       // cannot replenish quota. Sync-owned preparation still requires its fence.
@@ -274,6 +278,15 @@ export async function matterFetch<T>(path: string, options: MatterFetchOptions =
       if (fetchOptions.signal?.aborted) throw fetchOptions.signal.reason;
       if (localTimeout?.aborted) error = new MatterBudgetStop("timeout");
       await beforeRequest?.();
+      if (error instanceof MatterBudgetStop && error.reason === "timeout" && responseStatus === 429) {
+        error = new MatterRateLimitError({ message: "Matter API rate limit exceeded.", path, rateLimit: responseRateLimit });
+      }
+      if (error instanceof MatterBudgetStop && error.reason === "timeout" && responseStatus !== null
+        && responseStatus >= 400 && responseStatus !== 429 && ![500, 502, 503, 504].includes(responseStatus)) {
+        // A slow optional error body cannot turn known auth/validation status
+        // into a retryable request timeout.
+        error = new MatterApiError({ status: responseStatus, message: `Matter API request failed with HTTP ${responseStatus}.`, path, rateLimit: responseRateLimit });
+      }
       if (error instanceof MatterRateLimitError) { await finish({ quota: true }); throw error; }
       if (isTransientMatterFailure(error)) {
         await finish({ transient_delay_ms: matterRetryDelay(admission.attempt!, runtime.random) });

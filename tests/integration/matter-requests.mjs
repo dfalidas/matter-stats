@@ -51,6 +51,12 @@ try {
  await Promise.all(ready);for(const child of children)child.send({go:true});const contention=await Promise.all(outcomes);assert.equal(contention.filter(r=>r.admitted).length,5);assert.ok(contention.filter(r=>!r.admitted).every(r=>r.reason==="quota"));
  assert.equal((await read("matter_quota"))[0].sequence,5);checks.push("16 independent processes: exactly five burst admissions, eleven durable quota refusals, no over-admission");
  await fixture.reset();
+ // A process disappearing after reservation has no classified transient
+ // outcome. Expiry alone cannot turn that uncertainty into automatic retries.
+ const pendingKey=admission("uncertain-attempt");const pending=await rpc("admit_matter_request",pendingKey);assert.equal(pending.admitted,true);await fixture.clearQuota();
+ await sql("update public.matter_request_work set requests=jsonb_set(requests,array['"+pendingKey.p_key+"','next_at'],to_jsonb(clock_timestamp()-interval '1 second')) where slot='bootstrap';");
+ assert.equal((await rpc("admit_matter_request",pendingKey)).reason,"exhausted");const intentional=await rpc("admit_matter_request",{...pendingKey,p_recover:true});assert.equal(intentional.admitted,true);assert.equal(intentional.attempt,2);checks.push("Uncertain reserved attempt remains counted and never automatically retries after process death/expiry; deliberate recovery resumes the same bounded chain");
+ await fixture.reset();
  // Markdown consumes both quotas. Real Data API admission reserves one read and
  // one markdown; another process does not receive separate minute capacity.
  const mark=await rpc("admit_matter_request",admission("markdown",{p_markdown:true}));assert.equal(mark.admitted,true);let q=(await read("matter_quota"))[0];assert.equal(q.read_starts.length,1);assert.equal(q.markdown_starts.length,1);

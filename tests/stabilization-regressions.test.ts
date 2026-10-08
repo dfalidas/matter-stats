@@ -21,7 +21,8 @@ test("R4 characterization: public trigger modes still map to their endpoint stre
   assert.equal(getMatterSyncInitialPhase("recent_activity_scheduled"), "sessions");
   assert.equal(getMatterSyncInitialPhase("backfill_library"), "items");
 });
-test.todo("R4 target (W4): manual→scheduled→manual preserves independent cursor and a fenced lease admits one writer");
+// R4 is active in matter-sync-entrypoint.test.mjs after real fresh/upgrade
+// cross-trigger, contention and fencing acceptance; see docs/task-15-validation.md.
 
 const largeDataset = Array.from({ length: 1_200 }, (_, index) => ({ id: `session-${index}`, seconds: 60 }));
 test("R5 synthetic fixture independently defines the complete expected total", () => {

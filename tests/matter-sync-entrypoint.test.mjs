@@ -93,7 +93,8 @@ function harness({ sessions = [], items = [], now = [], legacyCooldown = null } 
 }
 const page = (results = [], next = null) => ({ object: "list", results, has_more: next !== null, next_cursor: next });
 
-test("manual/scheduled/manual retains independent cursors under the shared lease", async () => {
+// Activated after both real disposable migration paths passed in run 37764780597.
+test("R4 target (W4): manual→scheduled→manual preserves independent cursors under the shared lease", async () => {
   const h = harness({ sessions: [page([], "s1"), page([], "s2")], items: [page([], "i1")] });
   h.states.set("recent_sessions", stream("recent_sessions", { cycle_active: true, cursor: "s0", cycle_started_at: "2026-05-01T00:00:00Z", cycle_generation: 7 }));
   h.states.set("library_items", stream("library_items", { cycle_active: true, cursor: "i0", cycle_started_at: "2026-04-01T00:00:00Z", cycle_generation: 4 }));

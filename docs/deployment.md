@@ -29,6 +29,9 @@ Apply every SQL file in `supabase/migrations` in filename/timestamp order:
 12. `20261004010000_preserve_sync_cooldown_and_window.sql`
 13. `20261005000000_matter_account_lease_fencing.sql`
 14. `20261007085051_atomic_matter_page_commit.sql`
+15. `20261007132750_matter_continuation_history_intent.sql`
+16. `20261007145024_bound_account_cooldown_update.sql`
+17. `20261008095102_matter_shared_quota_retry_preparation.sql`
 
 The two `20260929` migrations must both succeed **before** deploying code that performs login. The first creates `public.app_sessions` and `public.app_login_attempts` and declares the table RLS/grant policy. The second defines:
 
