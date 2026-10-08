@@ -122,11 +122,53 @@ continuation invocations. Exceeding that bound is a protocol failure requiring
 explicit investigation, never completion. Its trigger runs inside page commit,
 so rejection rolls back effects, receipt, watermark and history completion.
 
+## P1 follow-up: rejected item preparation
+
+[Review finding](https://github.com/dfalidas/matter-stats/pull/78#discussion_r4218181976):
+a valid list envelope could cache malformed item/tag rows before ingestion
+rejected them, leaving manual recovery unable to replace the successful value.
+The cache now shares ingestion's item/tag identity checks before recording a
+successful response. This covers library lists, linked item lookups (including
+requested-ID agreement), and embedded items actually used by valid linked
+sessions. Skipped or unlinked sessions retain their existing behavior.
+
+Previously cached values are revalidated on read. Semantic rejection records
+`protocol: true` and replaces the rejected payload with `null` for only that URL identity through the existing
+`finish_matter_request` lease fence and reserved-sequence comparison. The value
+is quarantined: protocol takes precedence over it, and the existing deliberate
+manual recovery policy can replace that entry after its recorded **15-minute**
+eligibility. Scheduled continuation cannot clear it, and early manual invocations
+issue no HTTP for it. Valid linked/list reads and sibling preparation remain
+intact. No cursor, active cycle, completed watermark or history marker is reset;
+the final page still commits atomically. Quarantine writes are never HTTP retries.
+
+No schema, migration, RPC signature, grants or retry/quota policy changes are
+needed. Deployment uses the original Task 15 migration before this code. A code
+rollback must keep sync writers disabled: the earlier cache reader can recreate
+the reviewed wedge. Retain all durable progress and preparation for roll-forward.
+
+Three deterministic regressions cover validation before caching, legacy-cache
+manual recovery/valid-read preservation, and refusal to quarantine after lease
+loss or without a verified sequence. Both real disposable paths run eight
+production-sync scenarios: malformed library/linked item IDs and tag IDs,
+embedded tags, and legacy bad values for all three preparation paths. Each
+asserts zero ingestion/checkpoint/completion effects on rejection, no early
+manual recovery, corrected upstream recovery in a fresh invocation, and retained
+valid/sibling preparation. Owned SQL advances only the rejected identity's
+eligibility to simulate elapsed time; production exposes no such clock/reset.
+Real takeover evidence also rejects protocol-quarantine writes from a stale
+lease. Final-head standard CI, fresh/upgrade results and cleanup are recorded
+in the existing PR delivery record.
+The first P1 fresh run rejected an invalid test fixture that marked its sibling
+inactive while retaining an active-cycle timestamp. The fixture was corrected
+to keep the sibling and its preparation active and select the tested stream
+through fenced turns and a one-page budget; that failed run is not acceptance.
+
 ## Evidence and gates
 
 Local `npm ci`, CI-required `next typegen`, typecheck, lint, test, build and
-`audit:ci` have been executed. The updated suite reports **256 passed,
-0 failed, 1 TODO, 0 skipped (257 total)**; lint has the same three preexisting
+`audit:ci` have been executed. The updated suite reports **259 passed,
+0 failed, 1 TODO, 0 skipped (260 total)**; lint has the same three preexisting
 Visual Explainer warnings. Production audit: **0 findings**; full audit: **8 high,
 0 critical/moderate/low**, all within the unchanged development-only
 `GHSA-vfj7-8cjw-p6xm` policy. Final checks/results are retained in the PR.

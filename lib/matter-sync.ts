@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { emptyMatterPagePlan, validateMatterPage, validateMatterPagePlan, MatterPageValidationError, MATTER_ENRICHMENT_MAX_ROWS, type MatterPagePlan } from "./matter-page-plan";
+import { emptyMatterPagePlan, validateMatterItem, validateMatterPage, validateMatterPagePlan, MatterPageValidationError, MATTER_ENRICHMENT_MAX_ROWS, type MatterPagePlan } from "./matter-page-plan";
 
 import {
   getMatterAccount,
@@ -392,12 +392,8 @@ async function importMatterItemPage(page: MatterListResponse<NormalizableMatterI
   const tags = new Map<string, TablesInsert<"matter_tags">>();
   const links = new Map<string, TablesInsert<"item_tags">>();
   for (const item of page.results) {
-    if (!item || typeof item.id !== "string" || !item.id.trim()) throw new MatterPageValidationError("invalid_item_id");
+    validateMatterItem(item);
     items.set(item.id, normalizeMatterItem(item, new Date().toISOString()));
-    if (item.tags !== undefined && !Array.isArray(item.tags)) throw new MatterPageValidationError("invalid_tags");
-    for (const tag of item.tags ?? []) {
-      if (!tag || typeof tag.id !== "string" || !tag.id.trim()) throw new MatterPageValidationError("invalid_tag_id");
-    }
     const normalized = normalizeMatterItemTags(item);
     for (const tag of normalized.matterTags) tags.set(tag.id, tag);
     for (const link of normalized.itemTags) links.set(JSON.stringify([link.item_id, link.tag_id]), link);

@@ -1,6 +1,7 @@
 import "server-only";
 
-import { validateMatterPage, MatterPageValidationError } from "./matter-page-plan";
+import { validateMatterItem, validateMatterPage, MatterPageValidationError } from "./matter-page-plan";
+import { extractEmbeddedMatterItem, normalizeReadingSession } from "./matter-normalizers";
 import { admitMatterRequest, getMatterRequestRuntime, matterRequestIdentity } from "./matter-request-coordinator";
 import { strictMatterInteger, strictMatterReset, matterCooldownDeadline, isTransientMatterFailure, matterRetryDelay, MATTER_MAX_SHORT_WAIT_MS } from "./matter-request-policy";
 import type { Json } from "./supabase-types";
@@ -223,7 +224,19 @@ export async function matterFetch<T>(path: string, options: MatterFetchOptions =
       await beforeRequest?.();
       if (admission.entry?.protocol) throw new MatterPageValidationError("persisted_protocol_failure");
       if (admission.entry?.status) throw new MatterApiError({ status: admission.entry.status, message: "Previously unavailable Matter endpoint", path, rateLimit: emptyRateLimit() });
-      validateReadResponse(url, admission.entry?.value);
+      try { validateReadResponse(url, admission.entry?.value); }
+      catch (error) {
+        if (!(error instanceof MatterPageValidationError)) throw error;
+        // Earlier code cached envelopes before validating their item/tag rows.
+        // Quarantine only this request through the existing fenced sequence CAS;
+        // its recorded deadline then permits deliberate manual recovery.
+        const sequence = admission.entry?.sequence;
+        if (!sequence || !/^\d+$/.test(sequence)) throw new Error("Unverified cached Matter reservation");
+        fetchOptions.signal?.throwIfAborted();
+        await beforeRequest?.();
+        await runtime.store.finish({ p_slot: identity.p_slot, p_key: identity.p_key, p_sequence: sequence, p_entry: { protocol: true, value: null }, p_lease: identity.p_lease });
+        throw error;
+      }
       return admission.entry?.value as T;
     }
     const sequence = admission.sequence!;
@@ -309,11 +322,32 @@ function validateReadResponse(url: URL, value: unknown) {
   const path = url.pathname;
   if (["/items", "/reading_sessions", "/tags"].some((endpoint) => path.endsWith(endpoint)) || path.endsWith("/annotations")) {
     validateMatterPage(value as MatterListResponse<unknown>, Number(url.searchParams.get("limit") ?? 25), url.searchParams.get("cursor"));
+    const page = value as MatterListResponse<MatterReadingSession>;
+    if (path.endsWith("/items")) page.results.forEach(validateMatterItem);
+    if (path.endsWith("/reading_sessions")) {
+      // Match the items actually used by session preparation, including its
+      // duplicate-ID resolution. Skipped/unlinked sessions still do no enrichment.
+      const sessions = new Map<string, ReturnType<typeof normalizeReadingSession>>();
+      for (const session of page.results) {
+        if (typeof session?.id !== "string" || !session.id.trim()) continue;
+        const row = normalizeReadingSession(session);
+        if (row) sessions.set(row.id!, row);
+      }
+      const embedded = new Map(page.results.map(extractEmbeddedMatterItem).filter((item) => item !== null).map((item) => [item.id, item]));
+      for (const row of sessions.values()) {
+        const item = row?.item_id ? embedded.get(row.item_id) : undefined;
+        if (item) validateMatterItem(item);
+      }
+    }
   } else if (path === "/public/v1/me") {
     if (!value || typeof value !== "object" || (value as { object?: unknown }).object !== "account"
       || typeof (value as { id?: unknown }).id !== "string" || !(value as { id: string }).id.trim()) throw new MatterPageValidationError("invalid_account_envelope");
   } else if (!value || typeof value !== "object" || Array.isArray(value) || (path !== "/public/v1/me" && (typeof (value as { id?: unknown }).id !== "string" || !(value as { id: string }).id.trim()))) {
     throw new MatterPageValidationError("invalid_envelope");
+  }
+  if (/^\/public\/v1\/items\/[^/]+$/.test(path)) {
+    validateMatterItem(value);
+    if (value.id !== decodeURIComponent(path.split("/").at(-1)!)) throw new MatterPageValidationError("divergent_linked_item");
   }
 }
 

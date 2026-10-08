@@ -7,7 +7,7 @@ import { getMatterInvocationBudget } from "./matter-invocation-budget";
 import { MatterRequestDeferred, MATTER_MAX_SHORT_WAIT_MS, MATTER_RETRY_MAX_ATTEMPTS } from "./matter-request-policy";
 import type { Json, TablesInsert } from "./supabase-types";
 
-export type MatterRequestEntry = { value?: Json; status?: number; protocol?: boolean; attempts?: number };
+export type MatterRequestEntry = { value?: Json; status?: number; protocol?: boolean; attempts?: number; sequence?: string };
 export type MatterAdmission = { admitted: boolean; reason?: "quota" | "retry" | "exhausted" | "cached"; next_at?: string; entry?: MatterRequestEntry; sequence?: string; attempt?: number };
 export type MatterRequestStore = {
   admit: (args: { p_slot: string; p_key: string; p_markdown: boolean; p_recover: boolean; p_lease: Json | null }) => Promise<MatterAdmission>;

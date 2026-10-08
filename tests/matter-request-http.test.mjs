@@ -20,17 +20,19 @@ function harness() {
  const entries=new Map(),events=[];
  const runtime={ now:()=>now, random:()=>0, wait:async(ms,signal)=>{signal?.throwIfAborted();events.push(["wait",ms]);now+=ms;},store:{
   admit:async(args)=>{
-   events.push(["admit",args.p_slot,args.p_markdown]); const key=args.p_slot+args.p_key,r=entries.get(key)??{attempts:0};
+   events.push(["admit",args.p_slot,args.p_markdown]); const key=args.p_slot+args.p_key;let r=entries.get(key)??{attempts:0};
+   if(args.p_recover && (r.protocol || (r.status && ![403,404].includes(r.status))) && now>=r.next) r={attempts:0};
    if("value" in r || "status" in r || "protocol" in r) return { admitted:false,reason:"cached",entry:r };
    if(r.attempts>=3 && !(args.p_recover && now>=r.next)) return { admitted:false,reason:"exhausted",next_at:new Date(r.next).toISOString() };
    if(now<cooldown) return { admitted:false,reason:"quota",next_at:new Date(cooldown).toISOString() };
    if(now<(r.next??0)) return { admitted:false,reason:"retry",next_at:new Date(r.next).toISOString() };
-   const attempt=r.attempts>=3?1:r.attempts+1; entries.set(key,{attempts:attempt,next:now+900000});
-   return { admitted:true,sequence:String(++seq),attempt };
+   const attempt=r.attempts>=3?1:r.attempts+1,sequence=String(++seq); entries.set(key,{attempts:attempt,next:now+900000,sequence});
+   return { admitted:true,sequence,attempt };
   },
   feedback:async(args)=>{events.push(["feedback",args]); if(args.p_cooldown) cooldown=Math.max(cooldown,Date.parse(args.p_cooldown));},
   finish:async(args)=>{
    events.push(["finish",args.p_entry]);const key=args.p_slot+args.p_key,r=entries.get(key),entry=args.p_entry;
+   assert.equal(args.p_sequence,r.sequence,"outcome uses the reserved sequence");
    if("transient_delay_ms" in entry) r.next=now+(r.attempts>=3?900000:entry.transient_delay_ms);
    else if(entry.quota) {r.next=now+(r.attempts>=3?900000:0);}
    else if(args.p_slot==="bootstrap" && "value" in entry) entries.delete(key);
@@ -134,6 +136,40 @@ test("Task 15: a timed-out authentication error body never triggers another requ
   await synthetic(t,async()=>{requests++;return new Response(new ReadableStream({start(){}}),{status});},async()=>{
    await assert.rejects(h.run(()=>api.getMatterAccount(),budget),e=>e.status===status);
    await assert.rejects(h.run(()=>api.getMatterAccount()),e=>status===429?e.reason==="quota":e.status===status);assert.equal(requests,1);
+  });
+ }
+});
+test("P1: item/tag semantics are rejected before successful preparation caching",async(t)=>{
+ for(const [path,value] of [["/items",{...page(),results:[{}]}],["/items",{...page(),results:[{id:"bad",tags:[{}]}]}],["/items/bad",{id:"bad",tags:{}}],["/items/bad",{id:"different",tags:[]}],["/reading_sessions",{...page(),results:[{id:"s",date:"2300-02-01T10:00:00Z",seconds_read:60,item:{id:"bad",tags:[{}]}}]}]]) {
+  const h=harness();let requests=0;
+  await synthetic(t,async()=>{requests++;return Response.json(value);},async()=>{
+   await assert.rejects(h.run(()=>coordinator.withMatterRequestContext({slot:"library_items",recover:false},()=>api.matterFetch(path))),/page rejected/i);
+   const entry=[...h.entries.values()][0];assert.equal(entry.protocol,true);assert.equal("value" in entry,false);assert.equal(requests,1);
+  });
+ }
+});
+test("P1: legacy rejected values recover only deliberately after eligibility; unrelated valid reads survive",async(t)=>{
+ const h=harness();let requests=0;const run=()=>h.run(()=>coordinator.withMatterRequestContext({slot:"library_items",recover:true},()=>api.listMatterItems()));
+ await synthetic(t,async()=>{requests++;return Response.json({...page(),results:[{id:"corrected",tags:[]}]});},async()=>{
+  // Seed exactly the previously accepted cache shape, including its RPC sequence.
+  await run();const [key,entry]=[...h.entries.entries()][0];entry.value={...page(),results:[{id:"corrected",tags:[{}]}]};
+  const valid={sequence:"99",attempts:1,value:page(),next:h.runtime.now()+900000};h.entries.set("unrelated",valid);
+  await assert.rejects(run(),/page rejected/i);assert.equal(entry.protocol,true);assert.equal(entry.value,null);assert.equal(requests,1,"quarantine uses no HTTP");
+  await assert.rejects(run(),/page rejected/i);assert.equal(requests,1,"early manual recovery remains blocked");
+  h.advance(900001);
+  await assert.rejects(h.run(()=>coordinator.withMatterRequestContext({slot:"library_items",recover:false},()=>api.listMatterItems())),/page rejected/i);assert.equal(requests,1,"cron never resets a protocol failure");
+  assert.equal((await run()).results[0].id,"corrected");assert.equal(requests,2);assert.deepEqual(h.entries.get("unrelated"),valid);
+  assert.equal(h.entries.get(key).protocol,undefined);assert.equal(h.entries.get(key).attempts,1);
+ });
+});
+test("P1: cached rejection cannot write after lease loss or an unverifiable sequence",async(t)=>{
+ for(const missingSequence of [false,true]) {const h=harness();let requests=0,renewals=0;
+  await synthetic(t,async()=>{requests++;return Response.json({...page(),results:[{id:"fixture",tags:[]}]});},async()=>{
+   const context=work=>coordinator.withMatterRequestContext({slot:"library_items",recover:false},work);
+   await h.run(()=>context(()=>api.listMatterItems()));const entry=[...h.entries.values()][0];entry.value={...page(),results:[{}]};if(missingSequence)delete entry.sequence;
+   const writes=h.events.filter(e=>e[0]==="finish").length;
+   await assert.rejects(h.run(()=>context(()=>api.listMatterItems({},async()=>{if(++renewals===3)throw new Error("synthetic lost lease");}))),missingSequence?/Unverified cached/:/lost lease/);
+   assert.equal(entry.protocol,undefined);assert.equal(requests,1);assert.equal(h.events.filter(e=>e[0]==="finish").length,writes);
   });
  }
 });
