@@ -58,14 +58,14 @@ All application/data routes above except `/login` require an app session.
 | `SUPABASE_URL` | Yes | Server-side Supabase project URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Server-only administrative key; can bypass RLS. |
 | `CRON_SECRET` | Required for scheduled sync | Server-only Bearer secret; a missing value makes cron authorization fail closed. |
-| `MATTER_SYNC_ITEMS_LIMIT` | Optional | Positive per-request item page limit; defaults to `25`. |
-| `MATTER_SYNC_SESSIONS_LIMIT` | Optional | Positive per-request session page limit; defaults to `25`. |
+| `MATTER_SYNC_ITEMS_LIMIT` | Optional | Integer per-request item page limit, 1–100; defaults to `25`. |
+| `MATTER_SYNC_SESSIONS_LIMIT` | Optional | Integer per-request session page limit, 1–100; defaults to `25`. |
 
 ## Matter sync stream cycles
 
 Matter pagination is persisted independently in `public.matter_sync_streams` for `recent_sessions` (`GET /reading_sessions`) and `library_items` (`GET /items`). Manual and scheduled activity syncs are only different triggers for the same `recent_sessions` stream. Each active cycle pins its endpoint, exact documented filters/lower bound, page limit, opaque cursor, start time, and cycle generation; later invocations resume that contract even across a year boundary or environment limit change. Cycle generation identifies a logical cycle and is not the Task 12 lease/fencing generation.
 
-Matter cooldowns are account-wide: availability checks and every sync invocation use the latest active retry timestamp across both streams and the retained legacy singleton before any cycle write or upstream call. An explicit manual history-window selection is also durable. Repeating that same selection resumes the pinned contract without recomputing its rolling boundary; requesting a different window is rejected without changing state or calling Matter. Scheduled triggers do not change the stored history intent.
+Matter cooldowns are account-wide: availability checks and every sync invocation use the latest active retry timestamp across both streams and the retained legacy singleton before any cycle write or upstream call. An explicit manual history-window selection is also durable. Repeating that same selection resumes the pinned contract without recomputing its rolling boundary; conflicting incremental windows are rejected without changing state or calling Matter. During an explicit available-history enumeration, triggers resume its fixed full-history contract. Scheduled triggers do not change the stored history intent.
 
 The first sessions cycle uses the explicitly selected coverage lower bound. A genuinely exhausted cycle promotes its captured start time to the completed watermark, including when the final page is empty. Partial and failed cycles do not promote it. Later cycles replay from seven days before that watermark using inclusive `since`; this is an application overlap policy for idempotent upserts, not a Matter late-arrival or cursor-snapshot guarantee. Imported minimum/maximum timestamps do not establish historical completeness. Library enumeration uses only documented parameters and remains independent of session import.
 
@@ -73,7 +73,7 @@ The legacy singleton did not persist its page limit, so a complete active reques
 
 ## Account lease and fencing (Task 12 / E2 / W4 / R4)
 
-All three triggers acquire the same `matter` account scope in
+Manual, scheduled and backfill triggers acquire the same `matter` account scope in
 `public.matter_sync_leases`, before reading/resuming a cycle, creating a run or
 calling Matter. The scope is a fixed single-account identifier, never the API
 token. Every invocation generates a UUID owner. An occupied, unexpired lease
@@ -267,3 +267,69 @@ be accepted if an opaque cursor value recurs within the same cycle. The latest
 receipt remains bounded; a reused-cursor SQL regression verifies this guard.
 Permanent stale-contract conflicts return `PT409`; they do not use SQLSTATE
 `40001`, which can cause PostgREST to retry a deliberately rejected transaction.
+
+## Task 14 bounded continuation and explicit history
+
+Task 14 replaces the one-page invocation boundary with sequential bounded page
+commits. All triggers still acquire one account lease; the scheduler never calls
+another leased worker. Each next page uses the returned durable stream contract
+and a freshly read preceding receipt. Exhaustion follows validated `has_more`,
+including empty terminal pages. Partial work does not advance a watermark.
+
+`matter_sync_continuation` is one service-only/RLS singleton. An authenticated
+**Start / Resume Session History** (or explicit **All available sessions**)
+request records an idempotent `all` intent. A currently active narrower session
+cycle finishes under its original contract before full history starts. The fenced
+start binds a new generation to `/reading_sessions`, empty filters (no `since`),
+a fixed page limit and captured start, preserving its prior completed watermark,
+raw rows, receipts, dirty work and lease generations. The completion trigger runs
+inside the Task 13 page transaction and records exhaustion of this enumeration.
+Matching completed requests remain complete; they do not silently re-import or
+restart. Lower-bound/custom history coverage is not offered; the RPC rejects any
+coverage other than `all`. Later incremental cycles retain seven-day overlap.
+
+Every invocation shares an AsyncLocalStorage budget: **8 committed pages, 224
+Matter HTTP attempts, 90 seconds upstream preparation, 150 seconds total**.
+`/me`, linked-item reads, all annotation pages and failed HTTP attempts count.
+Each HTTP attempt, response body and lease check is cancellable at 10 seconds or
+the remaining preparation deadline. Existing 250 ms pacing remains; sync adds no
+upstream retries. Before later pages, admission reserves `limit + 101` attempts
+(the maximum list + linked items + 100 annotation pages); a deferred expensive
+page gets a fresh invocation. The maximum valid Task 13 page requires 201
+preparation attempts, plus `/me`, below the fresh 224-attempt ceiling. A request
+or time stop discards the entire uncommitted plan. Sustained upstream slowness,
+cooldowns or errors can still delay completion; no finite invocation promises
+that an unavailable/slow upstream will finish. This is not Task 15's shared quota
+limiter, and Matter can return 429 before an invocation budget is consumed.
+
+Database HTTP is bounded to 10 seconds and the remaining total deadline. Rollup
+recovery retains two snapshots of at most 32 markers and checks remaining time
+before each marker; it stops admission with 60 seconds remaining for one marker
+(renew, parallel reads, acknowledgement) and progress read/logging/release, each
+database step capped at 10 seconds. Exact-revision acknowledgement remains atomic. Commits,
+logging/release and recovery have a 60-second application margin after upstream
+preparation, plus 30 seconds below the explicit 180-second function cap. Deploy
+on the documented Node.js/Fluid Compute runtime (300-second default); verify the
+platform honors the 180-second route/page/server-action duration. This is bounded
+execution, not an unlimited duration increase.
+
+The unchanged daily **06:00 UTC** cron resumes active sessions, explicitly
+requested history and active library work. It never creates a full-history intent
+or starts an unrequested library backfill. A durable next-stream turn alternates
+eligible streams before requests, so failed/expensive sessions do not keep library
+work behind freshly started recent cycles. Each finished stream stops for this
+invocation, except a queued history intent may begin after its narrow predecessor.
+A browser is unnecessary; optional manual resumes only accelerate the same work.
+Remaining chunks may wait until the next daily scheduled invocation (or longer
+while busy, rate-limited or failing). Cron/manual responses expose partial status,
+page/attempt counts and history status without claiming analytics completeness.
+
+429s in `/me`, item or annotation preparation stop the page and persist an
+account cooldown through a fenced RPC updating current durable rows.
+The additive cooldown follow-up explicitly selects both account streams, retaining
+Supabase safeupdate protection and the same signature/lease fence. Previously
+accepted annotation pages are never committed as a subset after a later optional
+endpoint failure. Lost SQL responses retain exact receipt replay; cooldown writes
+cannot rewind a cursor. Authentication, raw UTC values, `APP_TIMEZONE`, per-session
+metric formulas and bounded Task 13 SQL transactions remain unchanged. Imported
+history is not an analytics cap fix or historical recompute/cutover (Tasks 16–20).

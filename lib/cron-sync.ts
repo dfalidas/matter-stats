@@ -38,11 +38,15 @@ export async function handleRecentActivityCron(request: Request, deps: CronSyncD
   return Response.json(
     {
       ok: result.ok,
-      status: result.ok ? "success" : "error",
+      status: result.ok ? result.status === "partial" ? "partial" : "success" : "error",
       sync_mode: syncMode,
       sessions_synced: result.sessionsSynced ?? 0,
       matter_sessions_returned: result.sessionsSynced ?? 0,
       skipped_reason: null,
+      has_more: result.hasMore ?? false,
+      pages_committed: result.pagesCommitted ?? 0,
+      requests_attempted: result.requestsAttempted ?? 0,
+      history_status: result.historyStatus ?? null,
       message: result.message,
     },
     { status: result.ok ? 200 : 500 }

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { getMatterInvocationBudget } from "./matter-invocation-budget";
+
 import { serverEnv } from "@/lib/env";
 import { parseRetryAfterHeader } from "@/lib/matter-sync-progress";
 
@@ -212,59 +214,44 @@ export class MatterRateLimitError extends MatterApiError {
 
 export async function matterFetch<T>(path: string, options: MatterFetchOptions = {}): Promise<T> {
   const { maxRateLimitRetries = DEFAULT_MAX_RATE_LIMIT_RETRIES, beforeRequest, ...fetchOptions } = options;
-
-  for (let attempt = 0; attempt <= maxRateLimitRetries; attempt += 1) {
+  const budget = getMatterInvocationBudget();
+  // Sync's bounded invocations never add upstream retries or long sleeps.
+  const retries = budget ? 0 : maxRateLimitRetries;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    budget?.check();
     await paceMatterRequest();
+    budget?.check();
     await beforeRequest?.();
-
-    const response = await fetch(buildMatterUrl(path, fetchOptions.query), {
-      ...fetchOptions,
-      headers: buildHeaders(fetchOptions.headers, fetchOptions.body),
-      body: buildBody(fetchOptions.body),
-    });
-
-    if (response.status === 429) {
-      const rateLimit = parseRateLimitHeaders(response.headers);
-      const errorBody = await readErrorBody(response);
-      const message = formatErrorMessage(response.status, errorBody, rateLimit);
-
-      if (attempt < maxRateLimitRetries && rateLimit.retryAfterSeconds !== null) {
-        const delayMs = rateLimit.retryAfterSeconds * 1_000;
-        if (delayMs > 0 && delayMs <= MAX_RATE_LIMIT_DELAY_MS) {
-          await sleep(delayMs);
-          continue;
-        }
-      }
-
-      throw new MatterRateLimitError({ message, path, rateLimit });
-    }
-
-    if (!response.ok) {
-      const rateLimit = parseRateLimitHeaders(response.headers);
-      const errorBody = await readErrorBody(response);
-      const error = errorBody.error;
-      throw new MatterApiError({
-        status: response.status,
-        code: error?.code ?? null,
-        message: formatErrorMessage(response.status, errorBody, rateLimit),
-        field: error?.field ?? null,
-        path,
-        rateLimit,
+    const readResponse = async (signal?: AbortSignal): Promise<T> => {
+      const response = await fetch(buildMatterUrl(path, fetchOptions.query), {
+        ...fetchOptions,
+        ...(signal ? { signal: fetchOptions.signal ? AbortSignal.any([signal, fetchOptions.signal]) : signal } : {}),
+        headers: buildHeaders(fetchOptions.headers, fetchOptions.body),
+        body: buildBody(fetchOptions.body),
       });
+      const rateLimit = parseRateLimitHeaders(response.headers);
+      if (!response.ok) {
+        const errorBody = await readErrorBody(response);
+        // Even optional failures validate the lease AFTER the upstream response.
+        await beforeRequest?.();
+        if (response.status === 429) throw new MatterRateLimitError({ message: formatErrorMessage(response.status, errorBody, rateLimit), path, rateLimit });
+        throw new MatterApiError({ status: response.status, code: errorBody.error?.code ?? null,
+          message: formatErrorMessage(response.status, errorBody, rateLimit), field: errorBody.error?.field ?? null, path, rateLimit });
+      }
+      const value = response.status === 204 ? undefined : await response.json();
+      await beforeRequest?.();
+      return value as T;
+    };
+    try { return budget ? await budget.attempt(readResponse) : await readResponse(); }
+    catch (error) {
+      if (error instanceof MatterRateLimitError && attempt < retries && error.rateLimit.retryAfterSeconds !== null) {
+        const delayMs = error.rateLimit.retryAfterSeconds * 1000;
+        if (delayMs > 0 && delayMs <= MAX_RATE_LIMIT_DELAY_MS) { await sleep(delayMs); continue; }
+      }
+      throw error;
     }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return (await response.json()) as T;
   }
-
-  throw new MatterRateLimitError({
-    message: "Matter API rate limit exceeded after retry attempts.",
-    path,
-    rateLimit: { limit: null, remaining: null, reset: null, retryAfterSeconds: null },
-  });
+  throw new Error("Invalid Matter retry bound");
 }
 
 export function logMatterApiError(error: unknown, context: string): void {

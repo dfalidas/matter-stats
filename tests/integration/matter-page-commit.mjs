@@ -119,6 +119,16 @@ try {
     return originalResolve.call(this, request, parent, isMain, options);
   };
   runtime = createRequire(import.meta.url)(path.join(root, ".test-build/lib/matter-sync.js"));
+  const runSync = runtime.syncMatterData;
+  runtime = { ...runtime, syncMatterData: async (mode, options, dependencies) => {
+    // Task 13 faults isolate ONE named page, even with its sibling pending.
+    // Set the real fenced scheduling fixture before acquiring the runtime lease;
+    // Task 14's separate suite exercises normal durable fair turns/default budgets.
+    const fixtureLease = await acquire();
+    try { await rpc("turn_matter_continuation", { ...leaseArgs(fixtureLease), p_stream: mode === "backfill_library" ? "recent_sessions" : "library_items" }); }
+    finally { await release(fixtureLease); }
+    return runSync(mode, { budget: { pages: 1, requests: 224, upstreamMs: 90000, totalMs: 150000, requestMs: 10000 }, ...options }, dependencies);
+  } };
   deps = { ...runtime.productionSyncDeps, now: () => new Date("2026-10-01T00:00:00Z"), createRun: async (row, lease) => { ownedRuns.add(lease.owner); return runtime.productionSyncDeps.createRun(row, lease); } };
   globalThis.fetch = async (request, init) => String(request).startsWith("https://api.getmatter.com/") ? upstream(String(request), init) : transport(request, init);
 
@@ -137,7 +147,7 @@ try {
       else if (stage === "preparation") upstream = (request) => new URL(request).pathname.endsWith("/annotations") ? Promise.reject(new Error("synthetic enrichment failure")) : normal(request);
       else await trap(stage === "rows" && mode === "backfill_library" ? "annotations" : stage);
       const before = await snapshot();
-      assert.equal((await runtime.syncMatterData(mode, {}, deps)).ok, false);
+      assert.equal((await runtime.syncMatterData(mode, {}, deps)).ok, false, `${mode}/${stage} must reject the injected fault`);
       assert.deepEqual(await snapshot(), before, `${mode}/${stage} left partial page effects`);
       upstream = normal; await dropTrap();
     }

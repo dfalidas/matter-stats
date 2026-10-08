@@ -10,3 +10,6 @@ out
 .test-build
 audit-results/
 artifacts/stabilization-db/
+
+work/
+supabase/.temp/

@@ -86,3 +86,4 @@ async function getDashboardMetrics(period: MetricsPeriodPreset, start: string | 
     return { ok: false as const, message };
   }
 }
+export const maxDuration = 180;

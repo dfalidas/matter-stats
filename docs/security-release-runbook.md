@@ -309,3 +309,36 @@ A failed or blocked path cannot establish release readiness. Consult
 writers/previews, migration-before-code order and checkpoint/marker-preserving
 rollback. No merge, deployment, production migration or personal-data mutation is
 authorized by these tests.
+
+## Task 14 continuation/history verification
+
+`matter_sync_continuation` is service-only, RLS enabled, with SELECT/UPDATE and no
+INSERT/DELETE/TRUNCATE for the service role. Its exact signatures (four lease-
+fenced RPCs and one completion trigger function) are inventoried in
+`scripts/matter-continuation-inventory.mjs`. All use SECURITY INVOKER, empty
+search_path and qualified relations. Direct administrative UPDATE is a trusted
+service boundary; application mutations use transactional account fencing. The
+completion trigger belongs to the enclosing already-fenced page transaction.
+
+The disposable fresh AND upgrade gate also executes the production multi-page
+runtime with synthetic Matter only: 5,000 minimal documented sessions across years
+and tied timestamps, an independent SQL raw-data reference, recreated worker
+processes, daily authenticated cron, pending library work, request/time interruption
+inside enrichment, expensive-page admission, terminal receipt replay, cooldowns
+and stale intent/start/scheduling/cooldown mutations. Real signed-in `authenticated`
+and `anon` clients must get exact object-specific 42501 denials for new table CRUD
+and every exposed RPC signature. The trigger-returning function is absent from
+PostgREST RPC discovery; its exact denial uses real SQL SET ROLE, with completion
+verified through the production page transaction. Invalid payload/cache/gateway errors never
+count as denials. Existing auth/cron, Task 12 barriers and Task 13 crash/rollup
+checks remain gates. The upgrade path additionally snapshots receipts and dirty
+revisions across Task 14, preserving prior stream/cooldown/lease/legacy state.
+The owned disposable Kong transport uses verified upstream keepalive pool size
+zero to avoid observed connection resets under the large fixture. Real gateway/
+Data API authentication and all SQL/RLS assertions remain required; failed HTTP
+responses still fail the gate. This setting is not applied to production.
+
+Retain exact tested SHA, results, complete migration histories and owned fixture/
+Auth/stack cleanup. Unavailable or failed execution is BLOCKED/FAILED, never passed.
+See [task-14-validation.md](task-14-validation.md). No production migration, sync,
+deployment, merge or personal-data operation is authorized by the test runner.

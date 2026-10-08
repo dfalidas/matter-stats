@@ -8,10 +8,12 @@ import { LEASE_FUNCTION_SIGNATURES } from "./matter-sync-lease-inventory.mjs";
 
 import { PAGE_TABLES, PAGE_FUNCTION_SIGNATURES } from "./matter-page-inventory.mjs";
 
+import { CONTINUATION_TABLES, CONTINUATION_FUNCTION_SIGNATURES } from "./matter-continuation-inventory.mjs";
+
 export const INVENTORIED_TABLES = [
   "matter_items", "reading_sessions", "matter_tags", "item_tags", "annotations",
   "daily_stats", "sync_runs", "sync_state", "app_sessions", "app_login_attempts",
-  "matter_sync_streams", "matter_sync_leases", ...PAGE_TABLES,
+  "matter_sync_streams", "matter_sync_leases", ...PAGE_TABLES, ...CONTINUATION_TABLES,
 ];
 
 export function catalogSql(tables = INVENTORIED_TABLES) {
@@ -28,9 +30,9 @@ BEGIN
       RAISE EXCEPTION 'RLS is disabled on public.%', table_name;
     END IF;
     FOREACH privilege_name IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE'] LOOP
-      IF table_name = 'matter_sync_leases' AND privilege_name IN ('INSERT', 'DELETE') THEN
-        IF has_table_privilege('service_role', 'public.matter_sync_leases', privilege_name) THEN
-          RAISE EXCEPTION 'service_role can reset durable lease via %', privilege_name;
+      IF table_name IN ('matter_sync_leases','matter_sync_continuation') AND privilege_name IN ('INSERT', 'DELETE') THEN
+        IF has_table_privilege('service_role', format('public.%I', table_name), privilege_name) THEN
+          RAISE EXCEPTION 'service_role can reset durable lease/intent public.% via %', table_name, privilege_name;
         END IF;
         CONTINUE;
       END IF;
@@ -58,7 +60,8 @@ BEGIN
   IF has_table_privilege('service_role', 'public.matter_sync_leases', 'TRUNCATE') THEN
     RAISE EXCEPTION 'service_role can truncate durable lease';
   END IF;
-  FOREACH function_signature IN ARRAY ARRAY[${[...LEASE_FUNCTION_SIGNATURES, ...PAGE_FUNCTION_SIGNATURES].map((signature) => `'public.${signature}'`).join(", ")}] LOOP
+  IF has_table_privilege('service_role','public.matter_sync_continuation','TRUNCATE') THEN RAISE EXCEPTION 'continuation can be truncated'; END IF;
+  FOREACH function_signature IN ARRAY ARRAY[${[...LEASE_FUNCTION_SIGNATURES, ...PAGE_FUNCTION_SIGNATURES, ...CONTINUATION_FUNCTION_SIGNATURES].map((signature) => `'public.${signature}'`).join(", ")}] LOOP
     IF to_regprocedure(function_signature) IS NULL THEN
       RAISE EXCEPTION 'missing lease function %', function_signature;
     END IF;

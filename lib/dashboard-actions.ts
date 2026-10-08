@@ -2,7 +2,7 @@ import type { MatterSyncResult } from "@/lib/matter-sync";
 
 export async function getAuthorizedSyncAvailability(deps: {
   authorize: () => Promise<boolean>;
-  getAvailability: () => Promise<{ rateLimitedUntil: string | null; message: string | null }>;
+  getAvailability: () => Promise<{ rateLimitedUntil: string | null; message: string | null; historyStatus?: string }>;
 }) {
   if (!await deps.authorize()) return { rateLimitedUntil: null, message: null };
   return deps.getAvailability();

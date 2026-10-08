@@ -1,5 +1,7 @@
 import "server-only";
 
+import { getMatterInvocationBudget } from "./matter-invocation-budget";
+
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { serverEnv } from "@/lib/env";
@@ -12,6 +14,12 @@ let supabaseAdminClient: SupabaseAdminClient | null = null;
 
 export function createSupabaseAdminClient(): SupabaseAdminClient {
   return createClient<Database>(serverEnv.supabase.url, serverEnv.supabase.serviceRoleKey, {
+    global: { fetch: (input, init) => {
+      const budget = getMatterInvocationBudget();
+      if (!budget) return fetch(input, init);
+      const timeout = AbortSignal.timeout(Math.min(10_000, budget.remainingTotalMs()));
+      return fetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout });
+    } },
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -211,4 +219,35 @@ export async function getMatterPageReceipt(stream: "recent_sessions" | "library_
   const { data, error } = await getSupabaseAdminClient().from("matter_page_receipts").select("receipt_id").eq("stream", stream).maybeSingle();
   if (error) throw error;
   return data?.receipt_id ?? null;
+}
+
+export async function getMatterContinuation() {
+  const { data, error } = await getSupabaseAdminClient().from("matter_sync_continuation").select("*").eq("account_scope", "matter").single();
+  if (error) throw error;
+  return data;
+}
+export async function requestMatterHistory(lease: MatterSyncLease) {
+  const { data, error } = await getSupabaseAdminClient().rpc("request_matter_history", { ...leaseRpcArgs(lease), p_coverage: "all" });
+  if (error?.code === "55000") throw new MatterSyncLeaseLostError();
+  if (error) throw error;
+  if (!data) throw new Error("Missing history intent response");
+  return data;
+}
+export async function beginMatterHistory(limit: number, startedAt: string, lease: MatterSyncLease) {
+  const { data, error } = await getSupabaseAdminClient().rpc("begin_matter_history", { ...leaseRpcArgs(lease), p_limit: limit, p_started_at: startedAt });
+  if (error?.code === "55000") throw new MatterSyncLeaseLostError();
+  if (error) throw error;
+  if (!data) throw new Error("Missing history contract response");
+  return data;
+}
+export async function turnMatterContinuation(stream: "recent_sessions" | "library_items", lease: MatterSyncLease) {
+  const { error } = await getSupabaseAdminClient().rpc("turn_matter_continuation", { ...leaseRpcArgs(lease), p_stream: stream });
+  if (error?.code === "55000") throw new MatterSyncLeaseLostError();
+  if (error) throw error;
+}
+
+export async function cooldownMatterAccount(retryAt: string, lease: MatterSyncLease) {
+  const { error } = await getSupabaseAdminClient().rpc("cooldown_matter_account", { ...leaseRpcArgs(lease), p_retry_at: retryAt });
+  if (error?.code === "55000") throw new MatterSyncLeaseLostError();
+  if (error) throw error;
 }

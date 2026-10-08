@@ -8,12 +8,13 @@ import { calendarDayBounds, calendarYear, timestampToCalendarDate } from "../lib
 import { resolveReportRange } from "../lib/reports-service.js";
 
 /** Target TODOs stay until their complete multi-page/lease/query requirements land. */
-test("R3 characterization: each Task 11 invocation remains one bounded page", () => {
+test("R3 characterization: recent defaults remain 25 rows and a fixed initial year bound", () => {
   const limits = getMatterSyncSessionsLimit({});
   assert.equal(limits, 25);
   assert.equal(getRecentActivityWindowStart(new Date("2026-09-29T00:00:00Z"), "current_year"), "2026-01-01T00:00:00.000Z");
 });
-test.todo("R3 target (W4): a 5,000-session stream resumes across pages/invocations without an annual reset");
+// R3 is active in matter-sync-entrypoint.test.mjs after real fresh/upgrade
+// 5,000-session acceptance; see docs/task-14-validation.md.
 
 test("R4 characterization: public trigger modes still map to their endpoint streams", () => {
   assert.equal(getMatterSyncInitialPhase("recent_activity_manual"), "sessions");
