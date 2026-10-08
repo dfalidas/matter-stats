@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { getSupabaseAdminClient } from "./supabase-admin";
 import { leaseRpcArgs, MatterSyncLeaseLostError, type MatterSyncLease } from "./matter-sync-lease-context";
 import { getMatterInvocationBudget } from "./matter-invocation-budget";
-import { MatterRequestDeferred, MATTER_MAX_SHORT_WAIT_MS } from "./matter-request-policy";
+import { MatterRequestDeferred, MATTER_MAX_SHORT_WAIT_MS, MATTER_RETRY_MAX_ATTEMPTS } from "./matter-request-policy";
 import type { Json, TablesInsert } from "./supabase-types";
 
 export type MatterRequestEntry = { value?: Json; status?: number; protocol?: boolean; attempts?: number };
@@ -51,7 +51,7 @@ export function matterRequestIdentity(url: URL) {
   return { p_slot: context?.slot ?? "bootstrap", p_key: createHash("sha256").update(url.href).digest("hex"), p_recover: context?.recover ?? false,
     p_lease: context?.lease ? leaseRpcArgs(context.lease) as Json : null };
 }
-export async function admitMatterRequest(url: URL, beforeRequest?: () => Promise<void>, signal?: AbortSignal): Promise<MatterAdmission> {
+export async function admitMatterRequest(url: URL, beforeRequest?: () => Promise<void>, signal?: AbortSignal, waitBudget = { remainingMs: MATTER_MAX_SHORT_WAIT_MS }): Promise<MatterAdmission> {
   const runtime = getMatterRequestRuntime();
   const args = { ...matterRequestIdentity(url), p_markdown: (url.searchParams.get("include") ?? "").split(",").includes("markdown") };
   for (;;) {
@@ -61,15 +61,17 @@ export async function admitMatterRequest(url: URL, beforeRequest?: () => Promise
     const admission = await runtime.store.admit(args);
     if (!admission || typeof admission.admitted !== "boolean") throw new Error("Unverified Matter admission");
     if (admission.admitted) {
-      if (!admission.sequence || !/^\d+$/.test(admission.sequence) || !Number.isInteger(admission.attempt) || admission.attempt! < 1 || admission.attempt! > 3) throw new Error("Unverified Matter reservation");
+      if (!admission.sequence || !/^\d+$/.test(admission.sequence) || !Number.isInteger(admission.attempt) || admission.attempt! < 1 || admission.attempt! > MATTER_RETRY_MAX_ATTEMPTS) throw new Error("Unverified Matter reservation");
       return admission;
     }
     if (admission.reason === "cached" && admission.entry && ("value" in admission.entry || admission.entry.protocol === true || (Number.isInteger(admission.entry.status) && admission.entry.status! >= 400 && admission.entry.status! <= 599))) return admission;
     if (!["quota", "retry", "exhausted"].includes(admission.reason ?? "") || !admission.next_at || !Number.isFinite(Date.parse(admission.next_at))) throw new Error("Unverified Matter refusal");
     const delay = Math.max(0, Date.parse(admission.next_at) - runtime.now());
-    if (admission.reason === "exhausted" || delay > MATTER_MAX_SHORT_WAIT_MS) throw new MatterRequestDeferred(admission.reason as "quota" | "retry" | "exhausted", admission.next_at);
+    if (admission.reason === "exhausted" || Math.max(1, delay) > waitBudget.remainingMs) throw new MatterRequestDeferred(admission.reason as "quota" | "retry" | "exhausted", admission.next_at);
     getMatterInvocationBudget()?.checkWait(delay);
-    await runtime.wait(Math.max(1, delay), signal);
+    const waitMs = Math.max(1, delay);
+    waitBudget.remainingMs -= waitMs;
+    await runtime.wait(waitMs, signal);
     await beforeRequest?.();
   }
 }

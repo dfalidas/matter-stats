@@ -62,7 +62,7 @@ coordinator may therefore defer even when its own rolling windows have space.
 
 Application retry policy (not upstream requirements): **3 attempts total**,
 initial included; backoff **500 ms × 2^(attempt−1)** plus integer jitter **0–250 ms**,
-capped at **2,000 ms**; at most **2,000 ms** per short in-function wait. Before
+capped at **2,000 ms**; at most **2,000 ms cumulative waiting per read operation**, including quota/retry waits. Before
 waiting, enough upstream time for that delay plus one request must remain. Retry
 only GET reads after the owned 10-second request timeout, explicitly classified
 transport codes (`ECONNRESET`, `ECONNREFUSED`, `ETIMEDOUT`, `EAI_AGAIN`,
@@ -73,7 +73,7 @@ Each attempt rechecks admission, cancellation, budget and lease ownership. The
 unchanged ceilings are **8 committed pages / 224 actual attempts / 90 seconds
 upstream / 150 seconds total / 10 seconds per request / 180 seconds ingress**.
 Long quota/retry waits return safely for the existing manual/daily continuation.
-Quota deferrals do not increase transient failure count. A reservation records
+Quota refusals perform no attempt or failure increment. HTTP 429 consumes its actual attempt but does not increase transient failure count; it returns to continuation rather than automatic HTTP retry. A reservation records
 its retry attempt before HTTP, so process death cannot replenish a chain.
 Exhausted chains never reset automatically or by TTL. An intentional manual sync
 can start another bounded chain only after the persisted **15-minute** eligibility

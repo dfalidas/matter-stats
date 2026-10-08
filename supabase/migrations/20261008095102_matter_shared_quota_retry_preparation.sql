@@ -101,7 +101,7 @@ begin
   markdown_starts=case when p_markdown then array_append(q.markdown_starts,n) else q.markdown_starts end,sequence=seq,
   feedback_remaining=case when q.feedback_until>n then greatest(q.feedback_remaining-1,0) else null end,
   feedback_until=case when q.feedback_until>n then q.feedback_until else null end where account_scope='matter';
- update public.matter_request_work set requests=jsonb_set(requests,array[p_key],jsonb_build_object('attempts',tries+1,'sequence',seq::text,'next_at',n+interval '15 minutes')) where slot=p_slot;
+ update public.matter_request_work set requests=jsonb_set(requests,array[p_key],jsonb_build_object('attempts',tries+1,'failures',coalesce((r->>'failures')::integer,0),'sequence',seq::text,'next_at',n+interval '15 minutes')) where slot=p_slot;
  return jsonb_build_object('admitted',true,'sequence',seq::text,'attempt',tries+1);
 end; $$;
 
@@ -141,10 +141,11 @@ begin
  if r is null or (r->>'sequence')::bigint is distinct from p_sequence then raise exception 'Stale request outcome' using errcode='PT409'; end if;
  if p_entry ? 'transient_delay_ms' then
   if (p_entry->>'transient_delay_ms')::integer not between 0 and 2000 then raise exception 'Invalid retry delay' using errcode='22023'; end if;
-  r:=r || jsonb_build_object('next_at',n+case when (r->>'attempts')::integer>=3 then interval '15 minutes' else make_interval(secs=>(p_entry->>'transient_delay_ms')::double precision/1000) end);
+  r:=r || jsonb_build_object('failures',coalesce((r->>'failures')::integer,0)+1,'next_at',n+case when (r->>'attempts')::integer>=3 then interval '15 minutes' else make_interval(secs=>(p_entry->>'transient_delay_ms')::double precision/1000) end);
  elsif p_entry ? 'quota' then
-  -- Quota deferral is distinct from transient failure and retains prior failures.
-  r:=r || jsonb_build_object('attempts',greatest((r->>'attempts')::integer-1,0),'next_at',n);
+  -- HTTP 429 consumes its attempt but is not a transient failure. No HTTP
+  -- retry occurs here; admission refusals consume neither attempts nor failures.
+  r:=r || jsonb_build_object('next_at',case when (r->>'attempts')::integer>=3 then n+interval '15 minutes' else n end);
  elsif p_slot='bootstrap' and p_entry ? 'value' then
   update public.matter_request_work set requests=requests-p_key where slot=p_slot; return;
  else r:=r || p_entry;

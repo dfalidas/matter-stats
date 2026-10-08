@@ -82,7 +82,7 @@ try {
  lease=await acquire();for(const state of originalStreams)await rpc("sync_upsert_stream",{...leaseArgs(lease),p_state:{...state,cycle_active:true,cursor:null,page_limit:100,cycle_started_at:"2026-10-08T00:00:00Z",cycle_generation:state.cycle_generation+1,filters:state.stream==="recent_sessions"?{}:{status:"all",order:"updated"},retry_at:null}});await rpc("turn_matter_continuation",{...leaseArgs(lease),p_stream:"library_items"});await release(lease);lease=null;
  const upstream=[];let failSessions=false;
  globalThis.fetch=async(input,init)=>{const u=new URL(String(input));if(u.hostname!=="api.getmatter.com")return originalFetch(input,init);upstream.push(u.href);
-  if(u.pathname.endsWith("/me"))return Response.json({});
+  if(u.pathname.endsWith("/me"))return Response.json({object:"account",id:"synthetic-account"});
   if(u.pathname.endsWith("/reading_sessions"))return failSessions?Response.json({}, {status:503}):Response.json(page(Array.from({length:100},(_,i)=>({id:`${prefix}-session-${i}`,item_id:`${prefix}-item-${i}`,date:"2300-02-01T10:00:00Z",seconds_read:60}))));
   if(u.pathname.endsWith("/items"))return Response.json(page());
   if(u.pathname.endsWith("/annotations"))return Response.json(page());

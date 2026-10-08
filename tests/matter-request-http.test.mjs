@@ -32,7 +32,7 @@ function harness() {
   finish:async(args)=>{
    events.push(["finish",args.p_entry]);const key=args.p_slot+args.p_key,r=entries.get(key),entry=args.p_entry;
    if("transient_delay_ms" in entry) r.next=now+(r.attempts>=3?900000:entry.transient_delay_ms);
-   else if(entry.quota) {r.attempts--;r.next=now;}
+   else if(entry.quota) {r.next=now+(r.attempts>=3?900000:0);}
    else if(args.p_slot==="bootstrap" && "value" in entry) entries.delete(key);
    else Object.assign(r,entry);
   }
@@ -43,7 +43,7 @@ const page=(next=null)=>({object:"list",results:[],has_more:next!==null,next_cur
 async function synthetic(t,fetcher,work) {const previous=globalThis.fetch;globalThis.fetch=fetcher;t.after(()=>globalThis.fetch=previous);await work();}
 test("Task 15: /me and each eligible retry require admission and consume actual request budget",async(t)=>{
  const h=harness();let requests=0;const budget=new MatterInvocationBudget();
- await synthetic(t,async()=>{requests++;return requests<3?Response.json({}, {status:503}):Response.json({});},async()=>{
+ await synthetic(t,async()=>{requests++;return requests<3?Response.json({}, {status:503}):Response.json({object:"account",id:"synthetic-account"});},async()=>{
   await h.run(()=>api.getMatterAccount(),budget);
   assert.equal(requests,3);assert.equal(budget.requests,3);
   assert.equal(h.events.filter((e)=>e[0]==="admit").length,5);
@@ -103,5 +103,5 @@ test("Task 15: lease loss after short wait and caller cancellation prevent anoth
 });
 test("Task 15: an ambiguous preparation database write is never automatically retried",async(t)=>{
  const h=harness();let requests=0;h.runtime.store.finish=async()=>{throw new TypeError("ambiguous DB response",{cause:{code:"ECONNRESET"}});};
- await synthetic(t,async()=>{requests++;return Response.json({});},async()=>{await assert.rejects(h.run(()=>api.getMatterAccount()),/ambiguous DB/);assert.equal(requests,1);});
+ await synthetic(t,async()=>{requests++;return Response.json({object:"account",id:"synthetic-account"});},async()=>{await assert.rejects(h.run(()=>api.getMatterAccount()),/ambiguous DB/);assert.equal(requests,1);});
 });

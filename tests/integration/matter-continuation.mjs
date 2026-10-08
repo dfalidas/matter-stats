@@ -145,7 +145,7 @@ try {
   for (const stopAt of [2, 3, 5]) {
     tick = 0; const before = await snapshot();
     upstream = (url) => {
-      if (url.pathname.endsWith("/me")) return Response.json({});
+      if (url.pathname.endsWith("/me")) return Response.json({object:"account",id:"synthetic-account"});
       if (url.pathname.endsWith("/reading_sessions")) return Response.json(page([{ id: `${prefix}-budget`, item_id: fixtureItem.id, date: "2027-03-01T10:00:00Z", seconds_read: 61 }]));
       if (url.pathname.endsWith("/annotations")) return Response.json(page([], `annotation:${Number((url.searchParams.get("cursor") ?? "annotation:0").split(":")[1]) + 1}`));
       return Response.json(fixtureItem);
@@ -159,7 +159,7 @@ try {
   for (const endpoint of ["item", "annotations"]) {
     tick = 0;
     upstream = (url) => {
-      if (url.pathname.endsWith("/me")) return Response.json({});
+      if (url.pathname.endsWith("/me")) return Response.json({object:"account",id:"synthetic-account"});
       if (url.pathname.endsWith("/reading_sessions")) return Response.json(page([{ id: `${prefix}-budget`, item_id: fixtureItem.id, date: "2027-03-01T10:00:00Z", seconds_read: 61 }]));
       if ((endpoint === "item" && url.pathname.endsWith(fixtureItem.id)) || (endpoint === "annotations" && url.pathname.endsWith("/annotations"))) tick = 90000;
       return Response.json(url.pathname.endsWith("/annotations") ? page() : fixtureItem);
@@ -180,7 +180,7 @@ try {
     };
     try {
       upstream = (url, init) => {
-        if (url.pathname.endsWith("/me")) return Response.json({});
+        if (url.pathname.endsWith("/me")) return Response.json({object:"account",id:"synthetic-account"});
         if (url.pathname.endsWith("/reading_sessions")) return Response.json(page([{ id: `${prefix}-budget`, item_id: fixtureItem.id, date: "2027-03-01T10:00:00Z", seconds_read: 61 }]));
         if ((endpoint === "item" && url.pathname.endsWith(fixtureItem.id)) || (endpoint === "annotations" && url.pathname.endsWith("/annotations"))) {
           assert.equal(typeof cancelAttempt,"function"); assert.equal(init.signal.aborted,false);
@@ -202,7 +202,7 @@ try {
   // contract in a fresh invocation without any fixture/cursor reset.
   tick = 0; let annotationCalls = 0; const expensiveParams = [];
   upstream = (url) => {
-    if (url.pathname.endsWith("/me")) return Response.json({});
+    if (url.pathname.endsWith("/me")) return Response.json({object:"account",id:"synthetic-account"});
     if (url.pathname.endsWith("/reading_sessions")) { expensiveParams.push(Object.fromEntries(url.searchParams)); return Response.json(page([{ id: `${prefix}-budget`, item_id: fixtureItem.id, date: "2027-03-01T10:00:00Z", seconds_read: 61 }])); }
     if (url.pathname.endsWith("/annotations")) {
       annotationCalls++;
@@ -236,7 +236,7 @@ try {
     upstream = (url) => {
       const target = endpoint === "item" ? url.pathname.endsWith(fixtureItem.id) : url.pathname.endsWith("/"+endpoint);
       if (target) return Response.json({error:{code:"synthetic",message:"synthetic failure"}},{status,headers:status===429?{"retry-after":"60"}:{}});
-      if (url.pathname.endsWith("/me")) return Response.json({});
+      if (url.pathname.endsWith("/me")) return Response.json({object:"account",id:"synthetic-account"});
       if (url.pathname.endsWith("/reading_sessions")) return Response.json(page([{id:`${prefix}-budget`,item_id:fixtureItem.id,date:"2027-03-01T10:00:00Z",seconds_read:61}]));
       if (url.pathname.endsWith("/annotations")) return Response.json(page());
       return Response.json(fixtureItem);

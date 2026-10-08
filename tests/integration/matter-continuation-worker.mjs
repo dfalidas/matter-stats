@@ -60,7 +60,7 @@ globalThis.fetch = async (input, init) => {
     return response;
   }
   requests.push({ path: url.pathname, params: Object.fromEntries(url.searchParams) });
-  if (url.pathname.endsWith("/me")) return Response.json({});
+  if (url.pathname.endsWith("/me")) return Response.json({object:"account",id:"synthetic-account"});
   if (url.pathname.endsWith("/reading_sessions")) {
     assert.ok([...url.searchParams.keys()].every((key) => ["since", "limit", "cursor"].includes(key)));
     const rows = Array.from({ length: 5000 }, (_, i) => ({ object: "reading_session", id: `${config.prefix}-${i}`,

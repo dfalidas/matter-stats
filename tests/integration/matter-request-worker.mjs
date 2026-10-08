@@ -17,8 +17,9 @@ if(config.admit) {
  Module._resolveFilename=function(request,parent,isMain,options){if(request==="server-only")return path.join(root,"tests/fixtures/server-only.cjs");if(request.startsWith("@/"))return path.join(root,".test-build",`${request.slice(2)}.js`);return resolve.call(this,request,parent,isMain,options);};
  process.env.SUPABASE_URL=url;process.env.SUPABASE_SERVICE_ROLE_KEY=process.env.STABILIZATION_TEST_SUPABASE_SERVICE_ROLE_KEY;process.env.MATTER_API_TOKEN="synthetic-never-sent";
  const api=createRequire(import.meta.url)(path.join(root,".test-build/lib/matter-api.js"));
+ const coordinator=createRequire(import.meta.url)(path.join(root,".test-build/lib/matter-request-coordinator.js"));
  const originalFetch=globalThis.fetch;let requests=0;
- globalThis.fetch=async(input,init)=>{if(new URL(String(input)).hostname!=="api.getmatter.com")return originalFetch(input,init);requests++;return Response.json({}, {status:config.status??429,headers:config.headers??{"Retry-After":"60"}});};
- let outcome;try {await api.getMatterAccount();outcome={ok:true};}catch(error){outcome={name:error.name,status:error.status,reason:error.reason};}
+ globalThis.fetch=async(input,init)=>{if(new URL(String(input)).hostname!=="api.getmatter.com")return originalFetch(input,init);requests++;return Response.json(config.status===200?{object:"account",id:"synthetic-account"}:{}, {status:config.status??429,headers:config.headers??{"Retry-After":"60"}});};
+ let outcome;try {await coordinator.withMatterRequestRuntime({...coordinator.getMatterRequestRuntime(),random:()=>0},()=>api.getMatterAccount());outcome={ok:true};}catch(error){outcome={name:error.name,status:error.status,reason:error.reason};}
  console.log(JSON.stringify({requests,outcome}));
 }

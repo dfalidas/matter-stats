@@ -2,7 +2,7 @@ import "server-only";
 
 import { validateMatterPage, MatterPageValidationError } from "./matter-page-plan";
 import { admitMatterRequest, getMatterRequestRuntime, matterRequestIdentity } from "./matter-request-coordinator";
-import { strictMatterInteger, strictMatterReset, matterCooldownDeadline, isTransientMatterFailure, matterRetryDelay } from "./matter-request-policy";
+import { strictMatterInteger, strictMatterReset, matterCooldownDeadline, isTransientMatterFailure, matterRetryDelay, MATTER_MAX_SHORT_WAIT_MS } from "./matter-request-policy";
 import type { Json } from "./supabase-types";
 import { MatterBudgetStop, getMatterInvocationBudget } from "./matter-invocation-budget";
 
@@ -216,8 +216,9 @@ export async function matterFetch<T>(path: string, options: MatterFetchOptions =
   const budget = getMatterInvocationBudget();
   const runtime = getMatterRequestRuntime();
   const identity = matterRequestIdentity(url);
+  const shortWait = { remainingMs: MATTER_MAX_SHORT_WAIT_MS };
   for (;;) {
-    const admission = await admitMatterRequest(url, beforeRequest, fetchOptions.signal ?? undefined);
+    const admission = await admitMatterRequest(url, beforeRequest, fetchOptions.signal ?? undefined, shortWait);
     if (admission.reason === "cached") {
       await beforeRequest?.();
       if (admission.entry?.protocol) throw new MatterPageValidationError("persisted_protocol_failure");
@@ -287,6 +288,9 @@ function validateReadResponse(url: URL, value: unknown) {
   const path = url.pathname;
   if (["/items", "/reading_sessions", "/tags"].some((endpoint) => path.endsWith(endpoint)) || path.endsWith("/annotations")) {
     validateMatterPage(value as MatterListResponse<unknown>, Number(url.searchParams.get("limit") ?? 25), url.searchParams.get("cursor"));
+  } else if (path === "/public/v1/me") {
+    if (!value || typeof value !== "object" || (value as { object?: unknown }).object !== "account"
+      || typeof (value as { id?: unknown }).id !== "string" || !(value as { id: string }).id.trim()) throw new MatterPageValidationError("invalid_account_envelope");
   } else if (!value || typeof value !== "object" || Array.isArray(value) || (path !== "/public/v1/me" && (typeof (value as { id?: unknown }).id !== "string" || !(value as { id: string }).id.trim()))) {
     throw new MatterPageValidationError("invalid_envelope");
   }
