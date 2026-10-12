@@ -1,3 +1,4 @@
+import { cappedPostgrest } from "./fixtures/capped-postgrest";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -24,32 +25,28 @@ test("R4 characterization: public trigger modes still map to their endpoint stre
 // R4 is active in matter-sync-entrypoint.test.mjs after real fresh/upgrade
 // cross-trigger, contention and fencing acceptance; see docs/task-15-validation.md.
 
-const largeDataset = Array.from({ length: 1_200 }, (_, index) => ({ id: `session-${index}`, seconds: 60 }));
-test("R5 synthetic fixture independently defines the complete expected total", () => {
-  assert.equal(new Set(largeDataset.map(({ id }) => id)).size, 1_200);
-  assert.equal(largeDataset.reduce((sum, row) => sum + row.seconds, 0), 72_000);
+test("R5 session retrieval target (Task 16): 1,200 sessions / 72,000 seconds under cap 100", async () => {
+  const sessions = Array.from({ length: 1_200 }, (_, index) => ({
+    id: `session-${String(index).padStart(4, "0")}`, item_id: null,
+    started_at: "2026-09-28T10:00:00Z", ended_at: null,
+    duration_seconds: 60, words_estimated: null, matter_items: null,
+  }));
+  const { client } = cappedPostgrest({ reading_sessions: sessions }, { cap: 100 });
+  const metrics = await getReadingMetrics(client, { preset: "all-time", now: "2026-09-28T12:00:00Z", timezone: "UTC" });
+  assert.equal(metrics.totals.sessionsCount, 1_200);
+  assert.equal(metrics.totals.totalReadingTimeSeconds, 72_000);
 });
-test.todo("R5 target (W5): dashboard totals retrieve all 1,200 rows when the mocked Data API caps pages at 1,000");
+// R5 session retrieval is executable in complete-session-services.test.ts.
+// Facet/join completeness and query-efficiency gates remain Tasks 17–18.
+test.todo("R5 facets/joins (Task 17): complete facet and relation inputs under Data API caps");
+test.todo("R5 query efficiency (Task 18): request-scoped query reuse and aggregate optimization");
 
 function streakClient(dates: string[]) {
   const sessions = dates.map((started_at, index) => ({
     id: `streak-${index}`, item_id: null, started_at, ended_at: null,
     duration_seconds: 60, words_estimated: 225, matter_items: null,
   }));
-  return { from(table: string) {
-    const rows = table === "reading_sessions" ? sessions : [];
-    let window: [number, number] | null = null;
-    const query = {
-      select: () => query, lt: () => query, gte: () => query, order: () => query,
-      range: (from: number, to: number) => { window = [from, to]; return query; },
-      in: () => Promise.resolve({ data: [], error: null }),
-      then: (resolve: (value: { data: typeof rows; error: null }) => unknown) => {
-        const data = window ? rows.slice(window[0], window[1] + 1) : rows;
-        return Promise.resolve({ data, error: null }).then(resolve);
-      },
-    };
-    return query;
-  } } as never;
+  return cappedPostgrest({ reading_sessions: sessions }).client;
 }
 
 test("R6 target (W5): sessions on 26–28 September yield current streak 3 as of 28 September regardless of preset", async () => {

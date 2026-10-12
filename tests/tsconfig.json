@@ -22,6 +22,7 @@
     "../lib/matter-sync-progress.ts",
     "../lib/matter-sync.ts",
     "../lib/metrics-service.ts",
+    "../lib/articles-service.ts",
     "../lib/reading-personality.ts",
     "../lib/supabase-queries.ts",
     "../lib/supabase-types.ts",

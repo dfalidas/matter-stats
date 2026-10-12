@@ -1,3 +1,4 @@
+import { readCompleteSessions } from "./complete-session-query";
 import { renewMatterSyncLease } from "./matter-sync-lease";
 import { leaseRpcArgs, type MatterSyncLease } from "./matter-sync-lease-context";
 import { getSupabaseAdminClient, upsertDailyStats, getPendingDailyStats, acknowledgeDailyStat } from "./supabase-admin";
@@ -42,12 +43,12 @@ export async function calculateDailyStat(date: string, timezone: string = getApp
   const start = bounds.start.toISOString();
   const end = bounds.end.toISOString();
 
-  const [{ data: sessions, error: sessionsError }, { count: highlightsCount, error: annotationsError }] = await Promise.all([
-    client
+  const [sessions, { count: highlightsCount, error: annotationsError }] = await Promise.all([
+    readCompleteSessions<DailyStatsSession & { id: string; started_at: string | null }>(() => client
       .from("reading_sessions")
-      .select("id,item_id,duration_seconds,words_estimated,matter_items(id,source,word_count,progress,status)")
+      .select("id,started_at,item_id,duration_seconds,words_estimated,matter_items(id,source,word_count,progress,status)")
       .gte("started_at", start)
-      .lt("started_at", end),
+      .lt("started_at", end)),
     client
       .from("annotations")
       .select("id", { count: "exact", head: true })
@@ -55,9 +56,6 @@ export async function calculateDailyStat(date: string, timezone: string = getApp
       .lt("created_at_matter", end),
   ]);
 
-  if (sessionsError) {
-    throw sessionsError;
-  }
   if (annotationsError) {
     throw annotationsError;
   }

@@ -1,3 +1,4 @@
+import { readCompleteSessions } from "./complete-session-query";
 import {
   METRICS_PERIOD_PRESETS,
   resolveMetricsDateRange,
@@ -141,23 +142,14 @@ export function compareAuthors(sortKey: AuthorRankingSortKey) {
 }
 
 async function fetchAuthorSessions(client: MatterStatsSupabaseClient, range: MetricsDateRange): Promise<AuthorSession[]> {
-  let query = client
-    .from("reading_sessions")
-    .select("id,item_id,started_at,duration_seconds,words_estimated,matter_items(id,author,source)")
-    .lt("started_at", range.end.toISOString())
-    .order("started_at", { ascending: false, nullsFirst: false });
-
-  if (range.start) {
-    query = query.gte("started_at", range.start.toISOString());
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? []) as unknown as AuthorSession[];
+  const rows = await readCompleteSessions<AuthorSession>(() => {
+    let query = client.from("reading_sessions")
+      .select("id,item_id,started_at,duration_seconds,words_estimated,matter_items(id,author,source)")
+      .lt("started_at", range.end.toISOString());
+    if (range.start) query = query.gte("started_at", range.start.toISOString());
+    return query;
+  });
+  return rows.reverse();
 }
 
 function bucketAuthorSessions(sessions: AuthorSession[]): Map<string, AuthorAccumulator> {

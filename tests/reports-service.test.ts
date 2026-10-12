@@ -1,41 +1,13 @@
+import { cappedPostgrest } from "./fixtures/capped-postgrest";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getReadingReport, isValidReportReference, resolveReportRange } from '../lib/reports-service';
 
 type Session={id:string;item_id:string|null;started_at:string|null;ended_at:string|null;duration_seconds:number|null;words_estimated:number|null;matter_items:null|{id:string;title:string|null;url:string|null;source:string|null;author:string|null;estimated_reading_time_minutes:number|null;word_count:number|null}};
-class Q {
-  private filters: Record<string, string | number | boolean> = {};
-  private sort: {col:string;asc:boolean}|null=null;
-  private lim:number|null=null;
-  private window:[number,number]|null=null;
-  constructor(private table:string, private rows:Record<string, unknown>[], private onMaybeSingle?: (table:string)=>void){}
-  select(){return this;} lt(c:string,v:string){this.filters[`lt:${c}`]=v;return this;} gte(c:string,v:string){this.filters[`gte:${c}`]=v;return this;}
-  gt(c:string,v:number){this.filters[`gt:${c}`]=v;return this;} not(c:string){this.filters[`not:${c}`]=true;return this;}
-  order(col:string,opt:{ascending?:boolean}){this.sort={col,asc:opt.ascending??true};return this;} limit(n:number){this.lim=n;return this;}
-  range(from:number,to:number){this.window=[from,to];return this;}
-  maybeSingle(){return Promise.resolve().then(()=>{this.onMaybeSingle?.(this.table); const data=this.result()[0]??null; return {data,error:null};});}
-  in(){return this;}
-  then<TResult1 = { data: unknown[]; error: null }, TResult2 = never>(
-    onf?: ((value: { data: unknown[]; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
-    onr?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
-  ){return Promise.resolve({data:this.result(),error:null}).then(onf,onr);}
-  private result(){let out=[...this.rows];
-    for (const [k,v] of Object.entries(this.filters)) {
-      const [op,col]=k.split(':');
-      if (!col) continue;
-      if(op==='lt') out=out.filter((r)=>r[col]!==null && String(r[col]) < String(v));
-      if(op==='gte') out=out.filter((r)=>r[col]!==null && String(r[col]) >= String(v));
-      if(op==='gt') out=out.filter((r)=>typeof r[col]==='number' && Number(r[col]) > Number(v));
-      if(op==='not') out=out.filter((r)=>r[col]!==null);
-    }
-    if(this.sort){out.sort((a,b)=> this.sort!.asc?String(a[this.sort!.col]??'').localeCompare(String(b[this.sort!.col]??'')):String(b[this.sort!.col]??'').localeCompare(String(a[this.sort!.col]??'')));}
-    if(this.lim!==null) out=out.slice(0,this.lim);
-    if(this.window) out=out.slice(this.window[0],this.window[1]+1);
-    return out;
-  }
-}
 function client(daily:{date:string;reading_time_seconds:number}[], sessions:Session[], onMaybeSingle?: (table:string)=>void){
-  return {from(table:string){if(table==='daily_stats') return new Q(table,daily,onMaybeSingle); if(table==='reading_sessions') return new Q(table,sessions,onMaybeSingle); if(table==='item_tags') return new Q(table,[],onMaybeSingle); return new Q(table,[],onMaybeSingle);} } as never;
+  return cappedPostgrest({ daily_stats: daily, reading_sessions: sessions }, {
+    before: ({table, url}) => { if(url.searchParams.get("limit") === "1") onMaybeSingle?.(table); },
+  }).client;
 }
 
 test('weekly report stays empty for empty current week and exposes latest week with data', async()=>{

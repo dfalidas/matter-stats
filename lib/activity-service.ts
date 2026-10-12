@@ -1,3 +1,4 @@
+import { readCompleteSessions } from "./complete-session-query";
 import type { MatterStatsSupabaseClient } from "./supabase-queries";
 import { estimateWordsFromSeconds } from "./reading-estimates";
 import {
@@ -6,7 +7,6 @@ import {
   localDateToUtc,
 } from "./metrics-service";
 
-const DATABASE_PAGE_SIZE = 500;
 const SESSION_PAGE_SIZE = 20;
 
 type SessionRow = {
@@ -110,21 +110,10 @@ export async function getActivityMonth(
 }
 
 async function fetchAllSessions(client: MatterStatsSupabaseClient, start: Date, end: Date): Promise<SessionRow[]> {
-  const rows: SessionRow[] = [];
-  for (let from = 0; ; from += DATABASE_PAGE_SIZE) {
-    const { data, error } = await client
-      .from("reading_sessions")
-      .select("id,started_at,duration_seconds")
-      .gte("started_at", start.toISOString())
-      .lt("started_at", end.toISOString())
-      .order("started_at", { ascending: true, nullsFirst: false })
-      .order("id", { ascending: true })
-      .range(from, from + DATABASE_PAGE_SIZE - 1);
-    if (error) throw error;
-    const result = (data ?? []) as SessionRow[];
-    rows.push(...result);
-    if (result.length < DATABASE_PAGE_SIZE) return rows;
-  }
+  return readCompleteSessions<SessionRow>(() => client.from("reading_sessions")
+    .select("id,started_at,duration_seconds")
+    .gte("started_at", start.toISOString())
+    .lt("started_at", end.toISOString()));
 }
 
 function positiveSeconds(value: number | null): number {

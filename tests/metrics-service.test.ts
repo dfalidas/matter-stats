@@ -1,3 +1,4 @@
+import { cappedPostgrest } from "./fixtures/capped-postgrest";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -36,111 +37,20 @@ type TestTagRow = {
   matter_tags: { id: string; name: string | null } | Array<{ id: string; name: string | null }> | null;
 };
 
-class TestQuery<Row extends TestSession | TestTagRow> {
-  private startedBefore: string | null = null;
-  private startedAtOrAfter: string | null = null;
-  private itemIds: string[] | null = null;
-  private startedAtAscending: boolean | null = null;
-  private window: [number, number] | null = null;
-
-  constructor(private readonly rows: Row[], private readonly record?: (operator: "gte" | "lt", value: string) => void) {}
-
-  select() {
-    return this;
-  }
-
-  lt(column: string, value: string) {
-    if (column === "started_at") {
-      this.startedBefore = value;
-      this.record?.("lt", value);
-    }
-    return this;
-  }
-
-  gte(column: string, value: string) {
-    if (column === "started_at") {
-      this.startedAtOrAfter = value;
-      this.record?.("gte", value);
-    }
-    return this;
-  }
-
-  order(column: string, options: { ascending?: boolean }) {
-    if (column === "started_at") {
-      this.startedAtAscending = options.ascending ?? true;
-    }
-    return this;
-  }
-
-  range(from: number, to: number) {
-    this.window = [from, to];
-    return this;
-  }
-
-  in(column: string, values: string[]) {
-    if (column === "item_id") {
-      this.itemIds = values;
-    }
-    return this;
-  }
-
-  then<TResult1 = { data: Row[]; error: null }, TResult2 = never>(
-    onfulfilled?: ((value: { data: Row[]; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
-  ): Promise<TResult1 | TResult2> {
-    return Promise.resolve({ data: this.result(), error: null }).then(onfulfilled, onrejected);
-  }
-
-  private result(): Row[] {
-    let result = [...this.rows];
-
-    if (this.startedBefore) {
-      result = result.filter((row) => "started_at" in row && row.started_at !== null && row.started_at < this.startedBefore!);
-    }
-
-    if (this.startedAtOrAfter) {
-      result = result.filter((row) => "started_at" in row && row.started_at !== null && row.started_at >= this.startedAtOrAfter!);
-    }
-
-    if (this.itemIds) {
-      result = result.filter((row) => "item_id" in row && row.item_id !== null && this.itemIds!.includes(row.item_id));
-    }
-
-    if (this.startedAtAscending !== null) {
-      result.sort((a, b) => {
-        const left = "started_at" in a ? a.started_at ?? "" : "";
-        const right = "started_at" in b ? b.started_at ?? "" : "";
-        return this.startedAtAscending ? left.localeCompare(right) : right.localeCompare(left);
-      });
-    }
-
-    return this.window ? result.slice(this.window[0], this.window[1] + 1) : result;
-  }
-}
-
 function createClient({ sessions = [], tags = [] }: { sessions?: TestSession[]; tags?: TestTagRow[] }) {
-  return {
-    from(table: string) {
-      if (table === "reading_sessions") {
-        return new TestQuery(sessions);
-      }
-
-      if (table === "item_tags") {
-        return new TestQuery(tags);
-      }
-
-      return new TestQuery([]);
-    },
-  } as never;
+  return cappedPostgrest({ reading_sessions: sessions, item_tags: tags }).client;
 }
 
 function createRecordingClient(sessions: TestSession[]) {
   const bounds: Array<{ operator: "gte" | "lt"; value: string }> = [];
-  const client = {
-    from(table: string) {
-      return new TestQuery(table === "reading_sessions" ? sessions : [], (operator, value) => bounds.push({ operator, value }));
+  const { client } = cappedPostgrest({ reading_sessions: sessions }, {
+    before: ({url}) => {
+      for (const filter of url.searchParams.getAll("started_at")) {
+        if (filter.startsWith("gte.")) bounds.push({operator: "gte", value: filter.slice(4)});
+        if (filter.startsWith("lt.")) bounds.push({operator: "lt", value: filter.slice(3)});
+      }
     },
-  } as never;
+  });
   return { client, bounds };
 }
 

@@ -1,3 +1,4 @@
+import { readCompleteSessions } from "./complete-session-query";
 import {
   addLocalDays,
   formatDateInTimezone,
@@ -185,23 +186,13 @@ async function fetchReportSessions(
   client: MatterStatsSupabaseClient,
   metrics: ReadingMetrics,
 ): Promise<ReportSessionRow[]> {
-  const rows: ReportSessionRow[] = [];
-  const pageSize = 500;
-  for (let from = 0; ; from += pageSize) {
-    let query = client
-      .from("reading_sessions")
+  return readCompleteSessions<ReportSessionRow>(() => {
+    let query = client.from("reading_sessions")
       .select("id,item_id,started_at,ended_at,duration_seconds,words_estimated,matter_items(id,title,url,source,author,estimated_reading_time_minutes,word_count)")
-      .lt("started_at", metrics.range.end.toISOString())
-      .order("started_at", { ascending: true, nullsFirst: false })
-      .order("id", { ascending: true })
-      .range(from, from + pageSize - 1);
+      .lt("started_at", metrics.range.end.toISOString());
     if (metrics.range.start) query = query.gte("started_at", metrics.range.start.toISOString());
-    const { data, error } = await query;
-    if (error) throw error;
-    const page = (data ?? []) as unknown as ReportSessionRow[];
-    rows.push(...page);
-    if (page.length < pageSize) return rows;
-  }
+    return query;
+  });
 }
 
 function buildLongformReads(sessions: ReportSessionRow[], limit: number): LongformRead[] {

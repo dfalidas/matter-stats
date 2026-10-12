@@ -1,3 +1,4 @@
+import { readCompleteSessions } from "./complete-session-query";
 import type { MatterItem, MatterTag, ReadingSession } from "@/lib/supabase-types";
 import type { MatterStatsSupabaseClient } from "@/lib/supabase-queries";
 import { METRICS_PERIOD_PRESETS, resolveMetricsDateRange, type MetricsPeriodPreset } from "@/lib/metrics-service";
@@ -374,14 +375,9 @@ async function fetchSourcePerformance(client: MatterStatsSupabaseClient, item: M
     };
   }
 
-  const { data: sourceSessions, error: sourceSessionsError } = await client
-    .from("reading_sessions")
-    .select("item_id,duration_seconds")
-    .in("item_id", sourceItemIds);
-
-  if (sourceSessionsError) {
-    throw sourceSessionsError;
-  }
+  const sourceSessions = await readCompleteSessions<{ id: string; started_at: string | null; item_id: string | null; duration_seconds: number | null }>(
+    () => client.from("reading_sessions").select("id,started_at,item_id,duration_seconds").in("item_id", sourceItemIds),
+  );
 
   const timeByItemId = new Map<string, number>();
   for (const session of sourceSessions ?? []) {
