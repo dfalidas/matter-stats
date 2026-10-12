@@ -1,4 +1,5 @@
 import { cappedPostgrest } from "./fixtures/capped-postgrest";
+import { getArticleList } from "../lib/articles-service";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -37,8 +38,22 @@ test("R5 session retrieval target (Task 16): 1,200 sessions / 72,000 seconds und
   assert.equal(metrics.totals.totalReadingTimeSeconds, 72_000);
 });
 // R5 session retrieval is executable in complete-session-services.test.ts.
-// Facet/join completeness and query-efficiency gates remain Tasks 17–18.
-test.todo("R5 facets/joins (Task 17): complete facet and relation inputs under Data API caps");
+// Detailed cap/batch/error acceptance is in complete-metadata-services.test.ts.
+test("R5 facets/joins (Task 17): complete facets and per-item metadata under cap 100", async () => {
+  const items = Array.from({ length: 1200 }, (_, i) => ({ id: `item-${String(i).padStart(4, "0")}`, source: "Source", created_at_matter: null, updated_at_matter: null }));
+  const tags = Array.from({ length: 1200 }, (_, i) => ({ id: `tag-${i}`, name: `Tag ${i}` }));
+  const links = items.map((item, i) => ({ item_id: item.id, tag_id: tags[i].id }));
+  for (const tag of tags.slice(1)) links.push({ item_id: items[0].id, tag_id: tag.id });
+  const annotations = Array.from({ length: 1200 }, (_, i) => ({ id: `a-${i}`, item_id: items[0].id }));
+  const { client } = cappedPostgrest({ matter_items: items, matter_tags: tags, item_tags: links, annotations }, { cap: 100 });
+  const result = await getArticleList(client);
+  assert.equal(result.total, items.length);
+  assert.equal(result.articles.length, 100);
+  assert.deepEqual(result.sources, [{ value: "Source", label: "Source", count: 1200 }]);
+  assert.equal(result.tags.length, tags.length);
+  assert.equal(result.articles[0].tags.length, 1200);
+  assert.equal(result.articles[0].highlights, annotations.length);
+});
 test.todo("R5 query efficiency (Task 18): request-scoped query reuse and aggregate optimization");
 
 function streakClient(dates: string[]) {

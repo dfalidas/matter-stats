@@ -1,3 +1,4 @@
+import { postgrestIn, readCompleteMetadata, readIdBatches } from "./complete-metadata-query";
 import { readCompleteSessions } from "./complete-session-query";
 import {
   METRICS_PERIOD_PRESETS,
@@ -193,16 +194,9 @@ async function fetchItemTags(client: MatterStatsSupabaseClient, itemIds: string[
     return [];
   }
 
-  const { data, error } = await client
-    .from("item_tags")
-    .select("item_id,tag_id,matter_tags(id,name)")
-    .in("item_id", itemIds);
-
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? []) as unknown as ItemTagJoin[];
+  return readIdBatches<ItemTagJoin>(itemIds, (ids) => readCompleteMetadata<ItemTagJoin>(() => client.from("item_tags")
+    .select("item_id,tag_id,matter_tags(id,name)").filter("item_id", "in", postgrestIn(ids))
+    .order("item_id", { ascending: true }).order("tag_id", { ascending: true }), ["item_id", "tag_id"]), ["item_id", "tag_id"]);
 }
 
 async function fetchTagAnnotations(
@@ -214,23 +208,12 @@ async function fetchTagAnnotations(
     return [];
   }
 
-  let query = client
-    .from("annotations")
-    .select("id,item_id,created_at_matter")
-    .in("item_id", itemIds)
-    .lt("created_at_matter", range.end.toISOString());
-
-  if (range.start) {
-    query = query.gte("created_at_matter", range.start.toISOString());
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? []) as unknown as TagAnnotation[];
+  return readIdBatches<TagAnnotation>(itemIds, (ids) => readCompleteMetadata<TagAnnotation>(() => {
+    let query = client.from("annotations").select("id,item_id,created_at_matter")
+      .filter("item_id", "in", postgrestIn(ids)).lt("created_at_matter", range.end.toISOString());
+    if (range.start) query = query.gte("created_at_matter", range.start.toISOString());
+    return query.order("id", { ascending: true });
+  }));
 }
 
 function groupTagsByItemId(itemTags: ItemTagJoin[]): Map<string, TagRecord[]> {

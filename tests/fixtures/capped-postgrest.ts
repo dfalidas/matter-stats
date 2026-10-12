@@ -6,6 +6,7 @@ type Row = Record<string, unknown>;
 type Request = { table: string; url: URL; rows: Row[]; number: number };
 type Options = {
   cap?: number;
+  maxUrlBytes?: number;
   before?: (request: Request) => void;
   respond?: (request: Request, result: Row[]) => Response | undefined;
 };
@@ -19,12 +20,24 @@ export function cappedPostgrest(tables: Record<string, Row[]>, options: Options 
   const requests: Array<{ table: string; url: URL; ids: unknown[] }> = [];
   const fetch: typeof globalThis.fetch = async (input, init) => {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input : input.url);
+    if (options.maxUrlBytes) assert.ok(url.href.length <= options.maxUrlBytes, `encoded request exceeds ${options.maxUrlBytes} bytes`);
     const table = url.pathname.split("/").at(-1)!;
     const rows = tables[table] ?? [];
     const request = { table, url, rows, number: requests.filter((r) => r.table === table).length + 1 };
     options.before?.(request);
     let result = [...rows];
+    const selection = url.searchParams.get("select") ?? "*";
+    // Model the existing FK semi-join: filter parents once, never multiply them
+    // by the number of matching relation rows. This happens before count/range.
+    if (table === "matter_items" && selection.includes("item_tags!inner(")) {
+      const tagFilter = url.searchParams.get("item_tags.tag_id");
+      assert.ok(tagFilter);
+      const matches = (tables.item_tags ?? []).filter(predicate(`tag_id.${tagFilter}`));
+      const itemIds = new Set(matches.map((row) => row.item_id));
+      result = result.filter((row) => itemIds.has(row.id));
+    }
     for (const [column, filter] of url.searchParams) {
+      if (column === "item_tags.tag_id") continue;
       if (column === "or" || column === "and") result = result.filter(logical(`${column}${filter}`));
       else if (!["select", "order", "limit", "offset"].includes(column)) result = result.filter(predicate(`${column}.${filter}`));
     }
@@ -44,13 +57,32 @@ export function cappedPostgrest(tables: Record<string, Row[]>, options: Options 
     });
     const offset = Number(url.searchParams.get("offset") ?? 0);
     const limit = Math.min(Number(url.searchParams.get("limit") ?? Infinity), options.cap ?? 1000);
+    const total = result.length;
     result = result.slice(offset, offset + limit);
     requests.push({ table, url, ids: result.map((r) => r.id) });
     const injected = options.respond?.(request, result);
     if (injected) return injected;
+    // Materialize declared to-one FK embeds unless the test explicitly supplies
+    // an object/array/null relationship shape. Project fields just like the API.
+    result = result.map((row) => {
+      if (selection === "*") return row;
+      const projected: Row = {};
+      for (const field of splitTerms(selection)) {
+        const embed = /^(\w+)(?:!inner)?\((.*)\)$/.exec(field);
+        if (!embed) { projected[field] = row[field] ?? null; continue; }
+        const [, relation, fields] = embed;
+        const joined = relation in row ? row[relation]
+          : relation === "matter_items" ? (tables.matter_items ?? []).find((item) => item.id === row.item_id) ?? null
+          : relation === "matter_tags" ? (tables.matter_tags ?? []).find((tag) => tag.id === row.tag_id) ?? null
+          : relation === "item_tags" ? (tables.item_tags ?? []).filter((link) => link.item_id === row.id) : null;
+        const project = (value: unknown) => Object.fromEntries(fields.split(",").map((key) => [key, (value as Row)[key] ?? null]));
+        projected[relation] = Array.isArray(joined) ? joined.map(project) : joined ? project(joined) : null;
+      }
+      return projected;
+    });
     const headers = new Headers(init?.headers);
     if (headers.get("prefer")?.includes("count=exact")) {
-      return new Response(init?.method === "HEAD" ? null : JSON.stringify(result), { headers: { "content-range": `0-${result.length - 1}/${result.length}` } });
+      return new Response(init?.method === "HEAD" ? null : JSON.stringify(result), { headers: { "content-range": `${offset}-${offset + result.length - 1}/${total}` } });
     }
     if (headers.get("accept")?.includes("vnd.pgrst.object")) return Response.json(result[0] ?? null);
     return Response.json(result);
@@ -83,22 +115,27 @@ function splitTerms(value: string): string[] {
 
 function logical(expression: string): (row: Row) => boolean {
   const match = /^(and|or)\((.*)\)$/.exec(expression);
-  if (!match) return predicate(expression);
+  if (!match) return predicate(expression, true);
   const predicates = splitTerms(match[2]).map(logical);
   return match[1] === "and" ? (row) => predicates.every((p) => p(row)) : (row) => predicates.some((p) => p(row));
 }
 
-function predicate(expression: string): (row: Row) => boolean {
-  const match = /^(\w+)\.(not\.)?(eq|neq|gt|gte|lt|lte|is|in)\.(.*)$/.exec(expression);
+function predicate(expression: string, inLogicalExpression = false): (row: Row) => boolean {
+  const match = /^(\w+)\.(not\.)?(eq|neq|gt|gte|lt|lte|is|in|ilike)\.(.*)$/.exec(expression);
   assert.ok(match, `supported filter: ${expression}`);
   const [, column, negation, op, raw] = match;
-  const value = raw.startsWith('"') ? JSON.parse(raw) : raw;
+  const value = inLogicalExpression && raw.startsWith('"') ? JSON.parse(raw) : raw;
+  const included = op === "in" ? new Set(splitTerms(raw.slice(1, -1)).map((v) => v.startsWith('"') ? JSON.parse(v) : v)) : null;
   return (row) => {
     const actual = row[column];
     let result: boolean;
     if (op === "is") result = value === "null" && actual == null;
-    else if (op === "in") result = splitTerms(raw.slice(1, -1)).map((v) => v.startsWith('"') ? JSON.parse(v) : v).includes(String(actual));
+    else if (op === "in") result = included!.has(String(actual));
     else if (actual == null) result = false; // SQL null comparison is not true.
+    else if (op === "ilike") {
+      const pattern = String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/%/g, ".*").replace(/_/g, ".");
+      result = new RegExp(`^${pattern}$`, "i").test(String(actual));
+    }
     else {
       const comparison = compare(column, actual, value);
       result = op === "eq" ? comparison === 0 : op === "neq" ? comparison !== 0 : op === "gt" ? comparison > 0 : op === "gte" ? comparison >= 0 : op === "lt" ? comparison < 0 : comparison <= 0;
@@ -109,7 +146,7 @@ function predicate(expression: string): (row: Row) => boolean {
 
 const timestampCache = new Map<string, bigint>();
 function compare(column: string, left: unknown, right: unknown): number {
-  if (column.endsWith("_at") || column === "created_at_matter") {
+  if (column.endsWith("_at") || column.endsWith("_at_matter")) {
     // PostgreSQL timestamptz comparisons preserve sub-millisecond precision.
     const micros = (value: unknown) => {
       const raw = String(value);

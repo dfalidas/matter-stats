@@ -1,3 +1,4 @@
+import { postgrestIn, readCompleteMetadata, readIdBatches } from "./complete-metadata-query";
 import { readCompleteSessions } from "./complete-session-query";
 import {
   METRICS_PERIOD_PRESETS,
@@ -167,23 +168,12 @@ async function fetchSourceAnnotations(
     return [];
   }
 
-  let query = client
-    .from("annotations")
-    .select("id,item_id,created_at_matter,matter_items(id,source)")
-    .in("item_id", itemIds)
-    .lt("created_at_matter", range.end.toISOString());
-
-  if (range.start) {
-    query = query.gte("created_at_matter", range.start.toISOString());
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? []) as unknown as SourceAnnotation[];
+  return readIdBatches<SourceAnnotation>(itemIds, (ids) => readCompleteMetadata<SourceAnnotation>(() => {
+    let query = client.from("annotations").select("id,item_id,created_at_matter,matter_items(id,source)")
+      .filter("item_id", "in", postgrestIn(ids)).lt("created_at_matter", range.end.toISOString());
+    if (range.start) query = query.gte("created_at_matter", range.start.toISOString());
+    return query.order("id", { ascending: true });
+  }));
 }
 
 function bucketSourceSessions(sessions: SourceSession[]): Map<string, SourceAccumulator> {

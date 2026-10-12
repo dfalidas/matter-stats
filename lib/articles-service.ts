@@ -1,7 +1,8 @@
+import { postgrestIn, quotePostgrest, readCompleteMetadata, readIdBatches } from "./complete-metadata-query";
 import { readCompleteSessions } from "./complete-session-query";
 import type { MatterItem, MatterTag, ReadingSession } from "@/lib/supabase-types";
 import type { MatterStatsSupabaseClient } from "@/lib/supabase-queries";
-import { METRICS_PERIOD_PRESETS, resolveMetricsDateRange, type MetricsPeriodPreset } from "@/lib/metrics-service";
+import { METRICS_PERIOD_PRESETS, resolveMetricsDateRange, type MetricsPeriodPreset } from "./metrics-service";
 
 export const ARTICLE_PAGE_SIZE = 100;
 export const RELATED_ARTICLES_LIMIT = 5;
@@ -110,32 +111,20 @@ export async function getArticleList(
   const size = filters.size?.trim() ?? "";
   const page = Math.max(filters.page ?? 1, 1);
   const range = resolveMetricsDateRange({ preset: period });
-  const [sources, tags, tagItemIds] = await Promise.all([
+  const [sources, tags] = await Promise.all([
     fetchArticleSourceFacets(client),
     fetchArticleTagFacets(client),
-    tag ? fetchItemIdsForTag(client, tag) : Promise.resolve<string[] | null>(null),
   ]);
-
-  if (tag && tagItemIds?.length === 0) {
-    return {
-      articles: [],
-      total: 0,
-      page,
-      pageSize: ARTICLE_PAGE_SIZE,
-      filters: { period, query, source, tag, status, author, contentType, size, page },
-      sources,
-      tags,
-    };
-  }
 
   let request = client
     .from("matter_items")
     .select(
-      "id,title,url,source,author,status,word_count,estimated_reading_time_minutes,progress,created_at_matter,updated_at_matter",
+      `id,title,url,source,author,status,word_count,estimated_reading_time_minutes,progress,created_at_matter,updated_at_matter${tag ? ",item_tags!inner(tag_id)" : ""}`,
       { count: "exact" },
     )
     .order("created_at_matter", { ascending: false, nullsFirst: false })
-    .order("updated_at_matter", { ascending: false, nullsFirst: false });
+    .order("updated_at_matter", { ascending: false, nullsFirst: false })
+    .order("id", { ascending: true });
 
   if (range.start) {
     request = request.gte("created_at_matter", range.start.toISOString()).lt("created_at_matter", range.end.toISOString());
@@ -143,7 +132,7 @@ export async function getArticleList(
 
   if (query) {
     const pattern = `%${escapeIlikePattern(query)}%`;
-    request = request.or(`title.ilike.${pattern},source.ilike.${pattern},author.ilike.${pattern}`);
+    request = request.or(`title.ilike.${quotePostgrest(pattern)},source.ilike.${quotePostgrest(pattern)},author.ilike.${quotePostgrest(pattern)}`);
   }
 
   if (source) {
@@ -156,9 +145,7 @@ export async function getArticleList(
   if (size === "medium") request = request.gte("word_count", 1500).lt("word_count", 4000);
   if (size === "long") request = request.gte("word_count", 4000);
 
-  if (tagItemIds) {
-    request = request.in("id", tagItemIds);
-  }
+  if (tag) request = request.eq("item_tags.tag_id", tag);
 
   const from = (page - 1) * ARTICLE_PAGE_SIZE;
   const to = from + ARTICLE_PAGE_SIZE - 1;
@@ -168,7 +155,13 @@ export async function getArticleList(
     throw error;
   }
 
-  const rows = (data ?? []) as ArticleListRow[];
+  if (!Array.isArray(data) || count === null || !Number.isSafeInteger(count) || count < 0) throw new Error("Invalid Library page response");
+  // The inner embed filters parents; it is not part of the public row contract.
+  const rows = data.map((row) => {
+    const { item_tags: relations, ...article } = row as unknown as ArticleListRow & { item_tags?: unknown };
+    void relations;
+    return article;
+  });
   const itemIds = rows.map((article) => article.id);
   const [highlightCounts, tagsByItemId] = await Promise.all([
     fetchHighlightCounts(client, itemIds),
@@ -181,7 +174,7 @@ export async function getArticleList(
       highlights: highlightCounts.get(article.id) ?? 0,
       tags: tagsByItemId.get(article.id) ?? [],
     })),
-    total: count ?? rows.length,
+    total: count,
     page,
     pageSize: ARTICLE_PAGE_SIZE,
     filters: { period, query, source, tag, status, author, contentType, size, page },
@@ -201,13 +194,14 @@ export async function getArticleDetail(client: MatterStatsSupabaseClient, id: st
     return null;
   }
 
-  const [tagsByItemId, annotationsResult, sessionsResult, relatedArticles, sourcePerformance] = await Promise.all([
+  const [tagsByItemId, annotations, sessionsResult, relatedArticles, sourcePerformance] = await Promise.all([
     fetchTagsByItemId(client, [id]),
-    client
+    readCompleteMetadata<ArticleDetail["annotations"][number]>(() => client
       .from("annotations")
       .select("id,text,note,created_at_matter")
       .eq("item_id", id)
-      .order("created_at_matter", { ascending: true, nullsFirst: false }),
+      .order("created_at_matter", { ascending: true, nullsFirst: false })
+      .order("id", { ascending: true })),
     client
       .from("reading_sessions")
       .select("id,started_at,duration_seconds,words_estimated,source_device")
@@ -218,10 +212,6 @@ export async function getArticleDetail(client: MatterStatsSupabaseClient, id: st
     fetchSourcePerformance(client, item),
   ]);
 
-  if (annotationsResult.error) {
-    throw annotationsResult.error;
-  }
-
   if (sessionsResult.error) {
     throw sessionsResult.error;
   }
@@ -229,7 +219,7 @@ export async function getArticleDetail(client: MatterStatsSupabaseClient, id: st
   return {
     ...item,
     tags: tagsByItemId.get(id) ?? [],
-    annotations: annotationsResult.data ?? [],
+    annotations,
     sessions: sessionsResult.data ?? [],
     relatedArticles,
     sourcePerformance,
@@ -237,11 +227,8 @@ export async function getArticleDetail(client: MatterStatsSupabaseClient, id: st
 }
 
 async function fetchArticleSourceFacets(client: MatterStatsSupabaseClient): Promise<ArticleFacet[]> {
-  const { data, error } = await client.from("matter_items").select("source").not("source", "is", null).order("source", { ascending: true });
-
-  if (error) {
-    throw error;
-  }
+  const data = await readCompleteMetadata<{ id: string; source: string | null }>(() => client.from("matter_items")
+    .select("id,source").not("source", "is", null).order("source", { ascending: true }).order("id", { ascending: true }));
 
   const counts = new Map<string, number>();
   for (const row of data ?? []) {
@@ -255,27 +242,15 @@ async function fetchArticleSourceFacets(client: MatterStatsSupabaseClient): Prom
 }
 
 async function fetchArticleTagFacets(client: MatterStatsSupabaseClient): Promise<ArticleFacet[]> {
-  const { data, error } = await client.from("matter_tags").select("id,name").order("name", { ascending: true });
-
-  if (error) {
-    throw error;
-  }
+  const data = await readCompleteMetadata<Pick<MatterTag, "id" | "name">>(() => client.from("matter_tags")
+    .select("id,name").order("name", { ascending: true }).order("id", { ascending: true }));
 
   return (data ?? []).map((tag) => ({ value: tag.id, label: tag.name }));
 }
 
-async function fetchItemIdsForTag(client: MatterStatsSupabaseClient, tagId: string): Promise<string[]> {
-  const { data, error } = await client.from("item_tags").select("item_id").eq("tag_id", tagId);
-
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? []).map((row) => row.item_id);
-}
-
 type JoinedTagRow = {
   item_id: string;
+  tag_id: string;
   matter_tags: Pick<MatterTag, "id" | "name"> | Pick<MatterTag, "id" | "name">[] | null;
 };
 
@@ -286,11 +261,9 @@ async function fetchTagsByItemId(client: MatterStatsSupabaseClient, itemIds: str
     return tagsByItemId;
   }
 
-  const { data, error } = await client.from("item_tags").select("item_id,matter_tags(id,name)").in("item_id", itemIds);
-
-  if (error) {
-    throw error;
-  }
+  const data = await readIdBatches<JoinedTagRow>(itemIds, (ids) => readCompleteMetadata<JoinedTagRow>(() => client.from("item_tags")
+    .select("item_id,tag_id,matter_tags(id,name)").filter("item_id", "in", postgrestIn(ids))
+    .order("item_id", { ascending: true }).order("tag_id", { ascending: true }), ["item_id", "tag_id"]), ["item_id", "tag_id"]);
 
   for (const row of (data ?? []) as unknown as JoinedTagRow[]) {
     const joined = Array.isArray(row.matter_tags) ? row.matter_tags[0] : row.matter_tags;
@@ -314,11 +287,8 @@ async function fetchHighlightCounts(client: MatterStatsSupabaseClient, itemIds: 
     return counts;
   }
 
-  const { data, error } = await client.from("annotations").select("item_id").in("item_id", itemIds);
-
-  if (error) {
-    throw error;
-  }
+  const data = await readIdBatches<{ id: string; item_id: string }>(itemIds, (ids) => readCompleteMetadata<{ id: string; item_id: string }>(() => client.from("annotations")
+    .select("id,item_id").filter("item_id", "in", postgrestIn(ids)).order("id", { ascending: true })));
 
   for (const row of data ?? []) {
     counts.set(row.item_id, (counts.get(row.item_id) ?? 0) + 1);
@@ -357,13 +327,9 @@ async function fetchSourcePerformance(client: MatterStatsSupabaseClient, item: M
     return null;
   }
 
-  const { data: sourceItems, error: sourceItemsError } = await client.from("matter_items").select("id").eq("source", source);
-
-  if (sourceItemsError) {
-    throw sourceItemsError;
-  }
-
-  const sourceItemIds = (sourceItems ?? []).map((sourceItem) => sourceItem.id);
+  const sourceItems = await readCompleteMetadata<{ id: string }>(() => client.from("matter_items")
+    .select("id").eq("source", source).order("id", { ascending: true }));
+  const sourceItemIds = sourceItems.map((sourceItem) => sourceItem.id);
 
   if (sourceItemIds.length === 0) {
     return {
@@ -375,9 +341,10 @@ async function fetchSourcePerformance(client: MatterStatsSupabaseClient, item: M
     };
   }
 
-  const sourceSessions = await readCompleteSessions<{ id: string; started_at: string | null; item_id: string | null; duration_seconds: number | null }>(
-    () => client.from("reading_sessions").select("id,started_at,item_id,duration_seconds").in("item_id", sourceItemIds),
-  );
+  type SourceSession = { id: string; started_at: string | null; item_id: string | null; duration_seconds: number | null };
+  const sourceSessions = await readIdBatches<SourceSession>(sourceItemIds, (ids) => readCompleteSessions<SourceSession>(
+    () => client.from("reading_sessions").select("id,started_at,item_id,duration_seconds").filter("item_id", "in", postgrestIn(ids)),
+  ));
 
   const timeByItemId = new Map<string, number>();
   for (const session of sourceSessions ?? []) {

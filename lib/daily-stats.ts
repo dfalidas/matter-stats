@@ -59,8 +59,11 @@ export async function calculateDailyStat(date: string, timezone: string = getApp
   if (annotationsError) {
     throw annotationsError;
   }
+  if (highlightsCount === null || !Number.isSafeInteger(highlightsCount) || highlightsCount < 0) {
+    throw new Error("Invalid complete annotation count response");
+  }
 
-  return buildDailyStat(date, (sessions ?? []) as unknown as DailyStatsSession[], highlightsCount ?? 0);
+  return buildDailyStat(date, (sessions ?? []) as unknown as DailyStatsSession[], highlightsCount);
 }
 
 async function upsertInBatches<Row>(rows: Row[], upsert: (batch: Row[], lease: MatterSyncLease) => Promise<unknown>, lease: MatterSyncLease) {

@@ -178,13 +178,27 @@ The SQL expresses the intended RLS and grant policy, and the TypeScript implemen
 - Legacy `daily_stats` rows may still reflect the former UTC-day buckets until the authorized repair/rebuild work in Tasks 19–20. Latest-week discovery therefore uses raw reading-session timestamps rather than treating those historical rollups as authoritative. This release does not recalculate, backfill, or otherwise repair production history.
 - Complete reading-session inputs use the shared Task 16 keyset reader, ordered by `started_at` and unique `id`, with separately pinned dated/null upper boundaries. A successful empty query proves exhaustion; short pages never do. Invalid keys, duplicate/non-advancing responses and later database failures reject the complete read. Each enumeration is a fenced live read, **not an MVCC snapshot**: unseen updates/deletes and backdated inserts can change its contents, and separate enumerations can disagree during writes. See [Task 16 validation](task-16-validation.md) for the query inventory, tested behavior and limitations. Activity's 20-session visible pages, article detail's 25-session preview, and Reports' latest-row lookup remain bounded independently of aggregate input.
 
+Task 17 completes Library source/tag facets, item-tag relations, annotation
+inputs and source-item membership with deterministic complete offset reads and
+encoded-size ID batches. Selected-tag Library pages use the existing server FK
+inner embed before exact count/range; visible pages remain 100 items, related
+articles five and article session previews 25. Composite relations retain both
+`item_id` and `tag_id`. Each complete batch stops only at an empty response;
+metadata offsets advance by actual returned rows. Daily annotation HEAD counts
+reject invalid/missing counts. These reads are live, not snapshots: concurrent
+deletes can shift unseen offset rows, and repeated rows reject rather than being
+counted twice. No metadata attribution is inferred for unlinked sessions, and
+bounded previews do not certify coverage. See [Task 17 validation](task-17-validation.md)
+for the query inventory, acceptance evidence and consistency limits. Task 16's
+session helper remains unchanged; query reuse/aggregate efficiency remains Task 18.
+
 ## Remaining stabilization work
 
 The merged interface redesign does not complete the stabilization plan. Remaining work includes:
 
 - review official advisories and apply the smallest supported security dependency patches;
 - reliable sync continuation and large-history behavior; Task 12 ownership requires isolated SQL/Data API verification before release;
-- facet/join completeness and query reuse/aggregate optimization (Tasks 17–18); Task 16 covers complete reading-session retrieval only;
+- query reuse/aggregate optimization (Task 18); Tasks 16–17 cover complete session and metadata inputs for unchanged datasets, with documented live-read consistency limits;
 - historical timezone rollup repair and reconciliation;
 - repair/rebuild tooling for derived data and interrupted sync state; and
 - CI coverage, including isolated database authorization and migration checks.

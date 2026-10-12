@@ -1,3 +1,4 @@
+import { postgrestIn, readCompleteMetadata, readIdBatches } from "./complete-metadata-query";
 import { readCompleteSessions } from "./complete-session-query";
 import type { MatterStatsSupabaseClient } from "@/lib/supabase-queries";
 
@@ -131,6 +132,7 @@ type MetricsSession = {
 };
 
 type TagJoinRow = {
+  tag_id: string;
   item_id: string | null;
   matter_tags: { id: string; name: string } | { id: string; name: string }[] | null;
 };
@@ -420,11 +422,9 @@ async function fetchTagsByItemId(client: MatterStatsSupabaseClient, itemIds: str
     return new Map();
   }
 
-  const { data, error } = await client.from("item_tags").select("item_id,matter_tags(id,name)").in("item_id", itemIds);
-
-  if (error) {
-    throw error;
-  }
+  const data = await readIdBatches<TagJoinRow>(itemIds, (ids) => readCompleteMetadata<TagJoinRow>(() => client.from("item_tags")
+    .select("item_id,tag_id,matter_tags(id,name)").filter("item_id", "in", postgrestIn(ids))
+    .order("item_id", { ascending: true }).order("tag_id", { ascending: true }), ["item_id", "tag_id"]), ["item_id", "tag_id"]);
 
   const tagsByItemId = new Map<string, string[]>();
 

@@ -38,7 +38,10 @@ type TestTagRow = {
 };
 
 function createClient({ sessions = [], tags = [] }: { sessions?: TestSession[]; tags?: TestTagRow[] }) {
-  return cappedPostgrest({ reading_sessions: sessions, item_tags: tags }).client;
+  return cappedPostgrest({ reading_sessions: sessions, item_tags: tags.flatMap((row) => {
+    const joined = Array.isArray(row.matter_tags) ? row.matter_tags : row.matter_tags ? [row.matter_tags] : [];
+    return joined.map((tag) => ({ item_id: row.item_id, tag_id: tag.id, matter_tags: tag }));
+  }) }).client;
 }
 
 function createRecordingClient(sessions: TestSession[]) {
