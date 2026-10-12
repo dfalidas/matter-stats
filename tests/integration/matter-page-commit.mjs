@@ -1,3 +1,4 @@
+import { requestFixture } from "./matter-request-fixture.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import Module, { createRequire } from "node:module";
@@ -48,6 +49,7 @@ const annotation = { id: `${prefix}-annotation`, item_id: item.id, text: "Synthe
 const ownedRuns = new Set();
 const checks = [];
 const originalFetch = globalThis.fetch;
+let requestState;
 const originalResolve = Module._resolveFilename;
 let authUser, originalStreams, ready = false, activeLease;
 let runtime, deps;
@@ -104,6 +106,8 @@ const trap = async (kind) => {
   await sql(`create function public.disposable_page_failure() returns trigger language plpgsql security invoker set search_path='' as $$begin ${condition} end;$$; create trigger ${name} after ${kind === "checkpoint" ? "update" : "insert or update"} on public.${table} for each row execute function public.disposable_page_failure();`);
 };
 try {
+  requestState=await requestFixture(sql);
+  await requestState.reset();
   originalStreams = await read("matter_sync_streams");
   assert.equal((await read("matter_sync_leases"))[0].owner, null);
   for (const table of PAGE_TABLES) assert.equal((await read(table)).length, 0, "refusing pending work/receipt collision");
@@ -127,6 +131,8 @@ try {
     const fixtureLease = await acquire();
     try { await rpc("turn_matter_continuation", { ...leaseArgs(fixtureLease), p_stream: mode === "backfill_library" ? "recent_sessions" : "library_items" }); }
     finally { await release(fixtureLease); }
+    // Task 13 isolates fault/receipt cases; Task 15 tests retain preparation.
+    await requestState.reset();
     return runSync(mode, { budget: { pages: 1, requests: 224, upstreamMs: 90000, totalMs: 150000, requestMs: 10000 }, ...options }, dependencies);
   } };
   deps = { ...runtime.productionSyncDeps, now: () => new Date("2026-10-01T00:00:00Z"), createRun: async (row, lease) => { ownedRuns.add(lease.owner); return runtime.productionSyncDeps.createRun(row, lease); } };
@@ -221,8 +227,9 @@ try {
   assert.equal((await read("matter_dirty_rollups")).find((r) => r.date === date).revision, marker2.revision);
   const staleBefore = await snapshot(); assert.equal((await service.rpc("commit_matter_page", first)).error?.code, "PT409"); assert.deepEqual(await snapshot(), staleBefore);
   const loopState = (await read("matter_sync_streams")).find((s) => s.stream === "library_items");
-  await rpc("commit_matter_page", await commitArgs(activeLease, loopState, emptyPlan(), crypto.randomUUID(), stateNow.cursor));
   const loopBefore = await snapshot();
+  assert.equal((await service.rpc("commit_matter_page", await commitArgs(activeLease, loopState, emptyPlan(), crypto.randomUUID(), stateNow.cursor))).error?.code, "22023", "Task 15 rejects a cursor loop atomically");
+  assert.deepEqual(await snapshot(), loopBefore);
   assert.equal((await service.rpc("commit_matter_page", first)).error?.code, "PT409", "reused opaque cursor must not admit delayed old page");
   assert.deepEqual(await snapshot(), loopBefore);
   checks.push("Exact page replay is read-only; delayed old page rejects; metadata dates dirty; older acknowledgement cannot clear newer same-lease revision");
@@ -395,5 +402,6 @@ try {
   });
   if (authUser) await clean(async () => assertSuccessful(await service.auth.admin.deleteUser(authUser), "Auth cleanup"));
   if (failures.length) throw new AggregateError(failures, "Atomic page fixture cleanup failed");
+  if (requestState) await requestState.restore();
 }
 console.log(JSON.stringify({ status: "passed", checks, realSqlAndDataApi: true, syntheticMatterOnly: true, cleanup: "passed" }));

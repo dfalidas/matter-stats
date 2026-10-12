@@ -342,3 +342,25 @@ Retain exact tested SHA, results, complete migration histories and owned fixture
 Auth/stack cleanup. Unavailable or failed execution is BLOCKED/FAILED, never passed.
 See [task-14-validation.md](task-14-validation.md). No production migration, sync,
 deployment, merge or personal-data operation is authorized by the test runner.
+
+## Task 15 shared quota/backoff release gate
+
+Task 15 adds `20261008095102_matter_shared_quota_retry_preparation.sql` after
+Tasks 12–14. Its two fixed server-only state tables enable RLS and grant service
+SELECT/UPDATE only; PUBLIC/anon/authenticated and service INSERT/DELETE/TRUNCATE
+are denied. Six invoker functions with empty search_path and the stream trigger
+are inventoried in `scripts/matter-request-inventory.mjs`. No raw Matter token is
+stored; the existing single-account scope covers bootstrap and all trigger/stream
+combinations. Preparation/cache/retry writes owned by sync assert Task 12 fencing.
+Account feedback may only tighten quota/cooldown, even after lease loss.
+
+Before an approved rollout, disable/drain all old writers/previews, back up, apply
+the additive migration before code, and require exact final-head fresh/upgrade
+catalog/Data API/browser denial/service control/concurrency/cleanup evidence.
+Deploy only compatible code, verify existing ingress limits and authentication,
+then re-enable the unchanged daily/manual triggers. Rollback repeats disable/drain
+and retains all quota/backoff/preparation/progress/receipts/dirty/generation state;
+older sync writers remain disabled. No destructive reset is a rollback procedure.
+See [Task 15 validation](task-15-validation.md) for current blocked/passed gates,
+exact retry policy and external consumers. This PR authorizes no production SQL,
+real sync, repair, token rotation, merge or deployment.

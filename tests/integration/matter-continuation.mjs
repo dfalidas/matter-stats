@@ -1,3 +1,4 @@
+import { requestFixture } from "./matter-request-fixture.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import Module, { createRequire } from "node:module";
@@ -34,6 +35,7 @@ const release = (lease) => rpc("release_matter_sync_lease", args(lease));
 const snapshot = () => sql(`select jsonb_build_object('streams',(select jsonb_agg(to_jsonb(s) order by stream) from public.matter_sync_streams s),'intent',(select to_jsonb(c) from public.matter_sync_continuation c),'receipts',(select coalesce(jsonb_agg(to_jsonb(r) order by stream),'[]') from public.matter_page_receipts r),'dirty',(select coalesce(jsonb_agg(to_jsonb(d) order by date),'[]') from public.matter_dirty_rollups d),'sessions',(select coalesce(jsonb_agg(to_jsonb(s) order by id),'[]') from public.reading_sessions s where id like '${prefix}%'))::text;`).then(JSON.parse);
 const originalResolve = Module._resolveFilename;
 const originalFetch = globalThis.fetch;
+let requestState;
 const checks = [];
 const ownedRuns = new Set();
 const databaseErrors = [];
@@ -45,12 +47,16 @@ const limits = { pages: 8, requests: 224, upstreamMs: 90000, totalMs: 150000, re
 let tick = 0;
 const fixtureItem = { id: `${prefix}-expensive`, title: "Synthetic expensive", tags: [] };
 async function resetOwnedCycles() {
+  await requestState.reset();
   activeLease = await acquire();
   for (const state of originalStreams) await rpc("sync_upsert_stream", { ...args(activeLease), p_state: state });
   assertSuccessful(await service.from("matter_sync_continuation").update(originalIntent).eq("account_scope", "matter"), "restore owned intent fixture");
   await release(activeLease); activeLease = null;
 }
 async function worker(mode, now, limit = 99, loseTerminal = false) {
+  // Distinct synthetic daily invocations: expire only fixture quota reservations.
+  // Keep page caches/chains/cursor history; new Task 15 suite checks real policy.
+  await requestState.clearQuota();
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.join(root, "tests/integration/matter-continuation-worker.mjs"), JSON.stringify({ prefix, mode, now, limit, loseTerminal })], {
       env: sanitizedEnvironment({ DISPOSABLE_DB_ACK: "yes", STABILIZATION_TEST_SUPABASE_URL: url,
@@ -62,6 +68,8 @@ async function worker(mode, now, limit = 99, loseTerminal = false) {
   });
 }
 try {
+  requestState=await requestFixture(sql);
+  await requestState.reset();
   originalStreams = await read("matter_sync_streams"); originalIntent = (await read("matter_sync_continuation"))[0];
   originalDailyStats = await read("daily_stats");
   initialRuns = new Set((await read("sync_runs")).map((r) => r.id));
@@ -137,7 +145,7 @@ try {
   for (const stopAt of [2, 3, 5]) {
     tick = 0; const before = await snapshot();
     upstream = (url) => {
-      if (url.pathname.endsWith("/me")) return Response.json({});
+      if (url.pathname.endsWith("/me")) return Response.json({object:"account",id:"synthetic-account"});
       if (url.pathname.endsWith("/reading_sessions")) return Response.json(page([{ id: `${prefix}-budget`, item_id: fixtureItem.id, date: "2027-03-01T10:00:00Z", seconds_read: 61 }]));
       if (url.pathname.endsWith("/annotations")) return Response.json(page([], `annotation:${Number((url.searchParams.get("cursor") ?? "annotation:0").split(":")[1]) + 1}`));
       return Response.json(fixtureItem);
@@ -151,7 +159,7 @@ try {
   for (const endpoint of ["item", "annotations"]) {
     tick = 0;
     upstream = (url) => {
-      if (url.pathname.endsWith("/me")) return Response.json({});
+      if (url.pathname.endsWith("/me")) return Response.json({object:"account",id:"synthetic-account"});
       if (url.pathname.endsWith("/reading_sessions")) return Response.json(page([{ id: `${prefix}-budget`, item_id: fixtureItem.id, date: "2027-03-01T10:00:00Z", seconds_read: 61 }]));
       if ((endpoint === "item" && url.pathname.endsWith(fixtureItem.id)) || (endpoint === "annotations" && url.pathname.endsWith("/annotations"))) tick = 90000;
       return Response.json(url.pathname.endsWith("/annotations") ? page() : fixtureItem);
@@ -160,7 +168,7 @@ try {
     assert.equal(result.status,"partial"); assert.equal(result.pagesCommitted,0); await resetOwnedCycles();
   }
   // Fire the actual invocation cancellation timer at a deterministic HTTP
-  // barrier. Database calls and the existing 250ms pacing retain real timers.
+  // barrier. Database calls and shared quota waits retain real timers.
   for (const endpoint of ["item", "annotations"]) {
     tick = 0; const before = await snapshot();
     const originalSetTimeout = globalThis.setTimeout;
@@ -172,7 +180,7 @@ try {
     };
     try {
       upstream = (url, init) => {
-        if (url.pathname.endsWith("/me")) return Response.json({});
+        if (url.pathname.endsWith("/me")) return Response.json({object:"account",id:"synthetic-account"});
         if (url.pathname.endsWith("/reading_sessions")) return Response.json(page([{ id: `${prefix}-budget`, item_id: fixtureItem.id, date: "2027-03-01T10:00:00Z", seconds_read: 61 }]));
         if ((endpoint === "item" && url.pathname.endsWith(fixtureItem.id)) || (endpoint === "annotations" && url.pathname.endsWith("/annotations"))) {
           assert.equal(typeof cancelAttempt,"function"); assert.equal(init.signal.aborted,false);
@@ -183,8 +191,8 @@ try {
         return Response.json(fixtureItem);
       };
       const timedOut = await runtime.syncMatterData("recent_activity_scheduled",{},deps);
-      assert.equal(timedOut.ok,false); assert.match(timedOut.message,/timeout/); assert.equal(timedOut.pagesCommitted,0);
-      assert.equal(timedOut.requestsAttempted,endpoint==="item"?3:4);
+      assert.equal(timedOut.ok,false); assert.match(timedOut.message,/exhausted/); assert.equal(timedOut.pagesCommitted,0);
+      assert.equal(timedOut.requestsAttempted,endpoint==="item"?5:6);
       const after = await snapshot(); assert.deepEqual(after.sessions,before.sessions); assert.deepEqual(after.receipts,before.receipts); assert.deepEqual(after.dirty,before.dirty);
       assert.equal(after.streams.find((s)=>s.stream==="recent_sessions").cursor,null);
     } finally { globalThis.setTimeout = originalSetTimeout; }
@@ -194,7 +202,7 @@ try {
   // contract in a fresh invocation without any fixture/cursor reset.
   tick = 0; let annotationCalls = 0; const expensiveParams = [];
   upstream = (url) => {
-    if (url.pathname.endsWith("/me")) return Response.json({});
+    if (url.pathname.endsWith("/me")) return Response.json({object:"account",id:"synthetic-account"});
     if (url.pathname.endsWith("/reading_sessions")) { expensiveParams.push(Object.fromEntries(url.searchParams)); return Response.json(page([{ id: `${prefix}-budget`, item_id: fixtureItem.id, date: "2027-03-01T10:00:00Z", seconds_read: 61 }])); }
     if (url.pathname.endsWith("/annotations")) {
       annotationCalls++;
@@ -210,10 +218,12 @@ try {
   assert.deepEqual(pausedState.sessions,beforeExpensive.sessions); assert.deepEqual(pausedState.receipts,beforeExpensive.receipts); assert.deepEqual(pausedState.dirty,beforeExpensive.dirty);
   const pausedContract = pausedState.streams.find((s)=>s.stream==="recent_sessions");
   assert.equal(pausedContract.cursor,null); assert.equal(pausedContract.completed_watermark,beforeExpensive.streams.find((s)=>s.stream==="recent_sessions").completed_watermark);
+  assert.equal(await sql("select jsonb_object_length from (select count(*) jsonb_object_length from public.matter_request_work w, lateral jsonb_object_keys(w.requests) where w.slot='recent_sessions') c;"),"4","all four prepared reads survive the budget stop");
   annotationCalls = 0;
+  await requestState.clearQuota();
   const expensive = await runtime.syncMatterData("recent_activity_scheduled", {}, { ...deps, now: () => new Date("2028-01-02T06:00:00Z") });
-  assert.equal(expensive.ok,true); assert.equal(expensive.pagesCommitted,1); assert.equal(expensive.requestsAttempted,103); assert.equal(annotationCalls,100);
-  assert.deepEqual(expensiveParams[1],expensiveParams[0]);
+  assert.equal(expensive.ok,true); assert.equal(expensive.pagesCommitted,1); assert.equal(expensive.requestsAttempted,99); assert.equal(annotationCalls,98);
+  assert.equal(expensiveParams.length,1,"cached list is not re-requested");
   const resumedContract = (await snapshot()).streams.find((s)=>s.stream==="recent_sessions");
   assert.equal(resumedContract.cycle_generation,pausedContract.cycle_generation); assert.equal(resumedContract.page_limit,pausedContract.page_limit);
   assert.equal(Date.parse(resumedContract.completed_watermark),Date.parse(pausedContract.cycle_started_at));
@@ -227,16 +237,16 @@ try {
     upstream = (url) => {
       const target = endpoint === "item" ? url.pathname.endsWith(fixtureItem.id) : url.pathname.endsWith("/"+endpoint);
       if (target) return Response.json({error:{code:"synthetic",message:"synthetic failure"}},{status,headers:status===429?{"retry-after":"60"}:{}});
-      if (url.pathname.endsWith("/me")) return Response.json({});
+      if (url.pathname.endsWith("/me")) return Response.json({object:"account",id:"synthetic-account"});
       if (url.pathname.endsWith("/reading_sessions")) return Response.json(page([{id:`${prefix}-budget`,item_id:fixtureItem.id,date:"2027-03-01T10:00:00Z",seconds_read:61}]));
       if (url.pathname.endsWith("/annotations")) return Response.json(page());
       return Response.json(fixtureItem);
     };
     const failed = await runtime.syncMatterData("recent_activity_scheduled",{},deps);
     assert.equal(failed.ok,false); assert.equal(failed.pagesCommitted,0);
-    const expectedAttempts = endpoint==="me"?1:endpoint==="item"?3:endpoint==="annotations"?4:2;
+    const expectedAttempts = status===500?4:endpoint==="me"?1:endpoint==="item"?3:endpoint==="annotations"?4:2;
     assert.equal(failed.requestsAttempted,expectedAttempts,JSON.stringify({endpoint,status,failed}));
-    if (status!==429) assert.match(failed.message,new RegExp(`status ${status}`),JSON.stringify({endpoint,status,failed}));
+    if (status!==429) assert.match(failed.message,status===500?/exhausted/:new RegExp(`status ${status}`),JSON.stringify({endpoint,status,failed}));
     const after = await snapshot(); assert.deepEqual(after.sessions,before.sessions); assert.deepEqual(after.receipts,before.receipts); assert.deepEqual(after.dirty,before.dirty);
     assert.equal(after.streams.find((s)=>s.stream==="recent_sessions").cursor,null);
     if (status===429) {
@@ -334,5 +344,6 @@ try {
     assert.deepEqual((await read("daily_stats")).sort((a,b)=>a.date.localeCompare(b.date)),originalDailyStats.sort((a,b)=>a.date.localeCompare(b.date)),"exact legacy aggregate restoration");
     if (authUser) assertSuccessful(await service.auth.admin.deleteUser(authUser),"Auth cleanup");
   }
+  if (requestState) await requestState.restore();
 }
 console.log(JSON.stringify({status:"passed",checks,historyReference,realSqlAndDataApi:true,syntheticMatterOnly:true,cleanup:"passed"}));

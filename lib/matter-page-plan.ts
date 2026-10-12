@@ -1,5 +1,6 @@
 import type { MatterListResponse } from "./matter-api";
 import type { TablesInsert } from "./supabase-types";
+import type { NormalizableMatterItem } from "./matter-normalizers";
 
 export const MATTER_PAGE_MAX_BYTES = 4 * 1024 * 1024;
 export const MATTER_ENRICHMENT_MAX_ROWS = 10000;
@@ -21,6 +22,19 @@ export class MatterPageValidationError extends Error {
 }
 export function emptyMatterPagePlan(): MatterPagePlan {
   return { placeholders: [], items: [], sessions: [], tags: [], itemTagIds: [], itemTags: [], annotations: [] };
+}
+// Share the ingestion checks with the HTTP preparation cache. A valid list
+// envelope alone does not make an item safe to reuse on future invocations.
+export function validateMatterItem(value: unknown): asserts value is NormalizableMatterItem {
+  if (!value || typeof value !== "object" || Array.isArray(value)
+      || typeof (value as { id?: unknown }).id !== "string" || !(value as { id: string }).id.trim()) {
+    throw new MatterPageValidationError("invalid_item_id");
+  }
+  const tags = (value as { tags?: unknown }).tags;
+  if (tags !== undefined && !Array.isArray(tags)) throw new MatterPageValidationError("invalid_tags");
+  for (const tag of tags ?? []) {
+    if (!tag || typeof tag.id !== "string" || !tag.id.trim()) throw new MatterPageValidationError("invalid_tag_id");
+  }
 }
 export function validateMatterPage<T>(page: MatterListResponse<T>, limit: number, cursor: string | null): void {
   if (!page || page.object !== "list" || !Array.isArray(page.results)

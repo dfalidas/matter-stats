@@ -98,7 +98,7 @@ BIGINT as decimal text to avoid JavaScript integer precision loss. Stream
 The runtime TTL is **120 seconds**, with SQL input validation of **30–300
 seconds**, including explicit rejection of NULL. There is no new configuration
 variable. Renewal occurs before and after account/page/item/annotation requests,
-after Matter pacing and immediately before each actual HTTP fetch, before each
+after shared quota/retry waiting and immediately before each actual HTTP fetch, before each
 100-row mutation batch, before each rollup calculation and each rollup batch.
 Annotation pagination has a guarded request for every page. Renewal failure or
 infrastructure failure stops the invocation; a response arriving after expiry
@@ -292,15 +292,17 @@ Every invocation shares an AsyncLocalStorage budget: **8 committed pages, 224
 Matter HTTP attempts, 90 seconds upstream preparation, 150 seconds total**.
 `/me`, linked-item reads, all annotation pages and failed HTTP attempts count.
 Each HTTP attempt, response body and lease check is cancellable at 10 seconds or
-the remaining preparation deadline. Existing 250 ms pacing remains; sync adds no
-upstream retries. Before later pages, admission reserves `limit + 101` attempts
+the remaining preparation deadline. Task 15 admits every attempt through shared
+durable quota and permits only its classified bounded GET retries. Before later
+pages, invocation admission reserves `limit + 101` attempts
 (the maximum list + linked items + 100 annotation pages); a deferred expensive
 page gets a fresh invocation. The maximum valid Task 13 page requires 201
 preparation attempts, plus `/me`, below the fresh 224-attempt ceiling. A request
-or time stop discards the entire uncommitted plan. Sustained upstream slowness,
+or time stop discards the uncommitted ingestion plan while retaining fenced
+validated request preparation for that exact page. Sustained upstream slowness,
 cooldowns or errors can still delay completion; no finite invocation promises
-that an unavailable/slow upstream will finish. This is not Task 15's shared quota
-limiter, and Matter can return 429 before an invocation budget is consumed.
+that an unavailable/slow upstream will finish. Invocation budgets and shared
+rolling quotas both apply; upstream can return 429 before either is consumed.
 
 Database HTTP is bounded to 10 seconds and the remaining total deadline. Rollup
 recovery retains two snapshots of at most 32 markers and checks remaining time
@@ -333,3 +335,23 @@ endpoint failure. Lost SQL responses retain exact receipt replay; cooldown write
 cannot rewind a cursor. Authentication, raw UTC values, `APP_TIMEZONE`, per-session
 metric formulas and bounded Task 13 SQL transactions remain unchanged. Imported
 history is not an analytics cap fix or historical recompute/cutover (Tasks 16–20).
+
+## Task 15 request admission and durable preparation
+
+Every Matter HTTP attempt reserves shared rolling quota through service-only
+Supabase RPC before HTTP, including `/me` and all retries. The single-account
+`matter` scope spans bootstrap, streams, trigger modes and server processes.
+Quota feedback only tightens capacity and persisted 429 cooldown is maximum-only.
+Transient GET retry identities/counts/eligibility persist across invocations;
+exhaustion needs deliberate manual recovery after 15 minutes. Invocation/ingress
+ceilings, daily UTC cron, authentication and independent stream contracts remain
+unchanged. No HTTP is performed inside a database transaction.
+
+Each stream has bounded fenced preparation separate from ingestion. Previously
+validated reads survive deferral and are reused for the pinned page; only a full
+validated plan reaches Task 13 atomic commit. The same transaction clears that
+page preparation and records bounded durable cursor history. Cursor loops or
+invalid envelopes roll back/no-op ingestion and cannot complete history. Existing
+receipt reconciliation and dirty-rollup recovery remain the only ingestion and
+recovery boundaries. See [Task 15](task-15-validation.md) for policy, tests and the
+external-token-consumer limitation.

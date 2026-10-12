@@ -46,6 +46,14 @@ export class MatterInvocationBudget {
     // preparation cost, preventing repeated failure on a residual request budget.
     if (this.pages > 0 && this.limits.requests - this.requests < limit + 101) throw new MatterBudgetStop("requests");
   }
+  checkRequest() {
+    this.check();
+    if (this.requests >= this.limits.requests) throw new MatterBudgetStop("requests");
+  }
+  checkWait(ms: number) {
+    this.checkRequest();
+    if (this.clock() - this.started + ms + this.limits.requestMs >= this.limits.upstreamMs) throw new MatterBudgetStop("deadline");
+  }
   async attempt<T>(work: (signal: AbortSignal) => Promise<T>): Promise<T> {
     this.check();
     if (this.requests >= this.limits.requests) throw new MatterBudgetStop("requests");

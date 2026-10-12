@@ -145,17 +145,27 @@ export function parseRetryAfterHeader(value: string | null, now: number = Date.n
     return null;
   }
 
-  const seconds = Number.parseInt(value, 10);
-  if (Number.isFinite(seconds)) {
-    return Math.max(seconds, 0);
+  if (/^\d+$/.test(value)) {
+    const seconds = Number(value);
+    return Number.isSafeInteger(seconds) && seconds >= 0 && Number.isFinite(new Date(now + seconds * 1000).getTime()) && now + seconds * 1000 <= 253402300799000 ? seconds : null;
   }
-
-  const retryAt = Date.parse(value);
-  if (Number.isFinite(retryAt)) {
-    return Math.max(Math.ceil((retryAt - now) / 1_000), 0);
-  }
-
-  return null;
+  // HTTP-date supports IMF-fixdate and the two obsolete recipient formats.
+  // Normalize their exact grammar, then validate calendar AND weekday against
+  // UTC serialization rather than accepting Date.parse's permissive inputs.
+  let canonical = value;
+  const obsolete = /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), (\d{2})-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-(\d{2}) (\d{2}:\d{2}:\d{2}) GMT$/.exec(value);
+  const asctime = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ( [1-9]|[12]\d|3[01]) (\d{2}:\d{2}:\d{2}) (\d{4})$/.exec(value);
+  if (obsolete) {
+    const currentYear = new Date(now).getUTCFullYear();
+    let year = Math.floor(currentYear / 100) * 100 + Number(obsolete[4]);
+    const horizon = new Date(now); horizon.setUTCFullYear(currentYear + 50);
+    if (Date.parse(`${obsolete[2]} ${obsolete[3]} ${year} ${obsolete[5]} GMT`) > horizon.getTime()) year -= 100;
+    canonical = `${obsolete[1].slice(0, 3)}, ${obsolete[2]} ${obsolete[3]} ${year} ${obsolete[5]} GMT`;
+  } else if (asctime) canonical = `${asctime[1]}, ${asctime[3].trim().padStart(2, "0")} ${asctime[2]} ${asctime[5]} ${asctime[4]} GMT`;
+  if (!/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/.test(canonical)) return null;
+  const retryAt = Date.parse(canonical);
+  if (!Number.isFinite(retryAt) || new Date(retryAt).toUTCString() !== canonical || retryAt > 253402300799000) return null;
+  return Math.max(Math.ceil((retryAt - now) / 1000), 0);
 }
 
 

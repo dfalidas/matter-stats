@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { catalogSql, INVENTORIED_TABLES, verifyCatalog } from "../scripts/stabilization-db-runner.mjs";
+import { REQUEST_TABLES, REQUEST_FUNCTION_SIGNATURES } from "../scripts/matter-request-inventory.mjs";
 import { LEASE_FUNCTION_SIGNATURES } from "../scripts/matter-sync-lease-inventory.mjs";
 
 test("catalog covers the durable lease and every exact RPC/helper signature", () => {
@@ -92,3 +93,9 @@ test("catalog SQL rejects effective browser table and column privileges for both
   assert.match(sql, /has_table_privilege\('anon'.*'SELECT,INSERT,UPDATE,DELETE'\)/);
   assert.match(sql, /has_table_privilege\('authenticated'.*'SELECT,INSERT,UPDATE,DELETE'\)/);
 });
+
+ test("Task 15 catalog inventories every quota/preparation object and singleton reset denial",()=>{
+  const sql=catalogSql();for(const table of REQUEST_TABLES)assert.ok(INVENTORIED_TABLES.includes(table));
+  for(const signature of REQUEST_FUNCTION_SIGNATURES)assert.ok(sql.includes(`public.${signature}`));
+  assert.match(sql,/request state can be truncated/);
+ });
