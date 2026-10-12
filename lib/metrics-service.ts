@@ -1,3 +1,4 @@
+import { readCompleteSessions } from "./complete-session-query";
 import type { MatterStatsSupabaseClient } from "@/lib/supabase-queries";
 
 import { estimateWordsFromSeconds, sumSessionWordEstimates } from "./reading-estimates";
@@ -400,32 +401,18 @@ async function fetchSessionsForStreaks(client: MatterStatsSupabaseClient, end: D
   return fetchAllSessions(client, null, end);
 }
 
-const DATABASE_PAGE_SIZE = 500;
-
-/** Fetch every row in a stable order; PostgREST otherwise caps aggregate inputs. */
 async function fetchAllSessions(
   client: MatterStatsSupabaseClient,
   start: Date | null,
   end: Date,
 ): Promise<MetricsSession[]> {
-  const rows: MetricsSession[] = [];
-
-  for (let from = 0; ; from += DATABASE_PAGE_SIZE) {
-    let query = client
-      .from("reading_sessions")
+  return readCompleteSessions<MetricsSession>(() => {
+    let query = client.from("reading_sessions")
       .select("id,item_id,started_at,ended_at,duration_seconds,words_estimated,matter_items(id,title,url,source,author)")
-      .lt("started_at", end.toISOString())
-      .order("started_at", { ascending: true, nullsFirst: false })
-      .order("id", { ascending: true })
-      .range(from, from + DATABASE_PAGE_SIZE - 1);
-
+      .lt("started_at", end.toISOString());
     if (start) query = query.gte("started_at", start.toISOString());
-    const { data, error } = await query;
-    if (error) throw error;
-    const page = (data ?? []) as unknown as MetricsSession[];
-    rows.push(...page);
-    if (page.length < DATABASE_PAGE_SIZE) return rows;
-  }
+    return query;
+  });
 }
 
 async function fetchTagsByItemId(client: MatterStatsSupabaseClient, itemIds: string[]): Promise<Map<string, string[]>> {

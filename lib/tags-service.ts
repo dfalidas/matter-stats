@@ -1,3 +1,4 @@
+import { readCompleteSessions } from "./complete-session-query";
 import {
   METRICS_PERIOD_PRESETS,
   resolveMetricsDateRange,
@@ -177,23 +178,14 @@ export function normalizeTagName(value: string | null | undefined): string | nul
 }
 
 async function fetchTagSessions(client: MatterStatsSupabaseClient, range: MetricsDateRange): Promise<TagSession[]> {
-  let query = client
-    .from("reading_sessions")
-    .select("id,item_id,started_at,duration_seconds,words_estimated")
-    .lt("started_at", range.end.toISOString())
-    .order("started_at", { ascending: false, nullsFirst: false });
-
-  if (range.start) {
-    query = query.gte("started_at", range.start.toISOString());
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? []) as unknown as TagSession[];
+  const rows = await readCompleteSessions<TagSession>(() => {
+    let query = client.from("reading_sessions")
+      .select("id,item_id,started_at,duration_seconds,words_estimated")
+      .lt("started_at", range.end.toISOString());
+    if (range.start) query = query.gte("started_at", range.start.toISOString());
+    return query;
+  });
+  return rows.reverse();
 }
 
 async function fetchItemTags(client: MatterStatsSupabaseClient, itemIds: string[]): Promise<ItemTagJoin[]> {

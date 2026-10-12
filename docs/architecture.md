@@ -176,6 +176,7 @@ The SQL expresses the intended RLS and grant policy, and the TypeScript implemen
 - Matter session payloads may lack a usable item identifier. Those sessions can be stored with a null `item_id`, so time/session totals can remain available while source, author, tag, article counts, and other attribution-dependent breakdowns are incomplete. Missing attribution is an unsupported capability with the observed payload—not a promise that another sync will repair it.
 - Analytics calendar behavior uses the validated `APP_TIMEZONE`, defaulting to `Europe/Athens`. Raw timestamps stay UTC; session, annotation, activity, report, and new daily-rollup windows use local calendar boundaries converted to UTC with half-open `[start, end)` queries. Reading sessions are attributed wholly to their start date. Current reading streaks are anchored to one request-scoped current time and may carry through an empty today only when yesterday is active; reports expose their selected-date streak separately.
 - Legacy `daily_stats` rows may still reflect the former UTC-day buckets until the authorized repair/rebuild work in Tasks 19–20. Latest-week discovery therefore uses raw reading-session timestamps rather than treating those historical rollups as authoritative. This release does not recalculate, backfill, or otherwise repair production history.
+- Complete reading-session inputs use the shared Task 16 keyset reader, ordered by `started_at` and unique `id`, with separately pinned dated/null upper boundaries. A successful empty query proves exhaustion; short pages never do. Invalid keys, duplicate/non-advancing responses and later database failures reject the complete read. Each enumeration is a fenced live read, **not an MVCC snapshot**: unseen updates/deletes and backdated inserts can change its contents, and separate enumerations can disagree during writes. See [Task 16 validation](task-16-validation.md) for the query inventory, tested behavior and limitations. Activity's 20-session visible pages, article detail's 25-session preview, and Reports' latest-row lookup remain bounded independently of aggregate input.
 
 ## Remaining stabilization work
 
@@ -183,7 +184,7 @@ The merged interface redesign does not complete the stabilization plan. Remainin
 
 - review official advisories and apply the smallest supported security dependency patches;
 - reliable sync continuation and large-history behavior; Task 12 ownership requires isolated SQL/Data API verification before release;
-- complete/paginated database queries rather than implicit Data API result limits;
+- facet/join completeness and query reuse/aggregate optimization (Tasks 17–18); Task 16 covers complete reading-session retrieval only;
 - historical timezone rollup repair and reconciliation;
 - repair/rebuild tooling for derived data and interrupted sync state; and
 - CI coverage, including isolated database authorization and migration checks.

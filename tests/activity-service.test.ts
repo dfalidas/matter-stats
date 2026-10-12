@@ -1,37 +1,12 @@
+import { cappedPostgrest } from "./fixtures/capped-postgrest";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getActivityMonth, isCalendarDate, isCalendarMonth, normalizeActivityPage } from "../lib/activity-service";
 
 type Row = { id: string; started_at: string; duration_seconds: number };
 
-class Query {
-  private start = "";
-  private end = "~";
-  private window: [number, number] = [0, Number.MAX_SAFE_INTEGER];
-  private orders: Array<{ column: string; ascending: boolean }> = [];
-  constructor(private readonly rows: Row[]) {}
-  select() { return this; }
-  gte(_column: string, value: string) { this.start = value; return this; }
-  lt(_column: string, value: string) { this.end = value; return this; }
-  order(column: string, options: { ascending?: boolean }) { this.orders.push({ column, ascending: options.ascending ?? true }); return this; }
-  range(from: number, to: number) { this.window = [from, to]; return this; }
-  then<TResult1 = { data: Row[]; error: null }>(onfulfilled?: (value: { data: Row[]; error: null }) => TResult1 | PromiseLike<TResult1>) {
-    const rows = this.rows
-      .filter((row) => row.started_at >= this.start && row.started_at < this.end)
-      .sort((left, right) => {
-        for (const order of this.orders) {
-          const comparison = String(left[order.column as keyof Row]).localeCompare(String(right[order.column as keyof Row]));
-          if (comparison) return order.ascending ? comparison : -comparison;
-        }
-        return 0;
-      })
-      .slice(this.window[0], this.window[1] + 1);
-    return Promise.resolve({ data: rows, error: null }).then(onfulfilled);
-  }
-}
-
 function client(rows: Row[]) {
-  return { from: () => new Query(rows) } as never;
+  return cappedPostgrest({ reading_sessions: rows }).client;
 }
 
 test("validates real calendar values and positive integer pages", () => {

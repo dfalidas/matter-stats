@@ -1,3 +1,4 @@
+import { cappedPostgrest } from "./fixtures/capped-postgrest";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -85,41 +86,5 @@ test("builds rankings from synced Matter tags without breaking on untagged items
 type FakeRows = Record<string, Array<Record<string, unknown>>>;
 
 function createFakeClient(rows: FakeRows): MatterStatsSupabaseClient {
-  return {
-    from(table: string) {
-      return new FakeQuery(rows[table] ?? []);
-    },
-  } as unknown as MatterStatsSupabaseClient;
-}
-
-class FakeQuery {
-  data: Array<Record<string, unknown>>;
-  error = null;
-
-  constructor(data: Array<Record<string, unknown>>) {
-    this.data = data;
-  }
-
-  select() {
-    return this;
-  }
-
-  order() {
-    return this;
-  }
-
-  lt(column: string, value: string) {
-    this.data = this.data.filter((row) => typeof row[column] !== "string" || row[column] < value);
-    return this;
-  }
-
-  gte(column: string, value: string) {
-    this.data = this.data.filter((row) => typeof row[column] !== "string" || row[column] >= value);
-    return this;
-  }
-
-  in(column: string, values: string[]) {
-    this.data = this.data.filter((row) => values.includes(row[column] as string));
-    return this;
-  }
+  return cappedPostgrest(rows).client;
 }
