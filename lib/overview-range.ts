@@ -15,4 +15,3 @@ export function formatOverviewRangeLabel(metrics: Pick<ReadingMetrics, "range">)
 function isMidnight(parts: ReturnType<typeof getLocalDateTimeParts>) {
   return parts.hour === 0 && parts.minute === 0 && parts.second === 0 && parts.millisecond === 0;
 }
-

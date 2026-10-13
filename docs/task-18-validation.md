@@ -173,7 +173,8 @@ remain external gates; synthetic fixtures do not establish production behavior.
 ## Final validation
 
 Checks below ran against runtime checkpoint `4ead3c0`; the final delivery commit
-adds only refreshed measurement/validation evidence and documentation.
+adds refreshed evidence/documentation, measurement-method wording and a
+whitespace-only helper cleanup; application behavior is unchanged.
 
 - **Passed:** exact `npm ci`; Next.js route-type generation; `npm run typecheck`;
   `npm run lint` (three preexisting Visual Explainer warnings, zero errors);

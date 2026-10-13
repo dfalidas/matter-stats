@@ -33,6 +33,6 @@
   "executionNotes": [
     "Earlier restricted npm test subprocess orchestration failed/hung and was terminated; the final networking-enabled sandbox run completed successfully. No real database/Matter requests were made.",
     "Initial arithmetic, empty-tag shape and obsolete query-shape assertion failures were corrected.",
-    "Final delivery head adds only evidence/documentation after the tested runtime head."
+    "Final delivery commits add refreshed evidence/documentation, measurement-method wording and whitespace-only helper cleanup after the tested runtime head; no application behavior changes."
   ]
 }
