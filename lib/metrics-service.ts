@@ -1,5 +1,4 @@
-import { postgrestIn, readCompleteMetadata, readIdBatches } from "./complete-metadata-query";
-import { readCompleteSessions } from "./complete-session-query";
+import { createAnalyticsQueryContext, type AnalyticsQueryContext, type StreakSession } from "./analytics-query-context";
 import type { MatterStatsSupabaseClient } from "@/lib/supabase-queries";
 
 import { estimateWordsFromSeconds, sumSessionWordEstimates } from "./reading-estimates";
@@ -111,6 +110,8 @@ export type GetReadingMetricsOptions = {
   historicalStreakDate?: string;
   topLimit?: number;
   recentLimit?: number;
+  /** Explicitly shared only within one service request. */
+  queryContext?: AnalyticsQueryContext;
 };
 
 type SessionItem = {
@@ -129,12 +130,6 @@ type MetricsSession = {
   duration_seconds: number | null;
   words_estimated: number | null;
   matter_items: SessionItem | SessionItem[] | null;
-};
-
-type TagJoinRow = {
-  tag_id: string;
-  item_id: string | null;
-  matter_tags: { id: string; name: string } | { id: string; name: string }[] | null;
 };
 
 type MetricsAccumulator = {
@@ -283,16 +278,24 @@ export async function getReadingMetrics(
     ? addLocalDays(localDateFromString(historicalStreakDate, range.timezone), 1, range.timezone)
     : null;
 
-  const [rangeSessions, previousSessions, bestStreakSessions, currentStreakSessions, historicalStreakSessions] = await Promise.all([
-    fetchSessionsForRange(client, range),
-    previousRange ? fetchSessionsForRange(client, previousRange) : Promise.resolve([]),
-    fetchSessionsForStreaks(client, range.end),
-    fetchSessionsForStreaks(client, currentStreakEnd),
-    historicalStreakEnd ? fetchSessionsForStreaks(client, historicalStreakEnd) : Promise.resolve([]),
+  const context = options.queryContext ?? createAnalyticsQueryContext(client);
+  context.assertClient(client);
+  // Largest existing history cutoff first; smaller cutoffs filter that same
+  // complete input. This scans no further than the original streak reads.
+  const historyEnd = new Date(Math.max(range.end.getTime(), currentStreakEnd.getTime(), historicalStreakEnd?.getTime() ?? -Infinity));
+  const rangeRead = context.sessions(range.start, range.end, "details");
+  const historyRead = context.sessions(null, historyEnd, "streak");
+  const [rangeSessions, previousSessions, historySessions] = await Promise.all([
+    rangeRead,
+    previousRange ? context.sessions(previousRange.start, previousRange.end, "details") : Promise.resolve([]),
+    historyRead,
   ]);
-
+  const before = (end: Date) => historySessions.filter((session) => session.started_at && Date.parse(session.started_at) < end.getTime());
+  const bestStreakSessions = before(range.end);
+  const currentStreakSessions = before(currentStreakEnd);
+  const historicalStreakSessions = historicalStreakEnd ? before(historicalStreakEnd) : [];
   const rangeItemIds = uniqueStrings(rangeSessions.map((session) => session.item_id).filter(isNonEmptyString));
-  const rangeTagsByItemId = await fetchTagsByItemId(client, rangeItemIds);
+  const rangeTagsByItemId = await context.tags(rangeItemIds);
 
   const totals = summarizeSessions(rangeSessions);
   const previousTotals = summarizeSessions(previousSessions);
@@ -393,51 +396,6 @@ function differenceInLocalDays(start: Date, end: Date, timezone: string): number
   const startUtc = Date.UTC(startLocal.year, startLocal.month - 1, startLocal.day);
   const endUtc = Date.UTC(endLocal.year, endLocal.month - 1, endLocal.day);
   return Math.round((endUtc - startUtc) / 86_400_000);
-}
-
-async function fetchSessionsForRange(client: MatterStatsSupabaseClient, range: MetricsDateRange): Promise<MetricsSession[]> {
-  return fetchAllSessions(client, range.start, range.end);
-}
-
-async function fetchSessionsForStreaks(client: MatterStatsSupabaseClient, end: Date): Promise<MetricsSession[]> {
-  return fetchAllSessions(client, null, end);
-}
-
-async function fetchAllSessions(
-  client: MatterStatsSupabaseClient,
-  start: Date | null,
-  end: Date,
-): Promise<MetricsSession[]> {
-  return readCompleteSessions<MetricsSession>(() => {
-    let query = client.from("reading_sessions")
-      .select("id,item_id,started_at,ended_at,duration_seconds,words_estimated,matter_items(id,title,url,source,author)")
-      .lt("started_at", end.toISOString());
-    if (start) query = query.gte("started_at", start.toISOString());
-    return query;
-  });
-}
-
-async function fetchTagsByItemId(client: MatterStatsSupabaseClient, itemIds: string[]): Promise<Map<string, string[]>> {
-  if (itemIds.length === 0) {
-    return new Map();
-  }
-
-  const data = await readIdBatches<TagJoinRow>(itemIds, (ids) => readCompleteMetadata<TagJoinRow>(() => client.from("item_tags")
-    .select("item_id,tag_id,matter_tags(id,name)").filter("item_id", "in", postgrestIn(ids))
-    .order("item_id", { ascending: true }).order("tag_id", { ascending: true }), ["item_id", "tag_id"]), ["item_id", "tag_id"]);
-
-  const tagsByItemId = new Map<string, string[]>();
-
-  for (const row of (data ?? []) as unknown as TagJoinRow[]) {
-    const tagRows = Array.isArray(row.matter_tags) ? row.matter_tags : row.matter_tags ? [row.matter_tags] : [];
-    const names = tagRows.map((tag) => tag.name?.trim()).filter(isNonEmptyString);
-    if (!isNonEmptyString(row.item_id)) {
-      continue;
-    }
-    tagsByItemId.set(row.item_id, [...(tagsByItemId.get(row.item_id) ?? []), ...names]);
-  }
-
-  return tagsByItemId;
 }
 
 function summarizeSessions(sessions: MetricsSession[]): MetricTotals {
@@ -613,7 +571,7 @@ function rankHeatmapDates(byDate: Map<string, MetricsAccumulator>): ReadingHeatm
 }
 
 function calculateStreakAsOf(
-  sessions: MetricsSession[],
+  sessions: StreakSession[],
   asOfDate: string,
   timezone: string,
   allowYesterdayFallback: boolean,
@@ -635,7 +593,7 @@ function calculateStreakAsOf(
   return streak;
 }
 
-function calculateBestStreak(sessions: MetricsSession[], timezone: string): number {
+function calculateBestStreak(sessions: StreakSession[], timezone: string): number {
   const activeDates = [...getActiveDates(sessions, timezone)].sort();
   let best = 0;
   let current = 0;
@@ -655,7 +613,7 @@ function calculateBestStreak(sessions: MetricsSession[], timezone: string): numb
   return best;
 }
 
-function getActiveDates(sessions: MetricsSession[], timezone: string): Set<string> {
+function getActiveDates(sessions: StreakSession[], timezone: string): Set<string> {
   return new Set(
     sessions
       .filter((session) => positiveInteger(session.duration_seconds) > 0)
