@@ -2,7 +2,7 @@ import { PageShell } from "../_components/page-shell";
 import { ReportsOverview } from "./reports-overview";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { requireAccessSession } from "@/lib/require-auth";
-import { getReadingReport, isValidReportReference, REPORT_PERIODS, type ReportPeriod } from "@/lib/reports-service";
+import { getReadingReport, toReportsClientPayload, isValidReportReference, REPORT_PERIODS, type ReportPeriod } from "@/lib/reports-service";
 
 const DEFAULT_REPORT_PERIOD: ReportPeriod = "weekly";
 
@@ -44,7 +44,7 @@ function normalizeReference(period: ReportPeriod, value: string | string[] | und
 async function getReportsResult(client: ReturnType<typeof getSupabaseAdminClient>, period: ReportPeriod, reference: string | null) {
   try {
     const report = await getReadingReport(client, period, { reference });
-    return { ok: true as const, report };
+    return { ok: true as const, report: toReportsClientPayload(report) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load reading report.";
     return { ok: false as const, message };

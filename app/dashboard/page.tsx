@@ -3,7 +3,7 @@ import { DashboardOverview } from "./dashboard-overview";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { requireAccessSession } from "@/lib/require-auth";
 import { getDefaultMetricsTimezone, METRICS_PERIOD_PRESETS, type MetricsPeriodPreset } from "@/lib/metrics-service";
-import { getOverviewReadingMetrics } from "@/lib/overview-service";
+import { getOverviewReadingMetrics, toOverviewClientPayload } from "@/lib/overview-service";
 import type { MatterItem } from "@/lib/supabase-types";
 import { validateCustomRange } from "@/lib/custom-range";
 
@@ -74,7 +74,7 @@ async function getDashboardMetrics(period: MetricsPeriodPreset, start: string | 
     ]);
     return {
       ok: true as const,
-      ...overviewMetrics,
+      ...toOverviewClientPayload(overviewMetrics),
       library: (library.data ?? []) as Pick<MatterItem, "id" | "title" | "source" | "author" | "word_count" | "estimated_reading_time_minutes" | "progress" | "status">[],
       dataStatus: {
         lastSuccessfulSync: latestSync.data?.finished_at ?? latestSync.data?.started_at ?? null,

@@ -10,7 +10,7 @@ import type { MatterItem } from "@/lib/supabase-types";
 import { formatOverviewRangeLabel } from "@/lib/overview-service";
 
 type LibraryPreview = Pick<MatterItem, "id" | "title" | "source" | "author" | "word_count" | "estimated_reading_time_minutes" | "progress" | "status">;
-type Result = { ok: true; metrics: ReadingMetrics; todayMetrics: ReadingMetrics; allTimeMetrics: ReadingMetrics; library: LibraryPreview[]; dataStatus: { lastSuccessfulSync: string | null; coverage: "unverified" | "unavailable" } } | { ok: false; message: string };
+type Result = { ok: true; metrics: ReadingMetrics; library: LibraryPreview[]; dataStatus: { lastSuccessfulSync: string | null; coverage: "unverified" | "unavailable" } } | { ok: false; message: string };
 const options = [{ value: "week", label: "Week" }, { value: "month", label: "Month" }, { value: "year", label: "Year" }, { value: "custom", label: "Custom" }] as const;
 
 export function DashboardOverview({ period, metricsResult }: { period: MetricsPeriodPreset | "custom"; metricsResult: Result }) {
