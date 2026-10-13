@@ -190,7 +190,8 @@ deletes can shift unseen offset rows, and repeated rows reject rather than being
 counted twice. No metadata attribution is inferred for unlinked sessions, and
 bounded previews do not certify coverage. See [Task 17 validation](task-17-validation.md)
 for the query inventory, acceptance evidence and consistency limits. Task 16's
-session helper remains unchanged; query reuse/aggregate efficiency remains Task 18.
+session helper remains unchanged. Task 18 adds request-owned session/tag reuse
+and focused server-to-client projections; see below.
 
 ## Remaining stabilization work
 
@@ -198,7 +199,7 @@ The merged interface redesign does not complete the stabilization plan. Remainin
 
 - review official advisories and apply the smallest supported security dependency patches;
 - reliable sync continuation and large-history behavior; Task 12 ownership requires isolated SQL/Data API verification before release;
-- query reuse/aggregate optimization (Task 18); Tasks 16–17 cover complete session and metadata inputs for unchanged datasets, with documented live-read consistency limits;
+- deployed analytics performance and live-read consistency verification; Tasks 16–18 retain complete raw-session/metadata inputs without claiming an MVCC snapshot;
 - historical timezone rollup repair and reconciliation;
 - repair/rebuild tooling for derived data and interrupted sync state; and
 - CI coverage, including isolated database authorization and migration checks.
@@ -370,3 +371,27 @@ invalid envelopes roll back/no-op ingestion and cannot complete history. Existin
 receipt reconciliation and dirty-rollup recovery remain the only ingestion and
 recovery boundaries. See [Task 15](task-15-validation.md) for policy, tests and the
 external-token-consumer limitation.
+
+
+## Analytics request reuse and view payloads (Task 18)
+
+Each Overview/Reports service invocation owns a fresh client-bound analytics
+query context. Equivalent concurrent reads share promises; containing date
+ranges/projections or item-ID sets can supply compatible subsets. Rejections
+remain rejections. There is no module-global or persistent cache of private data.
+Overview starts its existing all-time input first, and Metrics reuses one lean
+history input through the greatest existing streak cutoff. No history bound is
+extended solely for deduplication. Reports uses its selected detail input for
+metrics, the complete internal timeline, longform results and four server
+histogram bins, with one captured clock and timezone.
+
+Overview forwards selected metrics only. Reports forwards complete totals and
+comparisons, calendar buckets for charts/full-period CSV and fixed histogram
+bins. Year-in-Reading forwards metrics and bounded longform results. Neither
+report client receives raw timeline sessions; useful internal timeline consumers
+retain complete data. Prop size grows with requested calendar buckets and
+existing display limits, rather than raw session count. All existing page guards
+remain before protected reads. Reuse improves agreement on shared inputs but
+is not an MVCC snapshot across pages, metadata or independent reads. See
+[Task 18 validation](task-18-validation.md) for measured HTTP counts, rows/bytes,
+output equivalence, request-isolation tests and consistency limitations.

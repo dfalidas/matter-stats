@@ -27,6 +27,9 @@
     "../lib/supabase-queries.ts",
     "../lib/supabase-types.ts",
     "../lib/sync-run-log.ts",
+    "../app/dashboard/page.tsx",
+    "../app/reports/page.tsx",
+    "../app/year-in-reading/page.tsx",
     "./**/*.test.ts"
   ]
 }
