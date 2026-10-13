@@ -37,7 +37,7 @@ import {
   type DashboardIcon,
 } from "@/components/dashboard-components";
 import { Button } from "@/components/ui/button";
-import type { ReadingHeatmapDay, ReadingMetrics } from "@/lib/metrics-service";
+import type { ReadingHeatmapDay } from "@/lib/metrics-service";
 import { getDeterministicReadingPersonality, type ReadingPersonalityLabel } from "@/lib/reading-personality";
 import type { YearInReadingClientPayload } from "@/lib/reports-service";
 import { formatCalendarDate } from "@/lib/calendar";
@@ -356,7 +356,7 @@ function getMostProductiveDay(heatmap: ReadingHeatmapDay[]): ReadingHeatmapDay |
   return topDay ?? null;
 }
 
-function getReadingPersonality(metrics: ReadingMetrics) {
+function getReadingPersonality(metrics: YearInReadingClientPayload["metrics"]) {
   const personality = getDeterministicReadingPersonality(metrics);
 
   return {
@@ -385,7 +385,7 @@ function getReadingPersonalityIcon(label: ReadingPersonalityLabel): DashboardIco
   }
 }
 
-function getHeroSentence(metrics: ReadingMetrics, booksEquivalent: number, isLowData: boolean): string {
+function getHeroSentence(metrics: YearInReadingClientPayload["metrics"], booksEquivalent: number, isLowData: boolean): string {
   if (metrics.totals.articlesRead === 0) {
     return "No current-year reading sessions have synced yet. Once Matter activity appears, this page becomes your annual recap.";
   }

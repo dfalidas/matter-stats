@@ -45,6 +45,7 @@ test('real server pages construct bounded client props; calendar CSV and totals 
       assert.equal(overview.metrics.totals.sessionsCount,count);
       assert.equal('todayMetrics' in overview,false);
       assert.equal('allTimeMetrics' in overview,false);
+      assert.deepEqual(Object.keys(overview.metrics).sort(),['comparison','heatmap','range','totals']);
       const reportSizes=[];
       for(const period of ['weekly','monthly','yearly']) {
         const reference=period==='yearly'?'2026':period==='monthly'?'2026-09':'2026-09-10';
@@ -63,6 +64,9 @@ test('real server pages construct bounded client props; calendar CSV and totals 
       assert.equal(recap.report.metrics.totals.sessionsCount,count);
       assert.equal('timeline' in recap.report,false);
       assert.equal('sessionLengthHistogram' in recap.report,false);
+      assert.equal('recentReads' in recap.report.metrics,false);
+      assert.equal('comparison' in recap.report.metrics,false);
+      assert.ok(recap.report.longformReads.length<=4);
       sizes.push(reportSizes);
     }
     for(let i=0;i<3;i++) assert.ok(sizes[1][i]-sizes[0][i]<100,JSON.stringify(sizes));

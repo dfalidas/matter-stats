@@ -243,6 +243,7 @@ export function toReportsClientPayload(report: ReadingReport) {
 export type ReportsClientPayload = ReturnType<typeof toReportsClientPayload>;
 
 export function toYearInReadingClientPayload(report: ReadingReport) {
-  return { metrics: report.metrics, longformReads: report.longformReads };
+  const { range, totals, heatmap, bestStreakDays, topSources, topAuthors, topTags } = report.metrics;
+  return { metrics: { range, totals, heatmap, bestStreakDays, topSources, topAuthors, topTags }, longformReads: report.longformReads.slice(0, 4) };
 }
 export type YearInReadingClientPayload = ReturnType<typeof toYearInReadingClientPayload>;

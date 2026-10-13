@@ -37,11 +37,11 @@ checks, empty-page exhaustion and encoded-size ID batching remain unchanged.
 
 | Entry point | Inputs / reuse | Complete output |
 | --- | --- | --- |
-| Overview | Starts its already-required all-time detail read first; selected, today, comparisons and streaks reuse containing inputs. Future custom ranges remain distinct if outside that input. All-time tag input supplies subsets. | Internal selected/today/all-time metrics retained; page forwards selected metrics only. |
+| Overview | Starts its already-required all-time detail read first; selected, today, comparisons and streaks reuse containing inputs. Future custom ranges remain distinct if outside that input. All-time tag input supplies subsets. | Internal selected/today/all-time metrics retained; page forwards selected totals/comparisons/calendar only. |
 | Metrics | Selected and comparison details; one lean history read through the greatest of the existing best/current/historical cutoffs, filtered separately for each streak. | Existing totals, calendar comparisons, rankings, recent reads, heatmap, current and historical streak contracts. |
 | Reports | Same selected detail promise used by metrics, complete timeline, longform and histogram; comparisons/history retain their bounds. One captured clock and timezone, including weekly latest-data navigation. | Complete internal `ReadingReport` adds four fixed histogram bins; timeline remains complete for useful internal consumers. |
 | Reports page/client | `toReportsClientPayload` | Period, complete totals/comparisons, all calendar buckets for charts/CSV, fixed histogram; no session timeline or unused rankings/longform fields. |
-| Year-in-Reading page/client | `toYearInReadingClientPayload` | Complete metrics/calendar buckets and existing six longform results; no timeline or unused histogram/navigation fields. |
+| Year-in-Reading page/client | `toYearInReadingClientPayload` | Displayed metrics/calendar buckets, personality ranking inputs and four displayed longform results; no timeline or unused histogram/navigation fields. |
 
 The largest history cutoff was already scanned before this change. No query is
 broadened just to obtain reuse; the measured row/byte decreases demonstrate this
@@ -142,7 +142,7 @@ completeness expectation or result cap was weakened. R5's Task 18 placeholder
 is activated only with the executable HTTP/payload regression and matching
 before/after evidence.
 
-Client review follows the Vercel React best-practices skill: all server service
+Client review follows the Vercel React best-practices skill: the Overview range formatter lives in a pure module, and all server service
 imports in clients remain type-only; dates are existing React-serializable
 Date values; payloads contain plain objects/arrays and primitives, no promises,
 Maps or client credentials. Hooks remain unconditional before error rendering.

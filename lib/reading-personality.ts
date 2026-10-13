@@ -15,6 +15,8 @@ export type ReadingPersonality = {
   description: string;
 };
 
+type PersonalityMetrics = Pick<ReadingMetrics, "totals" | "topSources" | "topAuthors" | "topTags">;
+
 type PersonalityScore = {
   label: Exclude<ReadingPersonalityLabel, "The Generalist">;
   score: number;
@@ -99,7 +101,7 @@ const LABEL_TIEBREAK_ORDER: ReadingPersonalityLabel[] = [
   "The Generalist",
 ];
 
-export function getDeterministicReadingPersonality(metrics: ReadingMetrics): ReadingPersonality {
+export function getDeterministicReadingPersonality(metrics: PersonalityMetrics): ReadingPersonality {
   if (hasLowData(metrics)) {
     return buildPersonality("The Generalist", metrics);
   }
@@ -122,7 +124,7 @@ export function getDeterministicReadingPersonality(metrics: ReadingMetrics): Rea
   return buildPersonality(winner.label, metrics);
 }
 
-function hasLowData(metrics: ReadingMetrics): boolean {
+function hasLowData(metrics: PersonalityMetrics): boolean {
   return (
     metrics.totals.articlesRead < LOW_DATA_MIN_ARTICLES ||
     metrics.totals.sessionsCount < LOW_DATA_MIN_SESSIONS ||
@@ -130,7 +132,7 @@ function hasLowData(metrics: ReadingMetrics): boolean {
   );
 }
 
-function scoreSystemsAnalyst(metrics: ReadingMetrics): number {
+function scoreSystemsAnalyst(metrics: PersonalityMetrics): number {
   return (
     topicScore(metrics.topTags, SYSTEMS_TOPICS) * 2 +
     (topMetricShare(metrics.topTags, metrics.totals.wordsRead) >= 0.35 ? 1 : 0) +
@@ -138,7 +140,7 @@ function scoreSystemsAnalyst(metrics: ReadingMetrics): number {
   );
 }
 
-function scoreNewsGrazer(metrics: ReadingMetrics): number {
+function scoreNewsGrazer(metrics: PersonalityMetrics): number {
   const averageWordsPerArticle = metrics.totals.wordsRead / Math.max(metrics.totals.articlesRead, 1);
 
   return (
@@ -151,7 +153,7 @@ function scoreNewsGrazer(metrics: ReadingMetrics): number {
   );
 }
 
-function scoreDeepResearcher(metrics: ReadingMetrics): number {
+function scoreDeepResearcher(metrics: PersonalityMetrics): number {
   const averageWordsPerArticle = metrics.totals.wordsRead / Math.max(metrics.totals.articlesRead, 1);
   const sessionsPerArticle = metrics.totals.sessionsCount / Math.max(metrics.totals.articlesRead, 1);
 
@@ -163,7 +165,7 @@ function scoreDeepResearcher(metrics: ReadingMetrics): number {
   );
 }
 
-function scoreStrategyReader(metrics: ReadingMetrics): number {
+function scoreStrategyReader(metrics: PersonalityMetrics): number {
   return (
     topicScore(metrics.topTags, STRATEGY_TOPICS) * 2 +
     sourceScore(metrics.topSources, STRATEGY_SOURCES) +
@@ -204,7 +206,7 @@ function topMetricShare(metrics: RankedMetric[], totalWords: number): number {
   return metrics[0].wordsRead / totalWords;
 }
 
-function buildPersonality(label: ReadingPersonalityLabel, metrics: ReadingMetrics): ReadingPersonality {
+function buildPersonality(label: ReadingPersonalityLabel, metrics: PersonalityMetrics): ReadingPersonality {
   const topic = describeTopTopic(metrics.topTags);
   const pattern = describeReadingPattern(metrics);
 
@@ -252,7 +254,7 @@ function describeTopTopic(topTags: RankedMetric[]): string {
   return names.length === 1 ? names[0] : `${names[0]} and ${names[1]}`;
 }
 
-function describeReadingPattern(metrics: ReadingMetrics): string {
+function describeReadingPattern(metrics: PersonalityMetrics): string {
   const averageWordsPerArticle = metrics.totals.wordsRead / Math.max(metrics.totals.articlesRead, 1);
 
   if (averageWordsPerArticle >= 2_500 || metrics.totals.averageSessionLengthSeconds >= 12 * 60) {
