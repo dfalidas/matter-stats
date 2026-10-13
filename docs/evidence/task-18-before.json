@@ -1,5 +1,5 @@
 {
-  "method": "Installed Supabase client with in-memory capped HTTP fixture; UTF-8 JSON response bodies and page result props; includes boundary/exhaustion/ID-batch requests; one cold run per case; synthetic timing only",
+  "method": "Installed Supabase client with in-memory capped HTTP fixture; UTF-8 JSON response bodies and page result props; includes boundary/exhaustion/ID-batch requests; one invocation per case in one process; fixture timestamp cache can warm; synthetic timing only",
   "node": "v24.19.0",
   "platform": "linux/x64",
   "now": "2026-09-10T18:00:00.000Z",

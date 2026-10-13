@@ -81,10 +81,11 @@ analytics service count. Real server-page execution separately verifies actual
 payload construction, authorization and bounded growth.
 
 Elapsed time uses `performance.now()` around service execution and JSON props
-serialization: one run per case, no injected network/database latency. Some
+serialization: one invocation per case in one process, no injected network/database latency.
+The synthetic fixture timestamp cache can warm across cases. Some
 verification ran concurrently in this shared environment. These noisy synthetic
 numbers do not establish production query plans, database latency or throughput;
-one small Year-in-Reading timing is slower despite fewer requests/bytes.
+individual timings can be slower despite fewer requests/bytes.
 
 Full before/after table: [comparison](evidence/task-18-comparison.md).
 Machine-readable evidence: [before](evidence/task-18-before.json),
@@ -171,5 +172,38 @@ remain external gates; synthetic fixtures do not establish production behavior.
 
 ## Final validation
 
-Final results are appended after repository checks finish. Earlier corrected
-failures are not final-head acceptance evidence.
+Checks below ran against runtime checkpoint `4ead3c0`; the final delivery commit
+adds only refreshed measurement/validation evidence and documentation.
+
+- **Passed:** exact `npm ci`; Next.js route-type generation; `npm run typecheck`;
+  `npm run lint` (three preexisting Visual Explainer warnings, zero errors);
+  `npm run test` (**335 passed, 0 failed/cancelled/skipped/TODO**);
+  `npm run build`; all 28 output/hash and request/row/byte comparisons;
+  `git diff --check`. The isolated-db script in the normal test command remains
+  opt-in, independent of these unit/HTTP/page tests.
+- **Failed:** `npm run audit:ci`, exit 1. Exact policy error:
+  `A compatible remediation is available for chokidar; update the reviewed dependency baseline and remove the GHSA-vfj7-8cjw-p6xm exception`.
+  The production audit has **0 vulnerabilities**; the full audit has **8 high
+  entries**. Package versions, lockfile, audit policy and exception are identical
+  to the recorded baseline. The current registry reports `fixAvailable: true`
+  for this development dependency, so the existing policy correctly rejects its
+  exception. Changing dependencies or weakening audit policy would violate this
+  task's scope. This remains a release/CI gate, not a claimed passing check.
+- **Blocked:** no implementation or draft-delivery blocker; audit remediation
+  remains a release gate.
+- **Skipped:** opt-in isolated fresh/upgrade/security database execution (no
+  schema, migration, grants or database objects changed; not applicable here).
+  Production SQL, real Matter sync, repair/backfill/enrichment, deployment,
+  token rotation and merge were intentionally not run.
+- **TODO:** separately authorized dependency remediation and passing audit before
+  release; remote CI and deployed performance/consistency evidence. R5's Task 18
+  executable regression is active; no test TODOs remain.
+
+Initial arithmetic/empty-tag shape mistakes and an obsolete exact-query
+assertion were corrected. An initial restricted test invocation failed/hung in
+subprocess orchestration; it was stopped and rerun in the sandbox with networking
+permission needed for child-process/loopback fixtures, as in prior Task 16
+validation. The final full run completed successfully without contacting a real
+database or Matter. Earlier failures are not final acceptance evidence.
+
+Sanitized check summary: [validation JSON](evidence/task-18-validation.json).

@@ -1,0 +1,38 @@
+{
+  "baselineSha": "adf228f9e84d1d4a89d6cf8a609a13aacd315f26",
+  "testedRuntimeHead": "4ead3c0f3d40cca6544aaef6d6694661ef37bace",
+  "node": "v24.19.0",
+  "passed": [
+    "npm ci",
+    "Next.js route type generation",
+    "npm run typecheck",
+    "npm run lint (3 preexisting warnings)",
+    "npm run test (335 passed, 0 failed/cancelled/skipped/TODO)",
+    "npm run build",
+    "28-case output/hash/HTTP/row/byte/payload comparison",
+    "git diff --check"
+  ],
+  "failed": {
+    "npm run audit:ci": {
+      "exitCode": 1,
+      "message": "A compatible remediation is available for chokidar; update the reviewed dependency baseline and remove the GHSA-vfj7-8cjw-p6xm exception",
+      "productionVulnerabilities": 0,
+      "fullAuditHighFindings": 8,
+      "dependencyChanges": false
+    }
+  },
+  "blocked": [],
+  "skipped": [
+    "Opt-in isolated fresh/upgrade/security database execution: no schema/grant changes, not applicable to Task 18",
+    "Production SQL, Matter sync, deployment, token rotation, merge: outside scope"
+  ],
+  "todo": [
+    "Audit remediation in a separately authorized dependency change before release",
+    "Remote CI and deployed performance/live-write consistency verification"
+  ],
+  "executionNotes": [
+    "Earlier restricted npm test subprocess orchestration failed/hung and was terminated; the final networking-enabled sandbox run completed successfully. No real database/Matter requests were made.",
+    "Initial arithmetic, empty-tag shape and obsolete query-shape assertion failures were corrected.",
+    "Final delivery head adds only evidence/documentation after the tested runtime head."
+  ]
+}

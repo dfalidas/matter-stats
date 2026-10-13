@@ -1,5 +1,5 @@
 {
-  "method": "Installed Supabase client with in-memory capped HTTP fixture; UTF-8 JSON response bodies and page result props; includes boundary/exhaustion/ID-batch requests; one cold run per case; synthetic timing only",
+  "method": "Installed Supabase client with in-memory capped HTTP fixture; UTF-8 JSON response bodies and page result props; includes boundary/exhaustion/ID-batch requests; one invocation per case in one process; fixture timestamp cache can warm; synthetic timing only",
   "node": "v24.19.0",
   "platform": "linux/x64",
   "now": "2026-09-10T18:00:00.000Z",
@@ -13,8 +13,8 @@
       "requests": 27,
       "rows": 2281,
       "responseBytes": 420678,
-      "payloadBytes": 3803,
-      "elapsedMs": 1063.34
+      "payloadBytes": 1988,
+      "elapsedMs": 1012.7
     },
     {
       "view": "overview-today",
@@ -24,8 +24,8 @@
       "requests": 27,
       "rows": 2281,
       "responseBytes": 420678,
-      "payloadBytes": 2957,
-      "elapsedMs": 833.58
+      "payloadBytes": 1142,
+      "elapsedMs": 831.1
     },
     {
       "view": "overview-all-time",
@@ -35,8 +35,8 @@
       "requests": 27,
       "rows": 2281,
       "responseBytes": 420678,
-      "payloadBytes": 2771,
-      "elapsedMs": 807.94
+      "payloadBytes": 956,
+      "elapsedMs": 834.92
     },
     {
       "view": "reports-weekly",
@@ -47,7 +47,7 @@
       "rows": 3483,
       "responseBytes": 520424,
       "payloadBytes": 1817,
-      "elapsedMs": 466.75
+      "elapsedMs": 462.84
     },
     {
       "view": "reports-monthly",
@@ -58,7 +58,7 @@
       "rows": 3482,
       "responseBytes": 520378,
       "payloadBytes": 3980,
-      "elapsedMs": 454.39
+      "elapsedMs": 425.08
     },
     {
       "view": "reports-yearly",
@@ -69,7 +69,7 @@
       "rows": 3482,
       "responseBytes": 520378,
       "payloadBytes": 35469,
-      "elapsedMs": 507.35
+      "elapsedMs": 575.57
     },
     {
       "view": "year-in-reading",
@@ -79,8 +79,8 @@
       "requests": 42,
       "rows": 3482,
       "responseBytes": 520378,
-      "payloadBytes": 38706,
-      "elapsedMs": 494.95
+      "payloadBytes": 36292,
+      "elapsedMs": 576.78
     },
     {
       "view": "overview-month",
@@ -90,8 +90,8 @@
       "requests": 13,
       "rows": 2281,
       "responseBytes": 420664,
-      "payloadBytes": 3803,
-      "elapsedMs": 688.34
+      "payloadBytes": 1988,
+      "elapsedMs": 761.15
     },
     {
       "view": "overview-today",
@@ -101,8 +101,8 @@
       "requests": 13,
       "rows": 2281,
       "responseBytes": 420664,
-      "payloadBytes": 2957,
-      "elapsedMs": 664.41
+      "payloadBytes": 1142,
+      "elapsedMs": 871.38
     },
     {
       "view": "overview-all-time",
@@ -112,8 +112,8 @@
       "requests": 13,
       "rows": 2281,
       "responseBytes": 420664,
-      "payloadBytes": 2771,
-      "elapsedMs": 662.73
+      "payloadBytes": 956,
+      "elapsedMs": 757.11
     },
     {
       "view": "reports-weekly",
@@ -124,7 +124,7 @@
       "rows": 3483,
       "responseBytes": 520402,
       "payloadBytes": 1817,
-      "elapsedMs": 346.45
+      "elapsedMs": 363.35
     },
     {
       "view": "reports-monthly",
@@ -135,7 +135,7 @@
       "rows": 3482,
       "responseBytes": 520356,
       "payloadBytes": 3980,
-      "elapsedMs": 357.81
+      "elapsedMs": 352.54
     },
     {
       "view": "reports-yearly",
@@ -146,7 +146,7 @@
       "rows": 3482,
       "responseBytes": 520356,
       "payloadBytes": 35469,
-      "elapsedMs": 415.35
+      "elapsedMs": 478.14
     },
     {
       "view": "year-in-reading",
@@ -156,8 +156,8 @@
       "requests": 20,
       "rows": 3482,
       "responseBytes": 520356,
-      "payloadBytes": 38706,
-      "elapsedMs": 412.22
+      "payloadBytes": 36292,
+      "elapsedMs": 468.59
     },
     {
       "view": "overview-month",
@@ -167,8 +167,8 @@
       "requests": 10,
       "rows": 2281,
       "responseBytes": 420661,
-      "payloadBytes": 3803,
-      "elapsedMs": 679.32
+      "payloadBytes": 1988,
+      "elapsedMs": 780.87
     },
     {
       "view": "overview-today",
@@ -178,8 +178,8 @@
       "requests": 10,
       "rows": 2281,
       "responseBytes": 420661,
-      "payloadBytes": 2957,
-      "elapsedMs": 676.97
+      "payloadBytes": 1142,
+      "elapsedMs": 655.54
     },
     {
       "view": "overview-all-time",
@@ -189,8 +189,8 @@
       "requests": 10,
       "rows": 2281,
       "responseBytes": 420661,
-      "payloadBytes": 2771,
-      "elapsedMs": 643.57
+      "payloadBytes": 956,
+      "elapsedMs": 700.51
     },
     {
       "view": "reports-weekly",
@@ -201,7 +201,7 @@
       "rows": 3483,
       "responseBytes": 520398,
       "payloadBytes": 1817,
-      "elapsedMs": 374.44
+      "elapsedMs": 382.9
     },
     {
       "view": "reports-monthly",
@@ -212,7 +212,7 @@
       "rows": 3482,
       "responseBytes": 520352,
       "payloadBytes": 3980,
-      "elapsedMs": 310.26
+      "elapsedMs": 317.49
     },
     {
       "view": "reports-yearly",
@@ -223,7 +223,7 @@
       "rows": 3482,
       "responseBytes": 520352,
       "payloadBytes": 35469,
-      "elapsedMs": 376.54
+      "elapsedMs": 479.28
     },
     {
       "view": "year-in-reading",
@@ -233,8 +233,8 @@
       "requests": 16,
       "rows": 3482,
       "responseBytes": 520352,
-      "payloadBytes": 38706,
-      "elapsedMs": 466.27
+      "payloadBytes": 36292,
+      "elapsedMs": 561.34
     },
     {
       "view": "overview-month",
@@ -244,8 +244,8 @@
       "requests": 116,
       "rows": 11118,
       "responseBytes": 2806010,
-      "payloadBytes": 3836,
-      "elapsedMs": 6335.6
+      "payloadBytes": 1997,
+      "elapsedMs": 6355.15
     },
     {
       "view": "overview-today",
@@ -255,8 +255,8 @@
       "requests": 116,
       "rows": 11118,
       "responseBytes": 2806010,
-      "payloadBytes": 2990,
-      "elapsedMs": 6530.07
+      "payloadBytes": 1151,
+      "elapsedMs": 6845.82
     },
     {
       "view": "overview-all-time",
@@ -266,8 +266,8 @@
       "requests": 116,
       "rows": 11118,
       "responseBytes": 2806010,
-      "payloadBytes": 2804,
-      "elapsedMs": 6427.86
+      "payloadBytes": 965,
+      "elapsedMs": 6921.7
     },
     {
       "view": "reports-weekly",
@@ -278,7 +278,7 @@
       "rows": 21157,
       "responseBytes": 3639316,
       "payloadBytes": 1827,
-      "elapsedMs": 4914.42
+      "elapsedMs": 5074.27
     },
     {
       "view": "reports-monthly",
@@ -289,7 +289,7 @@
       "rows": 21156,
       "responseBytes": 3639270,
       "payloadBytes": 3990,
-      "elapsedMs": 5339.25
+      "elapsedMs": 5022.77
     },
     {
       "view": "reports-yearly",
@@ -300,7 +300,7 @@
       "rows": 21156,
       "responseBytes": 3639270,
       "payloadBytes": 35479,
-      "elapsedMs": 5044.37
+      "elapsedMs": 4872.33
     },
     {
       "view": "year-in-reading",
@@ -310,8 +310,8 @@
       "requests": 220,
       "rows": 21156,
       "responseBytes": 3639270,
-      "payloadBytes": 38747,
-      "elapsedMs": 5138.66
+      "payloadBytes": 36316,
+      "elapsedMs": 4907.38
     }
   ]
 }
