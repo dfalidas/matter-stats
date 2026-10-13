@@ -170,9 +170,11 @@ undo and retains Task 16–17 completeness. It restores duplicated reads and
 larger props. Live/deployed performance and concurrent-write snapshot semantics
 remain external gates; synthetic fixtures do not establish production behavior.
 
-## Final validation
+## Original Task 18 local validation (historical)
 
-Checks below ran against runtime checkpoint `4ead3c0`; the final delivery commit
+The results below preserve the original delivery-time record. The audit
+interpretation and outstanding CI/database/preview gates are reconciled in the
+follow-up section below. Checks ran against runtime checkpoint `4ead3c0`; the delivery commit
 adds refreshed evidence/documentation, measurement-method wording and a
 whitespace-only helper cleanup; application behavior is unchanged.
 
@@ -186,10 +188,11 @@ whitespace-only helper cleanup; application behavior is unchanged.
   `A compatible remediation is available for chokidar; update the reviewed dependency baseline and remove the GHSA-vfj7-8cjw-p6xm exception`.
   The production audit has **0 vulnerabilities**; the full audit has **8 high
   entries**. Package versions, lockfile, audit policy and exception are identical
-  to the recorded baseline. The current registry reports `fixAvailable: true`
-  for this development dependency, so the existing policy correctly rejects its
-  exception. Changing dependencies or weakening audit policy would violate this
-  task's scope. This remains a release/CI gate, not a claimed passing check.
+  to the recorded baseline. The local npm report contained `fixAvailable: true`, which the unchanged
+  policy rejected. This was initially interpreted as a compatible dependency
+  fix and recorded as a release gate. The follow-up below proves that this
+  interpretation came from incomplete npm metadata; the command failure itself
+  remains historical evidence. No dependencies or policy were changed.
 - **Blocked:** no implementation or draft-delivery blocker; audit remediation
   remains a release gate.
 - **Skipped:** opt-in isolated fresh/upgrade/security database execution (no
@@ -208,3 +211,157 @@ validation. The final full run completed successfully without contacting a real
 database or Matter. Earlier failures are not final acceptance evidence.
 
 Sanitized check summary: [validation JSON](evidence/task-18-validation.json).
+
+
+## Audit discrepancy follow-up (2026-10-13)
+
+Scope is evidence/documentation only on the existing draft PR #81. Local and
+remote heads were inspected first and both matched reviewed head
+`6c500b02a0680dc3e8d8f196a607e38b7840d1be`; the worktree was clean.
+Task 18 implementation, measurements, dependencies, lockfile, audit policy,
+exception and CI enforcement are unchanged. No application checks or benchmark
+runs were repeated. The previous local audit failure is retained above and in
+`historicalLocalValidation` in the validation JSON.
+
+### Exact CI-toolchain reproduction
+
+An isolated archive of reviewed SHA `6c500b02a0680dc3e8d8f196a607e38b7840d1be`
+was installed with the official Node **22.23.3** binary and bundled npm
+**10.9.9**, matching the successful CI job. The binary was verified against
+Node's official SHA-256 manifest. Registry: **https://registry.npmjs.org/**.
+A new empty `mktemp` cache was scoped to both installation and audit; neither
+repo `node_modules` nor the original reports were overwritten.
+
+| Verification | Node / npm | Cache | Command / exit | Full high entries | Production findings | Chokidar remediation |
+| --- | --- | --- | --- | ---: | ---: | --- |
+| CI run 38415550720 | 22.23.3 / 10.9.9 | GitHub runner | `npm run audit:ci` / 0 | 8 | 0 | `false` |
+| Fresh isolated reproduction | 22.23.3 / 10.9.9 | Initially empty, writable | `npm ci` / 0; `npm run audit:ci` / 0 | 8 | 0 | `false` |
+| Original runtime control | 24.19.0 / 11.9.0 | Default `/home/agent/.npm`, unavailable in sandbox | `npm run audit:ci` / 1 | 8 | 0 | `true`, with empty affected ranges |
+| Same installed tree/runtime control | 24.19.0 / 11.9.0 | New empty, writable | `npm_config_cache=<new-cache> npm run audit:ci` / 0 | 7 | 0 | `{name: "tailwindcss", version: "4.3.3", isSemVerMajor: true}` |
+
+The npm 10 reproduction's full and production reports are **byte-identical** to
+retained CI artifact **11824311698**, whose archive checksum was independently
+verified. Full JSON SHA-256:
+`39ee0782148e3cd818235b3fe5c541c200e94603c1103d750cfe09c2d4f58938`.
+Production JSON SHA-256:
+`31b90573b69000532cd0814cdaad5c24409299b1b2915c09085d2cb844233cfa`.
+The original failure's reports are also reproduced byte-for-byte by the
+unavailable-default-cache control. Each control uses the same registry and
+locked installed dependency tree; no `audit fix`, overrides or force flags.
+
+Reproduction outline (the exact snapshot and binary checksums are in JSON):
+
+```sh
+# Download/verify official Node 22.23.3 and put its bin directory first in PATH.
+audit_case=$(mktemp -d /tmp/task18-audit-match.XXXXXX)
+mkdir "$audit_case/work" "$audit_case/cache"
+git archive 6c500b02a0680dc3e8d8f196a607e38b7840d1be | tar -x -C "$audit_case/work"
+cd "$audit_case/work"
+export npm_config_cache="$audit_case/cache"
+node --version                  # v22.23.3
+npm --version                   # 10.9.9
+npm config get registry         # https://registry.npmjs.org/
+npm ci                          # exit 0
+npm run audit:ci                # exit 0, unchanged command/policy
+```
+
+### Proven cause and dependency verification
+
+This is an npm metadata/caching failure in the sandbox, not a proven new
+compatible dependency remediation. The default cache cannot be created there.
+`npm view chokidar@3.6.0 version --json` exits **1** with:
+
+```text
+ENOENT: no such file or directory, mkdir '/home/agent/.npm/_cacache'
+Invalid response body while trying to fetch https://registry.npmjs.org/chokidar
+```
+
+The installed `@npmcli/metavuln-calculator@9.0.3` catches package-metadata
+(`packument`) fetch errors in `lib/index.js` and substitutes `{name, versions:{}}`.
+Consequently npm can emit successful audit JSON with incomplete downstream
+remediation calculations even though the bulk advisory endpoint succeeded.
+The historical report has empty affected ranges on all entries and no
+`chokidar.effects` parent; npm 10's valid report has range `2.0.0 - 3.6.0`,
+parent `tailwindcss`, and `fixAvailable: false`. Changing only cache availability
+on the same Node/npm/installed tree reproduces or removes the original failure.
+This establishes the cache/metadata cause; **npm version alone is not the cause**.
+Fresh npm 11 also computes seven entries and major remediation candidates;
+the remaining version-specific attribution differences were not fully traced
+and are not treated as disappearance of the advisory or proof of a supported fix.
+
+The [official advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)
+(updated 2026-10-02) covers **braces <= 3.0.3**, has **no first patched version**,
+and describes stack-exhaustion denial of service through deeply nested patterns.
+Registry metadata still lists **3.0.3** as the latest stable braces release.
+The actual lockfile has:
+
+- `tailwindcss@3.4.19 -> chokidar@3.6.0 -> braces@3.0.3`;
+- `tailwindcss@3.4.19 -> micromatch@4.0.8 -> braces@3.0.3`;
+- `eslint-config-next@15.5.27 -> @next/eslint-plugin-next@15.5.27 -> fast-glob@3.3.1 -> micromatch@4.0.8 -> braces@3.0.3`.
+
+Tailwind specifies **chokidar ^3.6.0**. The highest published version satisfying
+that range is **3.6.0**. Chokidar **4.0.3** drops braces but fails that parent range
+so it is not a supported compatible transitive patch.
+It also would not remove the independent micromatch/ESLint paths. Fresh npm 11's
+Tailwind **4.3.3** target is explicitly a **major** change; npm's ESLint target
+**14.2.35** is an incompatible downgrade from the Next 15 configuration. These
+are unreviewed suggestions, not endorsed full remediations. No supported
+compatible dependency change was verified or performed.
+
+The real development-only advisory remains. The unchanged exception still
+applies; production audits remain clean. The originally inferred compatible-fix
+release blocker is reconciled under the CI toolchain with a valid cache. This
+conclusion comes from artifact equality, controlled reproduction, official
+advisory metadata and dependency-range checks—not merely green CI.
+
+### Completed CI, database and preview evidence
+
+[CI run 38415550720](https://github.com/dfalidas/matter-stats/actions/runs/38415550720)
+completed successfully. Its **verify** job `115358903865` checked out the PR test
+merge **27e2716b41a8f7572dd016d5d953def1eca797d7**, not the branch commit directly.
+The job log confirms that SHA and Node/npm versions. GitHub's merge tree and the
+reviewed head both have tree **7ff9f2ca2927fd4b18d4d3968926373a34d1815d**, so their
+contents are identical. Install, route generation, typecheck, lint, 335 tests,
+build and audit passed. The artifact's workflow head is reviewed **6c500b0**;
+that association is distinguished from the actual verify checkout SHA above.
+
+The **fresh/upgrade database** job `115358903214` checked out exact branch head
+**6c500b02a0680dc3e8d8f196a607e38b7840d1be**. Retained artifact **11823814476** was
+downloaded and its SHA-256 verified. Its `ci.json`, `results.json` and
+`cleanup.json` confirm both paths passed catalog/grant/RLS and Data API checks,
+lease/fencing, atomic-page/rollup, continuation/history and shared-quota/retry
+verification; upgrade data/state preservation passed. These used real SQL/Data
+API only in owned disposable instances and synthetic Matter fixtures. Cleanup
+passed: both resources stopped and the temporary directory was removed.
+No database verification or SQL was rerun in this follow-up.
+
+The existing Vercel branch preview deployment
+`dpl_GkUSiempk6A5btp9Cu84L68ZsBri` is **READY** and its provider metadata pins
+**6c500b02a0680dc3e8d8f196a607e38b7840d1be** on `task-18-analytics-reuse`.
+GitHub's commit status is `success`. Immutable URL:
+https://matter-stats-5c66k85os-dfalidas-7836s-projects.vercel.app .
+This proves successful existing preview deployment/status only; no browser,
+authenticated analytics, production correctness or performance test is inferred.
+No deployment was initiated by this follow-up.
+
+### Current result and remaining gates
+
+- **Passed:** fresh CI-version `npm ci` and unchanged `audit:ci`; exact CI-report
+  equality; same-runtime cache controls; advisory/parent-range verification;
+  evidence JSON/hash/scope checks and `git diff --check`. Completed CI/database/
+  preview results above are attached to their actual original SHAs.
+- **Historical failed:** the original local audit and reproduced unavailable-cache
+  control (exit 1), preserved without relabeling them as successes.
+- **Blocked:** no audit discrepancy or newly established compatible-remediation
+  blocker under the unchanged policy. The real advisory and its exception remain.
+- **Skipped:** unrelated application checks, Task 18 measurements, new database
+  runs and preview functional tests, since this is documentation/evidence only.
+- **Remaining merge gates:** normal review and required checks on the new evidence
+  commit; do not claim the earlier run tested that newer SHA. Keep PR #81 draft.
+  Dependency remediation requires a separate supported change if one becomes
+  available; no override/major migration/audit-policy weakening is authorized here.
+
+Raw audit reports, command output, default-cache diagnostic and official advisory
+summary are retained in [audit follow-up evidence](evidence/task-18-audit-followup/).
+The [validation JSON](evidence/task-18-validation.json) separates the historical
+local record, new verification and completed external results.

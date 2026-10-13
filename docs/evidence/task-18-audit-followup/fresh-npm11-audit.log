@@ -1,0 +1,12 @@
+
+> matter-stats@0.1.0 audit:ci
+> node scripts/audit-policy.mjs
+
+Full audit: 7 finding entries (low 0, moderate 0, high 7, critical 0).
+Allowed development-only exception: GHSA-vfj7-8cjw-p6xm.
+Production audit: 0 vulnerabilities.
+npm notice
+npm notice New major version of npm available! 11.9.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice
