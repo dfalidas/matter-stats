@@ -17,7 +17,7 @@ type Options = {
  * query evaluator or the production pagination helper.
  */
 export function cappedPostgrest(tables: Record<string, Row[]>, options: Options = {}) {
-  const requests: Array<{ table: string; url: URL; ids: unknown[] }> = [];
+  const requests: Array<{ table: string; url: URL; ids: unknown[]; rowCount: number; responseBytes: number }> = [];
   const fetch: typeof globalThis.fetch = async (input, init) => {
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input : input.url);
     if (options.maxUrlBytes) assert.ok(url.href.length <= options.maxUrlBytes, `encoded request exceeds ${options.maxUrlBytes} bytes`);
@@ -59,9 +59,14 @@ export function cappedPostgrest(tables: Record<string, Row[]>, options: Options 
     const limit = Math.min(Number(url.searchParams.get("limit") ?? Infinity), options.cap ?? 1000);
     const total = result.length;
     result = result.slice(offset, offset + limit);
-    requests.push({ table, url, ids: result.map((r) => r.id) });
+    const record = { table, url, ids: result.map((r) => r.id), rowCount: result.length, responseBytes: 0 };
+    requests.push(record);
+    const finish = async (response: Response) => {
+      record.responseBytes = Buffer.byteLength(await response.clone().text());
+      return response;
+    };
     const injected = options.respond?.(request, result);
-    if (injected) return injected;
+    if (injected) return finish(injected);
     // Materialize declared to-one FK embeds unless the test explicitly supplies
     // an object/array/null relationship shape. Project fields just like the API.
     result = result.map((row) => {
@@ -82,10 +87,10 @@ export function cappedPostgrest(tables: Record<string, Row[]>, options: Options 
     });
     const headers = new Headers(init?.headers);
     if (headers.get("prefer")?.includes("count=exact")) {
-      return new Response(init?.method === "HEAD" ? null : JSON.stringify(result), { headers: { "content-range": `${offset}-${offset + result.length - 1}/${total}` } });
+      return finish(new Response(init?.method === "HEAD" ? null : JSON.stringify(result), { headers: { "content-range": `${offset}-${offset + result.length - 1}/${total}` } }));
     }
-    if (headers.get("accept")?.includes("vnd.pgrst.object")) return Response.json(result[0] ?? null);
-    return Response.json(result);
+    if (headers.get("accept")?.includes("vnd.pgrst.object")) return finish(Response.json(result[0] ?? null));
+    return finish(Response.json(result));
   };
   const client = createClient<Database>("https://synthetic.invalid", "synthetic-test-key", {
     global: { fetch }, auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
