@@ -109,6 +109,8 @@ begin
       preserve_original=case when p_original then public.reading_generation_days.preserve_original else false end;
 end;
 $$;
+-- Deterministic fencing errors use 55000, never 40001: Data API transaction
+-- adapters may automatically retry serialization failures indefinitely.
 -- Statement-level mutex is taken BEFORE raw row locks. Same mutex for repair/cutover.
 create function public.repair_source_guard() returns trigger
 language plpgsql volatile security invoker set search_path='' as $$
@@ -176,7 +178,7 @@ begin
     raise exception 'Explicit valid repair contract required' using errcode='22023'; end if;
   select * into c from public.reading_generation_control where singleton for update;
   if c.active is distinct from p_expected_active or c.epoch<>p_expected_epoch or c.building is not null then
-    raise exception 'Conflicting repair operator or generation' using errcode='40001'; end if;
+    raise exception 'Conflicting repair operator or generation' using errcode='55000'; end if;
   base:=case when c.active is null then gen_random_uuid() else c.active end;
   if c.active is null then
     insert into public.reading_generations(id,timezone,state,owner,expires_at,captured_revision)
@@ -195,7 +197,7 @@ begin
   perform 1 from public.reading_generation_control where singleton for update;
   select * into g from public.reading_generations where id=p_id for update;
   if not found or p_owner is null or p_expected_fence is null or g.fence<>p_expected_fence then
-    raise exception 'Stale repair fence' using errcode='40001'; end if;
+    raise exception 'Stale repair fence' using errcode='55000'; end if;
   if g.owner<>p_owner and g.expires_at>clock_timestamp() then raise exception 'Repair worker busy' using errcode='55P03'; end if;
   update public.reading_generations set owner=p_owner,fence=fence+1,expires_at=clock_timestamp()+interval '120 seconds'
     where id=p_id returning * into g;
@@ -209,7 +211,7 @@ begin
   perform 1 from public.reading_generation_control where singleton for update;
   select * into g from public.reading_generations where id=p_id for update;
   if not found or p_owner is null or p_fence is null or g.owner<>p_owner or g.fence<>p_fence or g.expires_at<=clock_timestamp() then
-    raise exception 'Stale or expired repair owner' using errcode='40001'; end if;
+    raise exception 'Stale or expired repair owner' using errcode='55000'; end if;
   update public.reading_generations set expires_at=clock_timestamp()+interval '120 seconds' where id=p_id;
   return g;
 end;
@@ -227,7 +229,7 @@ begin
     raise exception 'Invalid repair batch budget' using errcode='22023'; end if;
   g:=public.repair_assert(p_id,p_owner,p_fence);
   select * into c from public.reading_generation_control where singleton;
-  if c.building is distinct from p_id then raise exception 'Repair no longer selected' using errcode='40001'; end if;
+  if c.building is distinct from p_id then raise exception 'Repair no longer selected' using errcode='55000'; end if;
   if g.state in ('capture_sessions','capture_days','verify_sessions','verify_days') and c.frozen is distinct from p_id then
     raise exception 'Source barrier lost; cancel and restart, never combine captures' using errcode='55000'; end if;
   if g.state in ('capture_sessions','capture_days') and c.source_revision<>g.captured_revision then
@@ -392,7 +394,7 @@ begin
   if not p_rollback and g.cutover_epoch=c.epoch and c.active=p_id then return to_jsonb(c); end if;
   if not p_rollback and g.state='noop' and c.active=g.parent and c.epoch=g.reconciled_epoch then return to_jsonb(c); end if;
   if c.active is distinct from p_expected_active or c.epoch<>p_expected_epoch or c.frozen is not null then
-    raise exception 'Conflicting or stale transition' using errcode='40001'; end if;
+    raise exception 'Conflicting or stale transition' using errcode='55000'; end if;
   if p_rollback then
     if c.active<>p_id or c.previous is distinct from g.parent or c.building is not null
       or not exists(select 1 from public.reading_generations where id=g.parent and state='retained'

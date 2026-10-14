@@ -15,8 +15,8 @@ assert.equal(process.env.DISPOSABLE_DB_ACK,'yes');
 const project=process.env.STABILIZATION_TEST_SQL_PROJECT;
 assert.match(project??'',/^matter-stats-(fresh|upgrade)-[a-z0-9-]+$/);
 const sqlOnly=process.env.TASK20_SQL_ONLY==='yes',root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
-const config={command:'docker',args:['--host=unix:///var/run/docker.sock','exec','-i',`supabase_db_${project}`,'psql','-XAtq','-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres','-f','-'],env:sanitizedEnvironment()};
-function sql(statement){return new Promise((resolve,reject)=>{const c=spawn(config.command,config.args,{env:config.env,stdio:['pipe','pipe','pipe']});let out='',error='';c.stdout.on('data',d=>out+=d);c.stderr.on('data',d=>error+=d);c.on('error',reject);c.on('close',code=>code===0?resolve(out.trim()):reject(new Error(`Synthetic SQL failed: ${error}`)));c.stdin.end(statement);});}
+const config={command:'docker',args:['--host=unix:///var/run/docker.sock','exec','-i',`supabase_db_${project}`,'psql','-XAtq','-v','ON_ERROR_STOP=1','-v','VERBOSITY=verbose','-U','postgres','-d','postgres','-f','-'],env:sanitizedEnvironment()};
+function sql(statement){return new Promise((resolve,reject)=>{const c=spawn(config.command,config.args,{env:config.env,stdio:['pipe','pipe','pipe']});let out='',error='';c.stdout.on('data',d=>out+=d);c.stderr.on('data',d=>error+=d);c.on('error',reject);c.on('close',code=>code===0?resolve(out.trim()):reject(Object.assign(new Error(`Synthetic SQL failed: ${error}`),{code:error.match(/ERROR:\s+([A-Z0-9]{5}):/)?.[1]})));c.stdin.end(statement);});}
 const q=v=>v===null?'null':typeof v==='object'?`'${JSON.stringify(v).replaceAll("'","''")}'::jsonb`:typeof v==='string'?`'${v.replaceAll("'","''")}'`:String(v);
 let service,anon,authenticated,authUser;
 if(!sqlOnly){
@@ -34,8 +34,10 @@ async function rpc(name,args){
       'activities',(select jsonb_agg(v) from (select state,wait_event_type,wait_event,count(*) from pg_stat_activity where backend_type='client backend' group by state,wait_event_type,wait_event) v)) from public.reading_generations g where id=${q(args.p_id)};`);
     console.error('Synthetic repair batch diagnostic',JSON.stringify({status:r.status,code:r.error.code,diagnostic}));
   }
+  if(r.error)throw Object.assign(new Error(`${name}: ${r.error.message}`),{code:r.error.code,status:r.status});
   assertSuccessful(r,name);return r.data;
 }
+const expectFailure=(promise,code='55000')=>assert.rejects(promise,error=>error.code===code);
 const json=async s=>JSON.parse(await sql(s));
 const control=()=>json('select to_jsonb(c)::text from public.reading_generation_control c;');
 const run=id=>json(`select to_jsonb(g)::text from public.reading_generations g where id='${id}';`);
@@ -117,7 +119,7 @@ try {
     insert into public.reading_sessions(id,started_at,duration_seconds,source_device) values('','2401-01-01T10:00:00Z',1,'${prefix}');`);
   let bad=await capture(await prepare(true));assert.equal(bad.state,'blocked');assert.equal(bad.invalid_rows,3);
   assert.deepEqual(await json(`select to_jsonb(invalid_reasons) from public.reading_repair_source where generation='${bad.id}' and key='${prefix}-invalid';`),['invalid_duration','invalid_timestamp']);
-  await assert.rejects(transition(bad));cli('cancel',{run:bad.id,owner:bad.owner,fence:bad.fence});
+  await expectFailure(transition(bad));cli('cancel',{run:bad.id,owner:bad.owner,fence:bad.fence});
   await sql(`delete from public.reading_sessions where id in ('${prefix}-invalid','${prefix}-infinite') or (id='' and source_device='${prefix}');`);
   checks.push('Unresolved invalid historical input remains explicit; capture completes blocked, cutover rejected, owned seed removed without automatic correction');
   await sql(`insert into public.matter_items(id,title,source,word_count,progress) values('${prefix}-item','Synthetic repair item','preserve-metadata.example',999999,0.4);
@@ -133,11 +135,11 @@ try {
     insert into public.daily_stats(date,reading_time_seconds,words_read,sessions_count,items_read_count,highlights_count,top_source)
       values('2400-12-31',60,1000,1,7,11,'unknown-utc.example'),('2401-01-01',10300,30000,3,42,17,'preserve.example'),('2401-01-03',60,1000,1,8,9,'stale.example');`);
   const before=await snapshot();let g=await prepare();
-  await assert.rejects(sql(`insert into public.reading_sessions(id,started_at,duration_seconds) values('${prefix}-blocked','2401-01-01T12:00:00Z',1);`));
+  await expectFailure(sql(`insert into public.reading_sessions(id,started_at,duration_seconds) values('${prefix}-blocked','2401-01-01T12:00:00Z',1);`));
   const prior=await run(g.id);
   await sql('revoke select on public.reading_sessions from service_role;');
-  try {await assert.rejects(batch(g));assert.deepEqual(await run(g.id),prior);} finally {await sql('grant select on public.reading_sessions to service_role;');}
-  await assert.rejects(sql(`begin;select public.repair_batch('${g.id}','${g.owner}',${g.fence},100,1000);select 1/0;commit;`));
+  try {await expectFailure(batch(g),'42501');assert.deepEqual(await run(g.id),prior);} finally {await sql('grant select on public.reading_sessions to service_role;');}
+  await expectFailure(sql(`begin;select public.repair_batch('${g.id}','${g.owner}',${g.fence},100,1000);select 1/0;commit;`),'22012');
   assert.deepEqual(await run(g.id),prior);assert.equal(await sql(`select count(*) from public.reading_repair_source where generation='${g.id}';`),'0');
   // A fresh process commits a batch, then is killed before receiving an operator response.
   const worker=`import {repairQuery} from ${JSON.stringify(new URL('../../scripts/historical-repair.mjs',import.meta.url).href)}; await repairQuery(${JSON.stringify(config)},${JSON.stringify(`select public.repair_batch('${g.id}','${g.owner}',${g.fence},500,1000)`)}); process.kill(process.pid,'SIGKILL');`;
@@ -146,23 +148,23 @@ try {
   g=cli('resume',{run:g.id,owner:g.owner,fence:g.fence,rows:1,milliseconds:1}).run;
   g=cli('execute',{run:g.id,owner:g.owner,fence:g.fence,rows:1,milliseconds:1}).run;
   const staleWorker=g;const successor=crypto.randomUUID();
-  await assert.rejects(rpc('repair_claim',{p_id:g.id,p_owner:successor,p_expected_fence:g.fence}));
+  await expectFailure(rpc('repair_claim',{p_id:g.id,p_owner:successor,p_expected_fence:g.fence}),'55P03');
   await sql(`update public.reading_generations set expires_at=clock_timestamp()-interval '1 second' where id='${g.id}';`);
   g=cli('claim',{run:g.id,owner:successor,fence:g.fence});
-  await assert.rejects(batch(staleWorker));await assert.rejects(transition(g));
+  await expectFailure(batch(staleWorker));await expectFailure(transition(g));
   // Simulate an incompatible privileged actor losing the barrier between chunks.
   // Restoring its flag cannot turn those chunks back into a consistent capture.
   await sql(`update public.reading_generation_control set frozen=null where singleton;
     insert into public.reading_sessions(id,started_at,duration_seconds,words_estimated) values('${prefix}-inconsistent','2401-01-01T12:00:00Z',1,4);
     update public.reading_generation_control set frozen='${g.id}' where singleton;`);
-  const interrupted=await run(g.id);await assert.rejects(batch(g));assert.deepEqual(await run(g.id),interrupted);await assert.rejects(transition(g));
+  const interrupted=await run(g.id);await expectFailure(batch(g));assert.deepEqual(await run(g.id),interrupted);await expectFailure(transition(g));
   await rpc('repair_cancel',args(g));await sql(`delete from public.reading_sessions where id='${prefix}-inconsistent';`);
   assert.equal(await snapshot(),before);g=await capture(await prepare());assert.equal(g.state,'catchup');assert.equal(await snapshot(),before);
   checks.push('A restored barrier cannot certify capture chunks after source revision changes; lost consistency rejects further progress and activation and requires explicit cancellation/new immutable capture');
   checks.push('10000+ tied sessions; atomic batch rollback/checkpoint; committed-response loss/SIGKILL; fresh-process resume; interrupted capture barrier; competing owner/stale fence/expiry takeover; no partial activation');
   const corrupt=g;
   await sql(`update public.reading_generation_sessions set words_estimated=words_estimated+1 where generation='${corrupt.id}' and id='${prefix}-boundary-130';`);
-  const rejected=await reconcile(corrupt);assert.equal(rejected.state,'blocked');assert.ok(rejected.mismatches>0);await assert.rejects(transition(rejected));
+  const rejected=await reconcile(corrupt);assert.equal(rejected.state,'blocked');assert.ok(rejected.mismatches>0);await expectFailure(transition(rejected));
   await rpc('repair_cancel',args(rejected));
   assert.equal(await snapshot(),before);g=await capture(await prepare());assert.equal(g.state,'catchup');
   checks.push('Independent reconciliation catches a deliberately corrupted shadow estimate, blocks readiness/cutover, retains evidence on explicit cancel and permits a clean bounded replacement run without raw correction');
@@ -179,7 +181,7 @@ try {
   assert.equal(await sql(`select md5(string_agg(row_data::text,E'\\n' order by kind,key)) from public.reading_repair_source where generation='${g.id}';`),captured);
   const changedSnapshot=await snapshot();g=await reconcile(g);assert.equal(g.state,'ready');assert.equal(g.mismatches,0);const ref=await reference(g.id);
   assert.equal(await sql(`select sum(words_estimated) from public.reading_generation_sessions where generation='${g.id}' and id like '${prefix}-sixty-%';`),'675');
-  await assert.rejects(estimates(g.id,[`${prefix}-boundary-130`]));
+  await expectFailure(estimates(g.id,[`${prefix}-boundary-130`]));
   const bounds=await json(`select jsonb_agg(jsonb_build_object('id',id,'words_estimated',words_estimated)) from public.reading_generation_sessions where generation='${g.id}' and id in (${[2,6,130,246,262].map(i=>q(`${prefix}-boundary-${i}`)).join(',')});`);assert.deepEqual(new Map(bounds.map(r=>[r.id,r.words_estimated])),new Map([[2,8],[6,23],[130,487],[246,922],[262,982]].map(([i,w])=>[`${prefix}-boundary-${i}`,w])));
   if(!sqlOnly){
     // Exercise actual low-cap raw keyset and production derived readers.
@@ -205,12 +207,12 @@ try {
   assert.deepEqual(await transition(g,true),rollback);assert.equal(await snapshot(),changedSnapshot);
   checks.push('Bounded atomic cutover and rollback before ingestion; captured request generation remains old across switch; stale reading dates zeroed while unrelated daily metadata retained; raw UTC/durations/ids/all columns unchanged');
   // Rollback switches away; this retained canonical generation cannot be reactivated by an old operator.
-  await assert.rejects(transition(g));
+  await expectFailure(transition(g));
   // New repair for the ingestion-after-cutover and stale-readiness cases.
   let next=await capture(await prepare());next=await reconcile(next);
   const readiness=await control();
   await sql(`update public.reading_sessions set started_at='2401-01-02T13:00:00Z' where id='${prefix}-000-new';`);
-  await assert.rejects(transition(next,false,readiness));next=await reconcile(next);assert.equal(next.state,'ready');
+  await expectFailure(transition(next,false,readiness));next=await reconcile(next);assert.equal(next.state,'ready');
   const preBoundary=JSON.parse(await snapshot());await boundary(next);
   const postBoundary=JSON.parse(await snapshot());assert.deepEqual(postBoundary.sessions.filter(s=>s.id!==`${prefix}-boundary-race`),preBoundary.sessions);assert.deepEqual(postBoundary.daily,preBoundary.daily);await reference(next.id);
   if(!sqlOnly){
@@ -230,7 +232,7 @@ try {
   const refAfter=await reference(next.id),afterIngest=await snapshot();const rollbackContract=await control();cli('rollback',{run:next.id,owner:next.owner,fence:next.fence,active:rollbackContract.active,epoch:rollbackContract.epoch});assert.equal(await snapshot(),afterIngest);
   const target=await control();assert.equal((await estimates(target.active,[`${prefix}-after-1`]))[0].words_estimated,4);
   assert.equal(await sql(`select sessions_count from public.reading_generation_days where generation='${target.active}' and date='2401-01-04';`),'3');
-  assert.deepEqual(await transition(next,true),target);await assert.rejects(transition(next,false,readiness));
+  assert.deepEqual(await transition(next,true),target);await expectFailure(transition(next,false,readiness));
   checks.push('Transactional cutover mutex demonstrably queues a racing insert which maintains the newly active generation; behind-cursor insert/update/date reassignment caught; readiness invalidated by racing input; normal fenced page ingestion and exact dirty-rollup recovery maintain active/rollback generations; rollback conservatively reconciles all unknown-calendar baseline dates, including obsolete UTC buckets, and includes every newly imported raw session and repeats idempotently');
   // Canonical cutover then unchanged run must produce no switch.
   let canonical=await reconcile(await capture(await prepare()));await transition(canonical);const unchangedControl=await control();const stableBefore=await snapshot();
