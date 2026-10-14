@@ -1,0 +1,604 @@
+{
+  "testedImplementationSha": "232bf91b059ece57cf973a2c31a737fa7fd94559",
+  "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/38596988638",
+  "artifact": "https://github.com/dfalidas/matter-stats/actions/runs/38596988638/artifacts/11910743702",
+  "artifactIndependentlyDownloadedAndInspected": true,
+  "syntheticOnly": true,
+  "cleanup": "passed",
+  "paths": [
+    {
+      "name": "fresh",
+      "catalog": "passed",
+      "migrationHistory": [
+        "20260513000000",
+        "20260514000000",
+        "20260515000000",
+        "20260515010000",
+        "20260515020000",
+        "20260515030000",
+        "20260518000000",
+        "20260519090000",
+        "20260929000000",
+        "20260929010000",
+        "20261004000000",
+        "20261004010000",
+        "20261005000000",
+        "20261007085051",
+        "20261007132750",
+        "20261007145024",
+        "20261008095102",
+        "20261014084407",
+        "20261014140402"
+      ],
+      "task19To20Preservation": "not applicable",
+      "repair": {
+        "checks": [
+          "Unresolved invalid historical input remains explicit; capture completes blocked, cutover rejected, owned seed removed without automatic correction",
+          "A restored barrier cannot certify capture chunks after source revision changes; lost consistency rejects further progress and activation and requires explicit cancellation/new immutable capture",
+          "10000+ tied sessions; atomic batch rollback/checkpoint; committed-response loss/SIGKILL; fresh-process resume; interrupted capture barrier; competing owner/stale fence/expiry takeover; no partial activation",
+          "Independent reconciliation catches a deliberately corrupted shadow estimate, blocks readiness/cutover, retains evidence on explicit cancel and permits a clean bounded replacement run without raw correction",
+          "Task 19 immutable daily/monthly old/new/delta, missing/stale dates and unavailable legacy explanations consumed; provenance never inferred from equality",
+          "Bounded atomic cutover and rollback before ingestion; captured request generation remains old across switch; stale reading dates zeroed while unrelated daily metadata retained; raw UTC/durations/ids/all columns unchanged",
+          "Transactional cutover mutex demonstrably queues a racing insert which maintains the newly active generation; behind-cursor insert/update/date reassignment caught; readiness invalidated by racing input; normal fenced page ingestion and exact dirty-rollup recovery maintain active/rollback generations; rollback conservatively reconciles all unknown-calendar baseline dates, including obsolete UTC buckets, and includes every newly imported raw session and repeats idempotently",
+          "Repeated completed run over unchanged inputs independently reconciles identically and performs no unnecessary cutover; all source/unrelated/progress values preserved",
+          "Real anonymous and authenticated Data API denials for every generation table and operator/read RPC; invoker exact ACL/search_path inventory; server production read/page/ack paths exercised",
+          "Actual isolated operator CLI prepare/status/execute/resume/claim/preview/reconcile/cancel/cutover/rollback exercised in fresh processes with dedicated synthetic libpq configuration"
+        ],
+        "checkCounts": {
+          "passed": 10,
+          "failed": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "reference": {
+          "sessions": 10614,
+          "days": 9
+        },
+        "afterIngestion": {
+          "sessions": 10618,
+          "days": 10
+        },
+        "reconciliation": {
+          "scope": {
+            "start": "2400-12-31",
+            "end": "2401-01-04",
+            "timezone": "Europe/Athens",
+            "range": "[start,end)",
+            "sessions": "All stored sessions scanned, including invalid/unlocatable and outside-range rows for trustworthy old-zone counterfactuals",
+            "daily": "All stored daily rows fingerprinted; reconciliation limited to calendar range"
+          },
+          "methods": {
+            "wordMethod": "session-duration-225-round-v1",
+            "calendarMethod": "local-occurrence-day-v1",
+            "formula": "Math.round(duration_seconds / 60 * 225)",
+            "wpm": 225,
+            "rounding": "Round each valid session, then sum; never round an aggregate duration.",
+            "calendar": "APP_TIMEZONE (default Europe/Athens); [start,end); whole duration on occurrence date; UTC source unchanged; no interval splitting."
+          },
+          "provenance": {
+            "canonical": 0,
+            "legacyUnknown": 10608,
+            "other": 0
+          },
+          "invalid": {
+            "sessions": {},
+            "daily": {},
+            "sessionRows": 0,
+            "dailyRows": 0,
+            "unlocatableSessions": 0,
+            "affectedLocalDays": {}
+          },
+          "daily": [
+            {
+              "date": "2400-12-31",
+              "proposed": {
+                "reading_time_seconds": 0,
+                "words_read": 0,
+                "sessions_count": 0
+              },
+              "storedSessionWords": 0,
+              "unavailableStoredSessionWords": 0,
+              "old": {
+                "reading_time_seconds": 60,
+                "words_read": 1000,
+                "sessions_count": 1
+              },
+              "oldProvenance": null,
+              "sessionWordDelta": 0,
+              "delta": {
+                "reading_time_seconds": -60,
+                "words_read": -1000,
+                "sessions_count": -1
+              },
+              "missingRollup": false,
+              "staleDateWouldBecomeEmpty": true,
+              "explanation": {
+                "status": "unavailable",
+                "wordMethodDifference": null,
+                "timezoneReassignment": null,
+                "unexplainedResidual": null,
+                "reason": "Old calendar provenance or stored session-word baseline unavailable; equality does not identify a method."
+              }
+            },
+            {
+              "date": "2401-01-01",
+              "proposed": {
+                "reading_time_seconds": 10183,
+                "words_read": 40687,
+                "sessions_count": 10006
+              },
+              "storedSessionWords": 33009,
+              "unavailableStoredSessionWords": 0,
+              "old": {
+                "reading_time_seconds": 10300,
+                "words_read": 30000,
+                "sessions_count": 3
+              },
+              "oldProvenance": null,
+              "sessionWordDelta": 7678,
+              "delta": {
+                "reading_time_seconds": -117,
+                "words_read": 10687,
+                "sessions_count": 10003
+              },
+              "missingRollup": false,
+              "staleDateWouldBecomeEmpty": false,
+              "explanation": {
+                "status": "unavailable",
+                "wordMethodDifference": null,
+                "timezoneReassignment": null,
+                "unexplainedResidual": null,
+                "reason": "Old calendar provenance or stored session-word baseline unavailable; equality does not identify a method."
+              }
+            },
+            {
+              "date": "2401-01-02",
+              "proposed": {
+                "reading_time_seconds": 180430,
+                "words_read": 676681,
+                "sessions_count": 602
+              },
+              "storedSessionWords": 0,
+              "unavailableStoredSessionWords": 0,
+              "old": null,
+              "oldProvenance": null,
+              "sessionWordDelta": 676681,
+              "delta": null,
+              "missingRollup": true,
+              "staleDateWouldBecomeEmpty": false,
+              "explanation": {
+                "status": "unavailable",
+                "wordMethodDifference": null,
+                "timezoneReassignment": null,
+                "unexplainedResidual": null,
+                "reason": "Old calendar provenance or stored session-word baseline unavailable; equality does not identify a method."
+              }
+            },
+            {
+              "date": "2401-01-03",
+              "proposed": {
+                "reading_time_seconds": 0,
+                "words_read": 0,
+                "sessions_count": 0
+              },
+              "storedSessionWords": 0,
+              "unavailableStoredSessionWords": 0,
+              "old": {
+                "reading_time_seconds": 60,
+                "words_read": 1000,
+                "sessions_count": 1
+              },
+              "oldProvenance": null,
+              "sessionWordDelta": 0,
+              "delta": {
+                "reading_time_seconds": -60,
+                "words_read": -1000,
+                "sessions_count": -1
+              },
+              "missingRollup": false,
+              "staleDateWouldBecomeEmpty": true,
+              "explanation": {
+                "status": "unavailable",
+                "wordMethodDifference": null,
+                "timezoneReassignment": null,
+                "unexplainedResidual": null,
+                "reason": "Old calendar provenance or stored session-word baseline unavailable; equality does not identify a method."
+              }
+            }
+          ],
+          "monthly": [
+            {
+              "month": "2400-12",
+              "old": {
+                "reading_time_seconds": 60,
+                "words_read": 1000,
+                "sessions_count": 1
+              },
+              "proposed": {
+                "reading_time_seconds": 0,
+                "words_read": 0,
+                "sessions_count": 0
+              },
+              "storedSessionWords": 0,
+              "unavailableStoredSessionWords": 0,
+              "missingRollups": 0,
+              "staleDates": 1,
+              "unexplainedDays": 1,
+              "explanation": {
+                "status": "unavailable",
+                "unavailableDays": 1
+              },
+              "delta": {
+                "reading_time_seconds": -60,
+                "words_read": -1000,
+                "sessions_count": -1
+              },
+              "oldBaseline": "Sum of existing rows only; missing rollups remain unavailable",
+              "partialCalendarMonth": true
+            },
+            {
+              "month": "2401-01",
+              "old": {
+                "reading_time_seconds": 10360,
+                "words_read": 31000,
+                "sessions_count": 4
+              },
+              "proposed": {
+                "reading_time_seconds": 190613,
+                "words_read": 717368,
+                "sessions_count": 10608
+              },
+              "storedSessionWords": 33009,
+              "unavailableStoredSessionWords": 0,
+              "missingRollups": 1,
+              "staleDates": 1,
+              "unexplainedDays": 3,
+              "explanation": {
+                "status": "unavailable",
+                "unavailableDays": 3
+              },
+              "delta": {
+                "reading_time_seconds": 180253,
+                "words_read": 686368,
+                "sessions_count": 10604
+              },
+              "oldBaseline": "Sum of existing rows only; missing rollups remain unavailable",
+              "partialCalendarMonth": true
+            }
+          ]
+        },
+        "boundaryCases": [
+          {
+            "seconds": 2,
+            "words": 8
+          },
+          {
+            "seconds": 6,
+            "words": 23
+          },
+          {
+            "seconds": 130,
+            "words": 487
+          },
+          {
+            "seconds": 246,
+            "words": 922
+          },
+          {
+            "seconds": 262,
+            "words": 982
+          }
+        ],
+        "range": {
+          "start": 0,
+          "endInclusive": 600,
+          "rows": 601
+        },
+        "browserDenials": {
+          "tables": 56,
+          "functions": 16
+        },
+        "realSqlAndDataApi": true,
+        "syntheticOnly": true,
+        "cleanup": "passed"
+      }
+    },
+    {
+      "name": "upgrade",
+      "catalog": "passed",
+      "migrationHistory": [
+        "20260513000000",
+        "20260514000000",
+        "20260515000000",
+        "20260515010000",
+        "20260515020000",
+        "20260515030000",
+        "20260518000000",
+        "20260519090000",
+        "20260929000000",
+        "20260929010000",
+        "20261004000000",
+        "20261004010000",
+        "20261005000000",
+        "20261007085051",
+        "20261007132750",
+        "20261007145024",
+        "20261008095102",
+        "20261014084407",
+        "20261014140402"
+      ],
+      "task19To20Preservation": "passed",
+      "repair": {
+        "checks": [
+          "Unresolved invalid historical input remains explicit; capture completes blocked, cutover rejected, owned seed removed without automatic correction",
+          "A restored barrier cannot certify capture chunks after source revision changes; lost consistency rejects further progress and activation and requires explicit cancellation/new immutable capture",
+          "10000+ tied sessions; atomic batch rollback/checkpoint; committed-response loss/SIGKILL; fresh-process resume; interrupted capture barrier; competing owner/stale fence/expiry takeover; no partial activation",
+          "Independent reconciliation catches a deliberately corrupted shadow estimate, blocks readiness/cutover, retains evidence on explicit cancel and permits a clean bounded replacement run without raw correction",
+          "Task 19 immutable daily/monthly old/new/delta, missing/stale dates and unavailable legacy explanations consumed; provenance never inferred from equality",
+          "Bounded atomic cutover and rollback before ingestion; captured request generation remains old across switch; stale reading dates zeroed while unrelated daily metadata retained; raw UTC/durations/ids/all columns unchanged",
+          "Transactional cutover mutex demonstrably queues a racing insert which maintains the newly active generation; behind-cursor insert/update/date reassignment caught; readiness invalidated by racing input; normal fenced page ingestion and exact dirty-rollup recovery maintain active/rollback generations; rollback conservatively reconciles all unknown-calendar baseline dates, including obsolete UTC buckets, and includes every newly imported raw session and repeats idempotently",
+          "Repeated completed run over unchanged inputs independently reconciles identically and performs no unnecessary cutover; all source/unrelated/progress values preserved",
+          "Real anonymous and authenticated Data API denials for every generation table and operator/read RPC; invoker exact ACL/search_path inventory; server production read/page/ack paths exercised",
+          "Actual isolated operator CLI prepare/status/execute/resume/claim/preview/reconcile/cancel/cutover/rollback exercised in fresh processes with dedicated synthetic libpq configuration"
+        ],
+        "checkCounts": {
+          "passed": 10,
+          "failed": 0,
+          "skipped": 0,
+          "todo": 0
+        },
+        "reference": {
+          "sessions": 10615,
+          "days": 10
+        },
+        "afterIngestion": {
+          "sessions": 10619,
+          "days": 11
+        },
+        "reconciliation": {
+          "scope": {
+            "start": "2400-12-31",
+            "end": "2401-01-04",
+            "timezone": "Europe/Athens",
+            "range": "[start,end)",
+            "sessions": "All stored sessions scanned, including invalid/unlocatable and outside-range rows for trustworthy old-zone counterfactuals",
+            "daily": "All stored daily rows fingerprinted; reconciliation limited to calendar range"
+          },
+          "methods": {
+            "wordMethod": "session-duration-225-round-v1",
+            "calendarMethod": "local-occurrence-day-v1",
+            "formula": "Math.round(duration_seconds / 60 * 225)",
+            "wpm": 225,
+            "rounding": "Round each valid session, then sum; never round an aggregate duration.",
+            "calendar": "APP_TIMEZONE (default Europe/Athens); [start,end); whole duration on occurrence date; UTC source unchanged; no interval splitting."
+          },
+          "provenance": {
+            "canonical": 0,
+            "legacyUnknown": 10608,
+            "other": 0
+          },
+          "invalid": {
+            "sessions": {},
+            "daily": {},
+            "sessionRows": 0,
+            "dailyRows": 0,
+            "unlocatableSessions": 0,
+            "affectedLocalDays": {}
+          },
+          "daily": [
+            {
+              "date": "2400-12-31",
+              "proposed": {
+                "reading_time_seconds": 0,
+                "words_read": 0,
+                "sessions_count": 0
+              },
+              "storedSessionWords": 0,
+              "unavailableStoredSessionWords": 0,
+              "old": {
+                "reading_time_seconds": 60,
+                "words_read": 1000,
+                "sessions_count": 1
+              },
+              "oldProvenance": null,
+              "sessionWordDelta": 0,
+              "delta": {
+                "reading_time_seconds": -60,
+                "words_read": -1000,
+                "sessions_count": -1
+              },
+              "missingRollup": false,
+              "staleDateWouldBecomeEmpty": true,
+              "explanation": {
+                "status": "unavailable",
+                "wordMethodDifference": null,
+                "timezoneReassignment": null,
+                "unexplainedResidual": null,
+                "reason": "Old calendar provenance or stored session-word baseline unavailable; equality does not identify a method."
+              }
+            },
+            {
+              "date": "2401-01-01",
+              "proposed": {
+                "reading_time_seconds": 10183,
+                "words_read": 40687,
+                "sessions_count": 10006
+              },
+              "storedSessionWords": 33009,
+              "unavailableStoredSessionWords": 0,
+              "old": {
+                "reading_time_seconds": 10300,
+                "words_read": 30000,
+                "sessions_count": 3
+              },
+              "oldProvenance": null,
+              "sessionWordDelta": 7678,
+              "delta": {
+                "reading_time_seconds": -117,
+                "words_read": 10687,
+                "sessions_count": 10003
+              },
+              "missingRollup": false,
+              "staleDateWouldBecomeEmpty": false,
+              "explanation": {
+                "status": "unavailable",
+                "wordMethodDifference": null,
+                "timezoneReassignment": null,
+                "unexplainedResidual": null,
+                "reason": "Old calendar provenance or stored session-word baseline unavailable; equality does not identify a method."
+              }
+            },
+            {
+              "date": "2401-01-02",
+              "proposed": {
+                "reading_time_seconds": 180430,
+                "words_read": 676681,
+                "sessions_count": 602
+              },
+              "storedSessionWords": 0,
+              "unavailableStoredSessionWords": 0,
+              "old": null,
+              "oldProvenance": null,
+              "sessionWordDelta": 676681,
+              "delta": null,
+              "missingRollup": true,
+              "staleDateWouldBecomeEmpty": false,
+              "explanation": {
+                "status": "unavailable",
+                "wordMethodDifference": null,
+                "timezoneReassignment": null,
+                "unexplainedResidual": null,
+                "reason": "Old calendar provenance or stored session-word baseline unavailable; equality does not identify a method."
+              }
+            },
+            {
+              "date": "2401-01-03",
+              "proposed": {
+                "reading_time_seconds": 0,
+                "words_read": 0,
+                "sessions_count": 0
+              },
+              "storedSessionWords": 0,
+              "unavailableStoredSessionWords": 0,
+              "old": {
+                "reading_time_seconds": 60,
+                "words_read": 1000,
+                "sessions_count": 1
+              },
+              "oldProvenance": null,
+              "sessionWordDelta": 0,
+              "delta": {
+                "reading_time_seconds": -60,
+                "words_read": -1000,
+                "sessions_count": -1
+              },
+              "missingRollup": false,
+              "staleDateWouldBecomeEmpty": true,
+              "explanation": {
+                "status": "unavailable",
+                "wordMethodDifference": null,
+                "timezoneReassignment": null,
+                "unexplainedResidual": null,
+                "reason": "Old calendar provenance or stored session-word baseline unavailable; equality does not identify a method."
+              }
+            }
+          ],
+          "monthly": [
+            {
+              "month": "2400-12",
+              "old": {
+                "reading_time_seconds": 60,
+                "words_read": 1000,
+                "sessions_count": 1
+              },
+              "proposed": {
+                "reading_time_seconds": 0,
+                "words_read": 0,
+                "sessions_count": 0
+              },
+              "storedSessionWords": 0,
+              "unavailableStoredSessionWords": 0,
+              "missingRollups": 0,
+              "staleDates": 1,
+              "unexplainedDays": 1,
+              "explanation": {
+                "status": "unavailable",
+                "unavailableDays": 1
+              },
+              "delta": {
+                "reading_time_seconds": -60,
+                "words_read": -1000,
+                "sessions_count": -1
+              },
+              "oldBaseline": "Sum of existing rows only; missing rollups remain unavailable",
+              "partialCalendarMonth": true
+            },
+            {
+              "month": "2401-01",
+              "old": {
+                "reading_time_seconds": 10360,
+                "words_read": 31000,
+                "sessions_count": 4
+              },
+              "proposed": {
+                "reading_time_seconds": 190613,
+                "words_read": 717368,
+                "sessions_count": 10608
+              },
+              "storedSessionWords": 33009,
+              "unavailableStoredSessionWords": 0,
+              "missingRollups": 1,
+              "staleDates": 1,
+              "unexplainedDays": 3,
+              "explanation": {
+                "status": "unavailable",
+                "unavailableDays": 3
+              },
+              "delta": {
+                "reading_time_seconds": 180253,
+                "words_read": 686368,
+                "sessions_count": 10604
+              },
+              "oldBaseline": "Sum of existing rows only; missing rollups remain unavailable",
+              "partialCalendarMonth": true
+            }
+          ]
+        },
+        "boundaryCases": [
+          {
+            "seconds": 2,
+            "words": 8
+          },
+          {
+            "seconds": 6,
+            "words": 23
+          },
+          {
+            "seconds": 130,
+            "words": 487
+          },
+          {
+            "seconds": 246,
+            "words": 922
+          },
+          {
+            "seconds": 262,
+            "words": 982
+          }
+        ],
+        "range": {
+          "start": 0,
+          "endInclusive": 600,
+          "rows": 601
+        },
+        "browserDenials": {
+          "tables": 56,
+          "functions": 16
+        },
+        "realSqlAndDataApi": true,
+        "syntheticOnly": true,
+        "cleanup": "passed"
+      }
+    }
+  ]
+}
