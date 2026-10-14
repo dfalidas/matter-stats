@@ -8,6 +8,42 @@ keyed by `git rev-parse HEAD` and the supplemental runner records dirty state.
 A SHA recorded during development with a dirty worktree is **not** proof that
 that committed SHA contains the tested Task 19 code.
 
+## Current implementation verification: PASSED
+
+[Full CI run 38546806912](https://github.com/dfalidas/matter-stats/actions/runs/38546806912)
+completed successfully at exact implementation SHA
+`22aec6e3484f5ef0be0adb553d9dbea34977e90b`. Both jobs and every required step
+passed, including artifact retention. The database job checked out the exact PR
+head and ran the **full existing** guarded entry point, not the supplemental runner.
+
+| Gate at implementation SHA | Verified outcome |
+| --- | --- |
+| Locked install / Next route types | PASSED |
+| Typecheck / lint | PASSED (four existing lint warnings) |
+| Application tests | PASSED: **344**, zero failed/skipped/TODO |
+| Production build / unchanged audit policy | PASSED in GitHub CI |
+| Full Supabase fresh AND upgrade | PASSED: migrations/catalog, real security and auth-role denials, leases, atomic page commit, rollup acknowledgement/recovery, word-method regression, continuation, shared quota and read-only preview |
+| New word-method Data API cases, each path | PASSED: **601** normalizer rows (0–600), **7** successful fenced pages; **10** false canonical ±1 pages rejected under HTTP 400 / 23514 / `session_word_method_valid`, with unchanged page effects |
+| Continuation independent word/method reference, each path | PASSED for all **5,000** stored fixture rows; mismatch assertion = **0** |
+| Owned cleanup | PASSED for both full stacks; the entry point exits unsuccessfully on any cleanup failure |
+| Dependency versions, lockfile, audit policy | UNCHANGED |
+| Production migration/repair/Matter sync/promotion | NOT EXECUTED |
+
+The successful full-runner end log and completed job/step statuses were read.
+GitHub retained the sanitized
+[database evidence artifact](https://github.com/dfalidas/matter-stats/actions/runs/38546806912/artifacts/11884819992)
+(`results.json`, cleanup and CI outcome); artifact download from this managed
+executor returned HTTP 403, so its payload was not independently downloaded here.
+Range/rejection/reference counts above are the mandatory assertions of the full
+runner that completed successfully. This access limitation is distinct from the
+passed database verification and retained evidence. Local typecheck/lint/344 tests
+also passed; local build passed on a retry after image-extraction pressure ended.
+Local audit's varying remediation response is retained below and does not override
+the successful unchanged audit policy in CI or imply a required dependency update.
+
+The final documentation-only commit/any subsequent exact-head CI are recorded
+in the PR description. No implementation files changed after this successful run.
+
 ## Historical local checks (retained, superseded by verified CI where applicable)
 
 | Check | Status | Evidence / limit |
@@ -85,9 +121,10 @@ HTTP low-cap/pagination/tie regressions remain in the application test run.
 
 ## Remaining gates
 
-Run the full owned Supabase fresh/upgrade stacks on an executor with enough image
-storage and retain successful Data API/security/page/ack/cleanup evidence at the
-reviewed final SHA. Reviewed CI passed audit; do not infer a required dependency upgrade solely from the earlier local response. Preserve the unchanged audit policy and verify it at the final implementation head. Production reader provisioning, production preview, migration
+The full implementation gates are closed by successful CI at
+`22aec6e3484f5ef0be0adb553d9dbea34977e90b`; earlier local and CI failures below
+remain historical evidence. Do not infer a required dependency upgrade solely
+from an earlier local audit response; the unchanged policy passed at that head. Production reader provisioning, production preview, migration
 and deployment remain separately authorized later operations. Task 20 must
 resolve invalid/unavailable baselines, implement its repair/catch-up/cutover and
 rollback semantics, and obtain production approvals. This PR stays **draft** and
