@@ -31,9 +31,14 @@ const expectedWords=rows.map((r,seconds)=>{assert.equal(r.duration_seconds,secon
 for(const [seconds,words] of expectedCases)assert.equal(expectedWords[seconds],words);
 const preview=createReconciliation({start:date,end:"2350-02-03",timezone:"Europe/Athens"});rows.forEach(preview.session);
 assert.equal(preview.finish({snapshot:"synthetic-reference"}).daily[0].proposed.words_read,expectedWords.reduce((a,b)=>a+b,0));
-const sqlBoundary=JSON.parse(await sql(`select json_agg(json_build_object('seconds',s,'oldNumeric',floor(s::numeric /60*225+0.5),'binaryValue',((s::double precision /60::double precision)*225::double precision)::text))::text from unnest(array[2,6,130,246,262]) s;`));
+const sqlBoundary=JSON.parse(await sql(`select json_agg(json_build_object('seconds',s,'oldNumeric',floor(s::numeric /60*225+0.5),'binaryValue',((s::double precision /60::double precision)*225::double precision)::text,'binaryHex',encode(float8send((s::double precision /60::double precision)*225::double precision),'hex')))::text from unnest(array[2,6,130,246,262]) s;`));
 assert.deepEqual(sqlBoundary.map(r=>r.oldNumeric),[7,23,488,923,983]);
-for(const r of sqlBoundary)assert.equal(Number(r.binaryValue),r.seconds /60*225,"Actual PostgreSQL float division/multiply must match the JS intermediate");
+for(const r of sqlBoundary) {
+  // Supabase may configure extra_float_digits=0; decimal text then loses bits.
+  // PostgreSQL float8send and DataView's big-endian float expose the actual value.
+  const bytes=new ArrayBuffer(8);new DataView(bytes).setFloat64(0,r.seconds /60*225,false);
+  assert.equal(r.binaryHex,Buffer.from(bytes).toString("hex"),"Actual PostgreSQL binary64 division/multiply must match the JS intermediate");
+}
 
 let lease,originalStream,receipt=null,report,owned=false;
 const fields=r=>Object.fromEntries(Object.entries(r).filter(([k])=>!["created_at","updated_at"].includes(k)));

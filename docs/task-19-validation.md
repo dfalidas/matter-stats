@@ -161,3 +161,24 @@ Official documentation rechecked for this fix:
 and the current Supabase changelog. PostgreSQL documents numeric/inexact-float
 and differing tie behavior; ECMAScript explicitly warns that `floor(x + 0.5)`
 can differ. Real Linux PostgreSQL and runtime tests supply platform evidence.
+
+## First fix CI diagnostic result (retained)
+
+[Run 38545787503](https://github.com/dfalidas/matter-stats/actions/runs/38545787503)
+tested `ef3bb0e0080abbfbcefa7f3723abd18da6a05073`: application verification
+**PASSED**, including **344 tests** and audit. The database job failed in the
+new word-method diagnostic before acquiring its fixture lease: parsing
+PostgreSQL's text-formatted intermediate yielded `487.5`, while JavaScript's
+binary64 value is `487.49999999999994`. Supabase's configured float text precision
+can hide that distinction; it is not evidence that the stored internal value or
+corrected CHECK differs. The test now compares `encode(float8send(x),'hex')` with
+JavaScript DataView's big-endian float bytes. This is an exact equality test with
+no tolerance. Canonical expected words and false-tag rejection remain unchanged.
+The full fresh/upgrade suite must rerun after this diagnostic correction.
+
+The repeated local full-runner attempt again failed at stack image setup and
+cleanup under storage pressure, and two local builds reported ENOSPC while
+Docker image extraction was underway. Local audit again returned the earlier
+remediation-metadata failure; **both reviewed and first-fix GitHub CI passed
+that unchanged audit policy**. These local failures are retained without inferring
+a dependency-upgrade requirement solely from them.
