@@ -84,6 +84,7 @@ test("normalizes reading sessions and estimates words from fixed reading speed w
     ended_at: "2026-05-14T10:02:00.000Z",
     duration_seconds: 120,
     source_device: null,
+    word_estimation_method: "session-duration-225-round-v1",
     words_estimated: Math.round((120 / 60) * DEFAULT_READING_SPEED_WORDS_PER_MINUTE),
   });
 });
@@ -124,6 +125,7 @@ test("normalizes Matter session shape without linked item id", () => {
     ended_at: "2026-05-18T14:02:00.000Z",
     duration_seconds: 120,
     source_device: null,
+    word_estimation_method: "session-duration-225-round-v1",
     words_estimated: Math.round((120 / 60) * DEFAULT_READING_SPEED_WORDS_PER_MINUTE),
   });
 });
@@ -258,6 +260,7 @@ test("normalizes reading sessions with API aliases and explicit end times", () =
       ended_at: "2026-05-14T10:10:00.000Z",
       duration_seconds: 61,
       source_device: "iPad",
+      word_estimation_method: "session-duration-225-round-v1",
       words_estimated: 229,
     }
   );

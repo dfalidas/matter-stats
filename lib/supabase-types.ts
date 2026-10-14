@@ -78,6 +78,7 @@ export type Database = {
           duration_seconds: number | null;
           source_device: string | null;
           words_estimated: number | null;
+          word_estimation_method?: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -89,6 +90,7 @@ export type Database = {
           duration_seconds?: number | null;
           source_device?: string | null;
           words_estimated?: number | null;
+          word_estimation_method?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -100,6 +102,7 @@ export type Database = {
           duration_seconds?: number | null;
           source_device?: string | null;
           words_estimated?: number | null;
+          word_estimation_method?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -223,6 +226,7 @@ export type Database = {
           items_read_count: number;
           highlights_count: number;
           top_source: string | null;
+          reading_provenance?: Json | null;
           created_at: string;
           updated_at: string;
         };
@@ -234,6 +238,7 @@ export type Database = {
           items_read_count?: number;
           highlights_count?: number;
           top_source?: string | null;
+          reading_provenance?: Json | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -245,6 +250,7 @@ export type Database = {
           items_read_count?: number;
           highlights_count?: number;
           top_source?: string | null;
+          reading_provenance?: Json | null;
           created_at?: string;
           updated_at?: string;
         };

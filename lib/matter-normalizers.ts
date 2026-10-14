@@ -1,6 +1,6 @@
 import type { MatterAnnotation, MatterItem, MatterReadingSession, MatterTag } from "./matter-api";
 import type { Database } from "./supabase-types";
-import { DEFAULT_READING_WPM, estimateWordsFromSeconds } from "./reading-estimates";
+import { DEFAULT_READING_WPM, SESSION_WORD_METHOD, estimateWordsFromSeconds } from "./reading-estimates";
 
 export const DEFAULT_READING_SPEED_WORDS_PER_MINUTE = DEFAULT_READING_WPM;
 
@@ -107,6 +107,7 @@ export function normalizeReadingSession(
     duration_seconds: durationSeconds,
     source_device: firstPresentText(session.source_device, session.sourceDevice, session.device),
     words_estimated: estimateWordsFromSeconds(durationSeconds),
+    word_estimation_method: SESSION_WORD_METHOD,
   };
 }
 

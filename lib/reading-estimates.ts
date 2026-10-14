@@ -1,4 +1,8 @@
-export const DEFAULT_READING_WPM = 225;
+import contract from "./estimation-contract.json";
+
+export const SESSION_WORD_METHOD = contract.wordMethod;
+
+export const DEFAULT_READING_WPM = contract.wpm;
 
 /** Canonical estimate for one reading session. Aggregate only after calling this per session. */
 export function estimateWordsFromSeconds(seconds: number): number {

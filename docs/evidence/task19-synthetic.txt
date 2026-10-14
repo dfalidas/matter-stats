@@ -1,0 +1,24 @@
+Historical repair PREVIEW: complete_read_incomplete_reconciliation
+2025-01-01 ≤ local day < 2027-01-02; Europe/Athens
+Snapshot synthetic-fixture-v1; as of 2026-10-14T00:00:00Z
+Invalid session rows: 4; invalid daily rows: 0. No writes.
+Month | words old → new (delta) | seconds old → new (delta) | sessions old → new (delta) | missing | stale
+2025-12 | 1000 → 0 (-1000) | 60 → 0 (-60) | 1 → 0 (-1) | 0 | 1
+2026-01 | 3235 → 1137 (-2098) | 243 → 303 (60) | 7 → 9 (2) | 2 | 1
+2026-02 | 0 → 4 (4) | 0 → 1 (1) | 0 → 1 (1) | 1 | 0
+2026-03 | 0 → 450 (450) | 0 → 120 (120) | 0 → 2 (2) | 1 | 0
+2026-10 | 0 → 450 (450) | 0 → 120 (120) | 0 → 2 (2) | 1 | 0
+2027-01 | 0 → 4 (4) | 0 → 1 (1) | 0 → 1 (1) | 1 | 0
+Daily | stored session words | words old → new (delta) | seconds old → new (delta) | sessions old → new (delta) | explanation
+2025-12-31 | 0 | 1000 → 0 (-1000) | 60 → 0 (-60) | 1 → 0 (-1) | known_calendar_counterfactual
+2026-01-01 | 2450 | 3000 → 900 (-2100) | 180 → 240 (60) | 3 → 4 (1) | unavailable
+2026-01-02 | 9 | 10 → 12 (2) | 3 → 3 (0) | 3 → 3 (0) | known_calendar_counterfactual
+2026-01-03 | 0 | unavailable → 0 (unavailable) | unavailable → 0 (unavailable) | unavailable → 1 (unavailable) | unavailable
+2026-01-04 | 0 | 225 → 0 (-225) | 60 → 0 (-60) | 1 → 0 (-1) | known_calendar_counterfactual
+2026-01-05 | 225 | unavailable → 225 (unavailable) | unavailable → 60 (unavailable) | unavailable → 1 (unavailable) | unavailable
+2026-02-01 | 4 | unavailable → 4 (unavailable) | unavailable → 1 (unavailable) | unavailable → 1 (unavailable) | unavailable
+2026-03-29 | 450 | unavailable → 450 (unavailable) | unavailable → 120 (unavailable) | unavailable → 2 (unavailable) | unavailable
+2026-10-25 | 450 | unavailable → 450 (unavailable) | unavailable → 120 (unavailable) | unavailable → 2 (unavailable) | unavailable
+2027-01-01 | 4 | unavailable → 4 (unavailable) | unavailable → 1 (unavailable) | unavailable → 1 (unavailable) | unavailable
+Monthly old values are existing-row subtotals; missing rollups are unavailable. New values exclude invalid source rows.
+Unknown old calendar/method explanations remain unavailable; residuals are counterfactuals, not causal proof. Unrelated rollup fields excluded.

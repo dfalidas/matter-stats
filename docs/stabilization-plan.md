@@ -179,3 +179,7 @@ Required evidence: RLS/RPC denied anon/unauthorized and allowed server; auth exp
 [S1 overview](https://docs.getmatter.com/api), [S2 sessions](https://docs.getmatter.com/api/reading-sessions/list), [S3 items](https://docs.getmatter.com/api/items/list), [S4 item](https://docs.getmatter.com/api/items/get), [S5 update](https://docs.getmatter.com/api/items/update), [S6 pagination](https://docs.getmatter.com/api/pagination), [S7 limits](https://docs.getmatter.com/api/rate-limits), [S8 authentication](https://docs.getmatter.com/api/authentication), [S9 errors](https://docs.getmatter.com/api/errors), [S10 versioning](https://docs.getmatter.com/api/versioning), [S11 annotations](https://docs.getmatter.com/api/annotations/list), [S12 tags](https://docs.getmatter.com/api/tags/list).
 
 225 WPM, overlap 7 ημερών, Europe/Athens, cookie TTL 30 ημερών και stale threshold 36 ωρών είναι application policies, όχι Matter guarantees.
+
+## Task 19 / W6-A status
+
+Task 19 implements the version/provenance contract and read-only historical repair preview only. It does not establish corrected production history. The resumable engine, shadow/catch-up/cutover/rollback remain Task 20. See [operator contract](task-19-preview.md) and [validation evidence](task-19-validation.md).

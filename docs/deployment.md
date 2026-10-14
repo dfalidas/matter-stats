@@ -261,3 +261,7 @@ disabled; prefer compatible roll-forward or a read-only rollback. Do not delete
 retry identities, reset cycles/cursors, drop additive objects, disable RLS or run a
 production sync as rollback. Migration-before-code can coexist with drained old
 code; its presence alone does not grant older consumers shared quota coordination.
+
+## Task 19 migration and read-only operator compatibility
+
+Apply `20261014084407_estimation_provenance.sql` after the complete prior chain and before new writers. Disable/drain older writers for a reviewed rollout. No historical rows are tagged canonical by the migration. Dedicated preview libpq service configuration never falls back to application or production credentials. Production read capability is prepared but was not exercised here. Follow [exact commands and compatibility requirements](task-19-preview.md) and [validation gates](task-19-validation.md).
