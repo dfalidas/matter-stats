@@ -37,9 +37,9 @@ import {
   type DashboardIcon,
 } from "@/components/dashboard-components";
 import { Button } from "@/components/ui/button";
-import type { ReadingHeatmapDay, ReadingMetrics } from "@/lib/metrics-service";
+import type { ReadingHeatmapDay } from "@/lib/metrics-service";
 import { getDeterministicReadingPersonality, type ReadingPersonalityLabel } from "@/lib/reading-personality";
-import type { ReadingReport } from "@/lib/reports-service";
+import type { YearInReadingClientPayload } from "@/lib/reports-service";
 import { formatCalendarDate } from "@/lib/calendar";
 
 const WORDS_PER_BOOK = 80_000;
@@ -47,7 +47,7 @@ const WORDS_PER_BOOK = 80_000;
 export type YearInReadingResult =
   | {
       ok: true;
-      report: ReadingReport;
+      report: YearInReadingClientPayload;
     }
   | {
       ok: false;
@@ -82,7 +82,7 @@ export function YearInReadingOverview({ year, recapResult }: YearInReadingOvervi
   return <YearInReadingContent year={year} report={recapResult.report} />;
 }
 
-function YearInReadingContent({ year, report }: { year: number; report: ReadingReport }) {
+function YearInReadingContent({ year, report }: { year: number; report: YearInReadingClientPayload }) {
   const { metrics } = report;
   const monthData = buildMonthData(metrics.heatmap, year);
   const activeMonths = monthData.filter((month) => month.words > 0 || month.minutes > 0 || month.articles > 0);
@@ -356,7 +356,7 @@ function getMostProductiveDay(heatmap: ReadingHeatmapDay[]): ReadingHeatmapDay |
   return topDay ?? null;
 }
 
-function getReadingPersonality(metrics: ReadingMetrics) {
+function getReadingPersonality(metrics: YearInReadingClientPayload["metrics"]) {
   const personality = getDeterministicReadingPersonality(metrics);
 
   return {
@@ -385,7 +385,7 @@ function getReadingPersonalityIcon(label: ReadingPersonalityLabel): DashboardIco
   }
 }
 
-function getHeroSentence(metrics: ReadingMetrics, booksEquivalent: number, isLowData: boolean): string {
+function getHeroSentence(metrics: YearInReadingClientPayload["metrics"], booksEquivalent: number, isLowData: boolean): string {
   if (metrics.totals.articlesRead === 0) {
     return "No current-year reading sessions have synced yet. Once Matter activity appears, this page becomes your annual recap.";
   }

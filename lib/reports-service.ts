@@ -1,4 +1,4 @@
-import { readCompleteSessions } from "./complete-session-query";
+import { createAnalyticsQueryContext, type AnalyticsSession, type AnalyticsSessionItem } from "./analytics-query-context";
 import {
   addLocalDays,
   formatDateInTimezone,
@@ -9,28 +9,11 @@ import {
   type ReadingMetrics,
 } from "./metrics-service";
 import type { MatterStatsSupabaseClient } from "./supabase-queries";
-import { estimateWordsFromSeconds } from "./reading-estimates";
+import { buildSessionLengthHistogram, estimateWordsFromSeconds } from "./reading-estimates";
 import { addCalendarDays, timestampToCalendarDate } from "./calendar";
 
-type ReportSessionItem = {
-  id: string;
-  title: string | null;
-  url: string | null;
-  source: string | null;
-  author: string | null;
-  estimated_reading_time_minutes: number | null;
-  word_count: number | null;
-};
-
-type ReportSessionRow = {
-  id: string;
-  item_id: string | null;
-  started_at: string | null;
-  ended_at: string | null;
-  duration_seconds: number | null;
-  words_estimated: number | null;
-  matter_items: ReportSessionItem | ReportSessionItem[] | null;
-};
+type ReportSessionItem = AnalyticsSessionItem;
+type ReportSessionRow = AnalyticsSession;
 
 export type ReportPeriod = "daily" | "weekly" | "monthly" | "yearly";
 
@@ -72,6 +55,7 @@ export type ReadingReport = {
   period: ReportPeriod;
   metrics: ReadingMetrics;
   timeline: ReadingSessionTimelineItem[];
+  sessionLengthHistogram: ReturnType<typeof buildSessionLengthHistogram>;
   longformReads: LongformRead[];
   latestWeekWithDataStartDate: string | null;
 };
@@ -81,32 +65,35 @@ export async function getReadingReport(
   period: ReportPeriod,
   options?: { reference?: string | null; weekStartDate?: string | null; now?: Date }
 ): Promise<ReadingReport> {
-  const now = options?.now ?? new Date();
+  const now = new Date(options?.now ?? new Date());
   const requestedReference = options?.reference ?? options?.weekStartDate;
-  const selectedRange = resolveReportRange(period, requestedReference, now);
   const timezone = getDefaultMetricsTimezone();
-  const latestWeekWithDataStartDate = period === "weekly" ? await getLatestWeekWithDataStartDate(client) : null;
+  const selectedRange = resolveReportRange(period, requestedReference, now, timezone);
+  const latestWeekWithDataStartDate = period === "weekly" ? await getLatestWeekWithDataStartDate(client, timezone) : null;
+  const queryContext = createAnalyticsQueryContext(client);
   const metrics = await getReadingMetrics(client, {
+    queryContext,
+    timezone,
     range: selectedRange,
-    comparisonRange: resolvePreviousReportRange(period, selectedRange),
+    comparisonRange: resolvePreviousReportRange(period, selectedRange, timezone),
     now,
     historicalStreakDate: formatDateInTimezone(addLocalDays(selectedRange.end, -1, timezone), timezone),
     topLimit: 6,
     recentLimit: 8,
   });
-  const sessions = await fetchReportSessions(client, metrics);
+  const sessions = await queryContext.sessions(metrics.range.start, metrics.range.end, "details");
 
   return {
     period,
     metrics,
     timeline: sessions.map(mapTimelineSession),
+    sessionLengthHistogram: buildSessionLengthHistogram(sessions.map((session) => positiveInteger(session.duration_seconds))),
     longformReads: buildLongformReads(sessions, 6),
     latestWeekWithDataStartDate,
   };
 }
 
-function resolvePreviousReportRange(period: ReportPeriod, range: { start: Date; end: Date }) {
-  const timezone = getDefaultMetricsTimezone();
+function resolvePreviousReportRange(period: ReportPeriod, range: { start: Date; end: Date }, timezone: string) {
   if (period === "monthly") {
     const key = formatDateInTimezone(range.start, timezone);
     const [year, month] = key.split("-").map(Number);
@@ -120,8 +107,7 @@ function resolvePreviousReportRange(period: ReportPeriod, range: { start: Date; 
   return { start: addLocalDays(range.start, -days, timezone), end: range.start };
 }
 
-export function resolveReportRange(period: ReportPeriod, requested?: string | null, now = new Date()) {
-  const timezone = getDefaultMetricsTimezone();
+export function resolveReportRange(period: ReportPeriod, requested?: string | null, now = new Date(), timezone = getDefaultMetricsTimezone()) {
   const today = formatDateInTimezone(now, timezone);
   const fallback = period === "yearly" ? today.slice(0, 4) : period === "monthly" ? today.slice(0, 7) : today;
   const reference = isValidReportReference(period, requested) ? requested : fallback;
@@ -164,7 +150,7 @@ function isRealDate(value: string): boolean {
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
-async function getLatestWeekWithDataStartDate(client: MatterStatsSupabaseClient): Promise<string | null> {
+async function getLatestWeekWithDataStartDate(client: MatterStatsSupabaseClient, timezone: string): Promise<string | null> {
   const { data: session, error: sessionError } = await client
     .from("reading_sessions")
     .select("started_at")
@@ -175,24 +161,10 @@ async function getLatestWeekWithDataStartDate(client: MatterStatsSupabaseClient)
     .maybeSingle();
   if (sessionError) throw sessionError;
   if (!session?.started_at) return null;
-  const timezone = getDefaultMetricsTimezone();
   const localDate = timestampToCalendarDate(session.started_at, timezone);
   const [year, month, day] = localDate.split("-").map(Number);
   const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
   return addCalendarDays(localDate, -((weekday + 6) % 7));
-}
-
-async function fetchReportSessions(
-  client: MatterStatsSupabaseClient,
-  metrics: ReadingMetrics,
-): Promise<ReportSessionRow[]> {
-  return readCompleteSessions<ReportSessionRow>(() => {
-    let query = client.from("reading_sessions")
-      .select("id,item_id,started_at,ended_at,duration_seconds,words_estimated,matter_items(id,title,url,source,author,estimated_reading_time_minutes,word_count)")
-      .lt("started_at", metrics.range.end.toISOString());
-    if (metrics.range.start) query = query.gte("started_at", metrics.range.start.toISOString());
-    return query;
-  });
 }
 
 function buildLongformReads(sessions: ReportSessionRow[], limit: number): LongformRead[] {
@@ -262,3 +234,16 @@ function getReportSessionItem(session: ReportSessionRow): ReportSessionItem | nu
 function positiveInteger(value: number | null): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
 }
+
+/** Complete aggregates, fixed bins and no raw sessions cross the RSC boundary. */
+export function toReportsClientPayload(report: ReadingReport) {
+  const { range, totals, comparison, heatmap } = report.metrics;
+  return { period: report.period, metrics: { range, totals, comparison, heatmap }, sessionLengthHistogram: report.sessionLengthHistogram };
+}
+export type ReportsClientPayload = ReturnType<typeof toReportsClientPayload>;
+
+export function toYearInReadingClientPayload(report: ReadingReport) {
+  const { range, totals, heatmap, bestStreakDays, topSources, topAuthors, topTags } = report.metrics;
+  return { metrics: { range, totals, heatmap, bestStreakDays, topSources, topAuthors, topTags }, longformReads: report.longformReads.slice(0, 4) };
+}
+export type YearInReadingClientPayload = ReturnType<typeof toYearInReadingClientPayload>;

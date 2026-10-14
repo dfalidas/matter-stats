@@ -44,19 +44,6 @@ function createClient({ sessions = [], tags = [] }: { sessions?: TestSession[]; 
   }) }).client;
 }
 
-function createRecordingClient(sessions: TestSession[]) {
-  const bounds: Array<{ operator: "gte" | "lt"; value: string }> = [];
-  const { client } = cappedPostgrest({ reading_sessions: sessions }, {
-    before: ({url}) => {
-      for (const filter of url.searchParams.getAll("started_at")) {
-        if (filter.startsWith("gte.")) bounds.push({operator: "gte", value: filter.slice(4)});
-        if (filter.startsWith("lt.")) bounds.push({operator: "lt", value: filter.slice(3)});
-      }
-    },
-  });
-  return { client, bounds };
-}
-
 const emptyClient = createClient({});
 
 test("defaults metrics timezone to Europe/Athens when APP_TIMEZONE is unset", () => {
@@ -175,12 +162,14 @@ test("local wall-time conversion advances gaps and chooses the earlier repeated 
 test("Overview production caller normalizes cross-month and DST comparison ends", async () => {
   const now = new Date("2026-04-05T09:00:00.000Z");
   const sessions: TestSession[] = [
+    { id: "before-start", item_id: "outside", started_at: "2026-03-22T21:59:59.999Z", ended_at: null, duration_seconds: 7000, words_estimated: 999 },
+    { id: "at-start", item_id: "start", started_at: "2026-03-22T22:00:00.000Z", ended_at: null, duration_seconds: 30, words_estimated: 999 },
     { id: "previous-in", item_id: "p", started_at: "2026-03-29T08:59:59.000Z", ended_at: null, duration_seconds: 60, words_estimated: 999 },
     { id: "previous-edge", item_id: "e", started_at: "2026-03-29T09:00:00.000Z", ended_at: null, duration_seconds: 180, words_estimated: 999 },
     { id: "previous-after", item_id: "a", started_at: "2026-03-29T09:30:00.000Z", ended_at: null, duration_seconds: 120, words_estimated: 999 },
     { id: "current", item_id: "c", started_at: "2026-04-05T08:59:59.000Z", ended_at: null, duration_seconds: 120, words_estimated: 999 },
   ];
-  const { client, bounds } = createRecordingClient(sessions);
+  const client = createClient({ sessions });
   const { metrics } = await getOverviewReadingMetrics(client, "week", null, null, now, "Europe/Athens");
   assert.equal(metrics.range.start?.toISOString(), "2026-03-29T21:00:00.000Z");
   assert.equal(metrics.range.end.toISOString(), now.toISOString());
@@ -188,12 +177,12 @@ test("Overview production caller normalizes cross-month and DST comparison ends"
   assert.equal(metrics.comparison.range?.end.toISOString(), "2026-03-29T09:00:00.000Z");
   assert.equal(metrics.totals.totalReadingTimeSeconds, 120);
   assert.equal(metrics.totals.wordsRead, 450);
-  assert.equal(metrics.comparison.totals.totalReadingTimeSeconds, 60);
-  assert.equal(metrics.comparison.totals.wordsRead, 225);
-  assert.equal(metrics.comparison.delta.totalReadingTimePercentChange, 1);
+  assert.equal(metrics.comparison.totals.totalReadingTimeSeconds, 90);
+  assert.equal(metrics.comparison.totals.wordsRead, 338);
+  assert.equal(metrics.comparison.delta.totalReadingTimePercentChange, 30 / 90);
   assert.equal(metrics.heatmap.reduce((sum, day) => sum + day.readingTimeSeconds, 0), 120);
-  assert.ok(bounds.some((bound) => bound.operator === "gte" && bound.value === "2026-03-22T22:00:00.000Z"));
-  assert.ok(bounds.some((bound) => bound.operator === "lt" && bound.value === "2026-03-29T09:00:00.000Z"));
+  assert.equal(metrics.comparison.totals.sessionsCount, 2, "include start, exclude before-start and exclusive end");
+  assert.equal(metrics.comparison.totals.articlesRead, 2);
   assert.equal(formatOverviewRangeLabel(metrics), "30 Mar – 5 Apr 2026 · Europe/Athens");
 });
 

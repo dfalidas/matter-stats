@@ -54,7 +54,23 @@ test("R5 facets/joins (Task 17): complete facets and per-item metadata under cap
   assert.equal(result.articles[0].tags.length, 1200);
   assert.equal(result.articles[0].highlights, annotations.length);
 });
-test.todo("R5 query efficiency (Task 18): request-scoped query reuse and aggregate optimization");
+test("R5 query efficiency (Task 18): actual HTTP requests and aggregate-only client payload", async () => {
+  const { getOverviewReadingMetrics, toOverviewClientPayload } = await import("../lib/overview-service.js");
+  const { getReadingReport, toReportsClientPayload } = await import("../lib/reports-service.js");
+  const rows = Array.from({length:1200},(_,i)=>({id:`s-${String(i).padStart(6,"0")}`,item_id:null,started_at:"2026-09-10T10:00:00Z",duration_seconds:60}));
+  const fixture = cappedPostgrest({reading_sessions:rows},{cap:100});
+  const now = new Date("2026-09-10T18:00:00Z");
+  const overview = await getOverviewReadingMetrics(fixture.client,"month",null,null,now,"Europe/Athens");
+  assert.equal(overview.metrics.totals.sessionsCount,1200);
+  assert.ok(fixture.requests.length <= 14, "one complete history enumeration supplies all Overview ranges");
+  assert.deepEqual(Object.keys(toOverviewClientPayload(overview)),["metrics"]);
+  const before = fixture.requests.length;
+  const report = await getReadingReport(fixture.client,"monthly",{now,reference:"2026-09"});
+  assert.ok(fixture.requests.length-before <= 29, "selected input once, one narrow history, empty comparison");
+  assert.equal(report.metrics.totals.wordsRead,270000);
+  assert.equal(toReportsClientPayload(report).sessionLengthHistogram[0].count,1200);
+  assert.equal("timeline" in toReportsClientPayload(report),false);
+});
 
 function streakClient(dates: string[]) {
   const sessions = dates.map((started_at, index) => ({

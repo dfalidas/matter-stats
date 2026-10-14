@@ -1,4 +1,6 @@
-import { addCalendarDays, formatCalendarDate, getLocalDateTimeParts } from "./calendar";
+import { createAnalyticsQueryContext } from "./analytics-query-context";
+import { addCalendarDays } from "./calendar";
+export { formatOverviewRangeLabel } from "./overview-range";
 import {
   getReadingMetrics,
   localDateToUtc,
@@ -28,28 +30,16 @@ export async function getOverviewReadingMetrics(
       : resolvePeriodToDateRanges(period, now, timezone);
   const todayOptions = resolvePeriodToDateRanges("today", now, timezone);
 
-  const common = { now, timezone, topLimit: 5, recentLimit: 6 };
+  const common = { now, timezone, topLimit: 5, recentLimit: 6, queryContext: createAnalyticsQueryContext(client) };
+  // All-time is already a required input and contains today/selected history.
+  // Register it first so concurrent compatible reads share its promise.
+  const allTimeRead = getReadingMetrics(client, { preset: "all-time", comparisonRange: null, ...common });
   const [metrics, todayMetrics, allTimeMetrics] = await Promise.all([
     getReadingMetrics(client, { ...selectedOptions, ...common }),
     getReadingMetrics(client, { ...todayOptions, ...common }),
-    getReadingMetrics(client, { preset: "all-time", comparisonRange: null, ...common }),
+    allTimeRead,
   ]);
   return { metrics, todayMetrics, allTimeMetrics };
-}
-
-export function formatOverviewRangeLabel(metrics: ReadingMetrics): string {
-  const { range } = metrics;
-  const suffix = ` · ${range.timezone}`;
-  if (range.start && range.end.getTime() <= range.start.getTime()) {
-    return `As of ${formatCalendarDate(range.endDate, { day: "numeric", month: "short", year: "numeric" })}${suffix}`;
-  }
-  const endParts = getLocalDateTimeParts(range.end, range.timezone);
-  const endDate = isMidnight(endParts) ? addCalendarDays(range.endDate, -1) : range.endDate;
-  return `${range.startDate ? formatCalendarDate(range.startDate, { day: "numeric", month: "short" }) : "All time"} – ${formatCalendarDate(endDate, { day: "numeric", month: "short", year: "numeric" })}${suffix}`;
-}
-
-function isMidnight(parts: ReturnType<typeof getLocalDateTimeParts>) {
-  return parts.hour === 0 && parts.minute === 0 && parts.second === 0 && parts.millisecond === 0;
 }
 
 function dateParts(value: string): [number, number, number] {
@@ -60,3 +50,12 @@ function nextDateParts(value: string): [number, number, number] {
   const [year, month, day] = addCalendarDays(value, 1).split("-").map(Number);
   return [year, month, day];
 }
+
+/** Only selected metrics are displayed by Overview. Keep complete internal
+ * today/all-time results for service consumers, outside client props. */
+export function toOverviewClientPayload(result: Awaited<ReturnType<typeof getOverviewReadingMetrics>>) {
+  const { range, totals, comparison, heatmap } = result.metrics;
+  return { metrics: { range, totals, comparison, heatmap } };
+}
+
+export type OverviewClientPayload = ReturnType<typeof toOverviewClientPayload>;

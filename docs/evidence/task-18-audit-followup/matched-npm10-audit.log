@@ -1,0 +1,11 @@
+(node:8606) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+> matter-stats@0.1.0 audit:ci
+> node scripts/audit-policy.mjs
+
+(node:8619) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Full audit: 8 finding entries (low 0, moderate 0, high 8, critical 0).
+Allowed development-only exception: GHSA-vfj7-8cjw-p6xm.
+Production audit: 0 vulnerabilities.

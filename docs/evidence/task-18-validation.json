@@ -1,0 +1,201 @@
+{
+  "baselineSha": "adf228f9e84d1d4a89d6cf8a609a13aacd315f26",
+  "reviewedHeadSha": "6c500b02a0680dc3e8d8f196a607e38b7840d1be",
+  "historicalLocalValidation": {
+    "baselineSha": "adf228f9e84d1d4a89d6cf8a609a13aacd315f26",
+    "testedRuntimeHead": "4ead3c0f3d40cca6544aaef6d6694661ef37bace",
+    "node": "v24.19.0",
+    "passed": [
+      "npm ci",
+      "Next.js route type generation",
+      "npm run typecheck",
+      "npm run lint (3 preexisting warnings)",
+      "npm run test (335 passed, 0 failed/cancelled/skipped/TODO)",
+      "npm run build",
+      "28-case output/hash/HTTP/row/byte/payload comparison",
+      "git diff --check"
+    ],
+    "failed": {
+      "npm run audit:ci": {
+        "exitCode": 1,
+        "message": "A compatible remediation is available for chokidar; update the reviewed dependency baseline and remove the GHSA-vfj7-8cjw-p6xm exception",
+        "productionVulnerabilities": 0,
+        "fullAuditHighFindings": 8,
+        "dependencyChanges": false
+      }
+    },
+    "blocked": [],
+    "skipped": [
+      "Opt-in isolated fresh/upgrade/security database execution: no schema/grant changes, not applicable to Task 18",
+      "Production SQL, Matter sync, deployment, token rotation, merge: outside scope"
+    ],
+    "todo": [
+      "Audit remediation in a separately authorized dependency change before release",
+      "Remote CI and deployed performance/live-write consistency verification"
+    ],
+    "executionNotes": [
+      "Earlier restricted npm test subprocess orchestration failed/hung and was terminated; the final networking-enabled sandbox run completed successfully. No real database/Matter requests were made.",
+      "Initial arithmetic, empty-tag shape and obsolete query-shape assertion failures were corrected.",
+      "Final delivery commits add refreshed evidence/documentation, measurement-method wording and whitespace-only helper cleanup after the tested runtime head; no application behavior changes."
+    ]
+  },
+  "auditFollowup": {
+    "auditedCommit": "6c500b02a0680dc3e8d8f196a607e38b7840d1be",
+    "auditedTree": "7ff9f2ca2927fd4b18d4d3968926373a34d1815d",
+    "registry": "https://registry.npmjs.org/",
+    "snapshotMethod": "git archive of exact reviewed SHA into a disposable directory; no .env files; repository worktree and node_modules preserved",
+    "scopeFileSha256": {
+      "package.json": "28a14e8425abdb2b880b45fd7da60fb6eced74250e7f675b1b59222a9ef75468",
+      "package-lock.json": "bb834c481d9770d988ac5ecb743850fe1fa8fb4dbf205c7da672a173b7137c39",
+      "scripts/audit-policy.mjs": "dfe5170c3e0d203bd9b42bf12302861d2a8e5482b48757c832d30fe33accb177",
+      ".github/workflows/ci.yml": "7a7b1eab7fd2377f3e72ae304d479cc8196c34a5774939a5c16d2f287b3c786b"
+    },
+    "matchedCiReproduction": {
+      "node": "v22.23.3",
+      "npm": "10.9.9",
+      "nodeBinarySource": "https://nodejs.org/dist/v22.23.3/node-v22.23.3-linux-x64.tar.xz",
+      "verifiedNodeBinarySha256": "df450af89261115ef9f9e3830c3eeb2cc9213b63c720b1af623cb5dcbe2e02de",
+      "cache": "new empty mktemp directory, scoped npm_config_cache for install and audit",
+      "commands": [
+        {
+          "command": "npm ci",
+          "exitCode": 0
+        },
+        {
+          "command": "npm run audit:ci",
+          "exitCode": 0
+        }
+      ],
+      "fullHighFindingEntries": 8,
+      "productionVulnerabilities": 0,
+      "chokidarFixAvailable": false,
+      "reportsByteIdenticalToCiArtifact": 11824311698
+    },
+    "controlledSameToolchainComparison": {
+      "node": "v24.19.0",
+      "npm": "11.9.0",
+      "registry": "https://registry.npmjs.org/",
+      "sameInstalledTree": true,
+      "installCommand": "npm ci with its own initially empty writable cache",
+      "installExitCode": 0,
+      "defaultCache": {
+        "path": "/home/agent/.npm",
+        "command": "npm run audit:ci",
+        "exitCode": 1,
+        "chokidarFixAvailable": true,
+        "allAffectedRangesEmpty": true,
+        "chokidarEffects": [],
+        "reportsByteIdenticalToHistoricalLocalFailure": true,
+        "metadataLookupCommand": "npm view chokidar@3.6.0 version --json",
+        "metadataLookupExitCode": 1,
+        "metadataLookupError": "ENOENT while creating /home/agent/.npm/_cacache; invalid registry response body"
+      },
+      "freshWritableCache": {
+        "command": "npm_config_cache=<new-empty-mktemp-cache> npm run audit:ci",
+        "exitCode": 0,
+        "fullHighFindingEntries": 7,
+        "productionVulnerabilities": 0,
+        "chokidarFixAvailable": {
+          "name": "tailwindcss",
+          "version": "4.3.3",
+          "isSemVerMajor": true
+        }
+      }
+    },
+    "provenCause": "In this sandbox the default npm cache cannot be created. Package-metadata reads fail; @npmcli/metavuln-calculator@9.0.3 catches packument failures and substitutes an empty versions map. Changing only the cache on the same Node/npm/installed tree reproduces or removes the historical false compatible-remediation flag. The matched CI toolchain produces byte-identical CI reports.",
+    "notClaimed": [
+      "npm version alone caused the historical failure",
+      "CI passing eliminates the real development-only advisory",
+      "npm 11 major upgrade/downgrade suggestions are reviewed or sufficient remediations",
+      "seven versus eight npm-version finding entries is a disappearance of the underlying braces advisory"
+    ],
+    "dependencyVerification": {
+      "advisory": "GHSA-vfj7-8cjw-p6xm",
+      "affectedBraces": "<= 3.0.3",
+      "firstPatchedVersion": null,
+      "registryLatestStableBraces": "3.0.3",
+      "lockedChain": [
+        "tailwindcss@3.4.19 -> chokidar@3.6.0 -> braces@3.0.3",
+        "tailwindcss@3.4.19 -> micromatch@4.0.8 -> braces@3.0.3",
+        "eslint-config-next@15.5.27 -> @next/eslint-plugin-next@15.5.27 -> fast-glob@3.3.1 -> micromatch@4.0.8 -> braces@3.0.3"
+      ],
+      "tailwindChokidarRange": "^3.6.0",
+      "highestPublishedChokidarWithinRange": "3.6.0",
+      "chokidar4AllowedByParentRange": false,
+      "chokidar4Dependencies": {
+        "readdirp": "^4.0.1"
+      },
+      "supportedCompatibleRemediationVerified": false
+    },
+    "result": "The unchanged audit policy passes under the CI toolchain with a valid isolated cache. The historical compatible-remediation gate is reconciled; the genuine development advisory remains covered only by the unchanged exception.",
+    "dependencyPolicyLockfileWorkflowChanges": false,
+    "remainingMergeGates": [
+      "Normal review and required checks on the evidence-only follow-up head; completed results below are tied to their original actual SHAs.",
+      "Retain the existing development-only advisory exception; no supported compatible dependency fix is established."
+    ]
+  },
+  "completedExternalVerification": {
+    "ci": {
+      "runId": 38415550720,
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/38415550720",
+      "conclusion": "success",
+      "prHeadSha": "6c500b02a0680dc3e8d8f196a607e38b7840d1be",
+      "verifyJob": {
+        "id": 115358903865,
+        "checkoutSha": "27e2716b41a8f7572dd016d5d953def1eca797d7",
+        "treeSha": "7ff9f2ca2927fd4b18d4d3968926373a34d1815d",
+        "treeIdenticalToReviewedHead": true,
+        "node": "v22.23.3",
+        "npm": "10.9.9",
+        "passedSteps": [
+          "npm ci",
+          "Next.js route generation",
+          "typecheck",
+          "lint",
+          "335 tests",
+          "production build",
+          "audit:ci"
+        ]
+      },
+      "auditArtifact": {
+        "id": 11824311698,
+        "archiveSha256": "a004709ea41529ffa5df54ad9ef233275dc51fc888d56f84ed54acee50d2f319",
+        "fullReportSha256": "39ee0782148e3cd818235b3fe5c541c200e94603c1103d750cfe09c2d4f58938",
+        "productionReportSha256": "31b90573b69000532cd0814cdaad5c24409299b1b2915c09085d2cb844233cfa"
+      }
+    },
+    "disposableDatabase": {
+      "jobId": 115358903214,
+      "checkoutSha": "6c500b02a0680dc3e8d8f196a607e38b7840d1be",
+      "artifactId": 11823814476,
+      "artifactArchiveSha256": "9a0b33acc2f6f4ff75d8d71b95306b40f749c573d302f0f65879c2600c17ab88",
+      "conclusion": "passed",
+      "paths": {
+        "fresh": "passed",
+        "upgrade": "passed"
+      },
+      "checks": [
+        "catalog/RLS/grants",
+        "Data API role/security assertions",
+        "account leases/fencing",
+        "atomic pages/rollup recovery",
+        "bounded continuation/history",
+        "shared quotas/retries",
+        "upgrade data/state preservation"
+      ],
+      "realSqlAndDataApi": true,
+      "syntheticMatterOnly": true,
+      "cleanup": "passed; both owned resources stopped and temporary directory removed",
+      "rerunInFollowup": false
+    },
+    "preview": {
+      "deploymentId": "dpl_GkUSiempk6A5btp9Cu84L68ZsBri",
+      "commitSha": "6c500b02a0680dc3e8d8f196a607e38b7840d1be",
+      "branch": "task-18-analytics-reuse",
+      "readyState": "READY",
+      "immutableUrl": "https://matter-stats-5c66k85os-dfalidas-7836s-projects.vercel.app",
+      "gitHubCommitStatus": "success",
+      "verificationBoundary": "Existing deployment metadata/status inspected; no new deployment, no browser/authenticated analytics/data correctness test performed."
+    }
+  }
+}
