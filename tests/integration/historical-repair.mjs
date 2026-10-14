@@ -28,7 +28,13 @@ if(!sqlOnly){
 }
 async function rpc(name,args){
   if(sqlOnly)return JSON.parse(await sql(`set role service_role; select public.${name}(${Object.entries(args).map(([k,v])=>`${k}=>${k==='p_ids'?`array[${v.map(q).join(',')}]::text[]`:q(v)}`).join(',')});`));
-  const r=await service.rpc(name,args);assertSuccessful(r,name);return r.data;
+  const r=await service.rpc(name,args);
+  if(r.error && name==='repair_batch') {
+    const diagnostic=await json(`select jsonb_build_object('state',g.state,'capturedSessions',g.captured_sessions,'checkedSessions',g.checked_sessions,'fence',g.fence,
+      'activities',(select jsonb_agg(v) from (select state,wait_event_type,wait_event,count(*) from pg_stat_activity where backend_type='client backend' group by state,wait_event_type,wait_event) v)) from public.reading_generations g where id=${q(args.p_id)};`);
+    console.error('Synthetic repair batch diagnostic',JSON.stringify({status:r.status,code:r.error.code,diagnostic}));
+  }
+  assertSuccessful(r,name);return r.data;
 }
 const json=async s=>JSON.parse(await sql(s));
 const control=()=>json('select to_jsonb(c)::text from public.reading_generation_control c;');
@@ -53,10 +59,10 @@ const snapshot=()=>sql(`select jsonb_build_object('sessions',(select jsonb_agg(t
 const estimates=(id,keys)=>rpc('read_generation_estimates',{p_generation:id,p_ids:keys});
 const args=g=>({p_id:g.id,p_owner:g.owner,p_fence:g.fence});
 async function prepare(viaCli=false){const c=await control(),id=crypto.randomUUID();ids.add(id);const g=viaCli?cli('prepare',{run:id,owner,active:c.active??'legacy',epoch:c.epoch,timezone:'Europe/Athens'}):await rpc('repair_prepare',{p_id:id,p_owner:owner,p_expected_active:c.active,p_expected_epoch:c.epoch,p_timezone:'Europe/Athens'});ids.add(g.baseline);return g;}
-async function batch(g){const result=await rpc('repair_batch',{...args(g),p_rows:500,p_milliseconds:1000});assert.ok(result.processed<=500);return result.run;}
+async function batch(g){const result=await rpc('repair_batch',{...args(g),p_rows:100,p_milliseconds:250});assert.ok(result.processed<=100);return result.run;}
 async function capture(g){for(let i=0;i<500&&g.state.startsWith('capture');i++)g=await batch(g);assert.ok(!g.state.startsWith('capture'));return g;}
 async function reconcile(g,viaCli=false){g=await run(g.id);if(g.state==='ready')g.state='catchup';
-  if(g.state==='catchup')for(let i=0;i<500;i++){const result=await rpc('repair_batch',{...args(g),p_rows:500,p_milliseconds:1000});g=result.run;if(!result.processed)break;}
+  if(g.state==='catchup')for(let i=0;i<500;i++){const result=await rpc('repair_batch',{...args(g),p_rows:100,p_milliseconds:250});g=result.run;if(!result.processed)break;}
   if(viaCli)cli('reconcile',{run:g.id,owner:g.owner,fence:g.fence});else await rpc('repair_reconcile',args(g));g=await run(g.id);for(let i=0;i<500&&g.state.startsWith('verify');i++)g=await batch(g);return g;
 }
 async function transition(g,rollback=false,expected){const c=expected??await control();return rpc('repair_transition',{...args(g),p_expected_active:c.active,p_expected_epoch:c.epoch,p_rollback:rollback});}
