@@ -4,6 +4,8 @@ import type { Database, DailyStat, MatterItem, SyncRun } from "@/lib/supabase-ty
 import { formatDateInTimezone, getDefaultMetricsTimezone } from "@/lib/metrics-service";
 import { addCalendarDays } from "@/lib/calendar";
 
+import { readDerivedDays, type DerivedGenerationContext } from "./derived-generation";
+
 export type MatterStatsSupabaseClient = SupabaseClient<Database>;
 
 export type DashboardSummary = {
@@ -13,18 +15,9 @@ export type DashboardSummary = {
   currentStreakDays: number;
 };
 
-export async function getDashboardSummary(client: MatterStatsSupabaseClient, now = new Date()): Promise<DashboardSummary> {
-  const { data, error } = await client
-    .from("daily_stats")
-    .select("date, reading_time_seconds, items_read_count, top_source")
-    .order("date", { ascending: false });
-
-  if (error) {
-    throw error;
-  }
-
-  const stats = data ?? [];
-  const topSource = stats.find((stat) => stat.top_source)?.top_source ?? null;
+export async function getDashboardSummary(client: MatterStatsSupabaseClient, now = new Date(), context?: DerivedGenerationContext): Promise<DashboardSummary> {
+  const stats = await readDerivedDays(client, null, context);
+  const topSource = [...stats].reverse().find((stat) => stat.top_source)?.top_source ?? null;
 
   return {
     articlesRead: stats.reduce((total, stat) => total + stat.items_read_count, 0),
@@ -34,21 +27,11 @@ export async function getDashboardSummary(client: MatterStatsSupabaseClient, now
   };
 }
 
-export async function getReadingTrend(client: MatterStatsSupabaseClient, days = 30, now = new Date()): Promise<DailyStat[]> {
+export async function getReadingTrend(client: MatterStatsSupabaseClient, days = 30, now = new Date(), context?: DerivedGenerationContext): Promise<DailyStat[]> {
   const today = formatDateInTimezone(now, getDefaultMetricsTimezone());
   const since = addCalendarDays(today, -Math.max(days - 1, 0));
 
-  const { data, error } = await client
-    .from("daily_stats")
-    .select("*")
-    .gte("date", since)
-    .order("date", { ascending: true });
-
-  if (error) {
-    throw error;
-  }
-
-  return data ?? [];
+  return readDerivedDays(client, since, context);
 }
 
 export async function getRecentMatterItems(client: MatterStatsSupabaseClient, limit = 10): Promise<MatterItem[]> {

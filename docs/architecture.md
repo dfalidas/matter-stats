@@ -399,3 +399,15 @@ output equivalence, request-isolation tests and consistency limitations.
 ## Task 19 estimation provenance and snapshot preview
 
 Session and daily reading methods are explicitly versioned, with NULL historical provenance retained. Real fenced session/page and rollup/ack writers persist metadata. The historical preview streams a single read-only repeatable-read PostgreSQL snapshot, computes daily/monthly reconciliation and never invokes sync. See [the contract and operator guide](task-19-preview.md). Task 20 owns execution/cutover.
+
+
+## Task 20 historical generation boundary
+
+[Task 20 operator guide](task-20-operator-guide.md) inventories affected readers and writers,
+the durable capture barrier, bounded checkpoints/catch-up and reversible generation switch.
+Canonical analytics continue deriving from raw duration/timezone. Persisted derived reads
+(`getArticleDetail` estimate payload and daily-query exports) capture one explicit generation.
+Session/daily statement triggers coordinate the real fenced page and rollup paths; repair
+never rewrites their raw fields, receipts, dirty revisions or progress. Installing the additive
+migration is inactive; only an isolated explicit operator invocation starts work. No production
+repair/cutover, cron invocation, deployment or release readiness is implied.

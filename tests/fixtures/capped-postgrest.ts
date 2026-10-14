@@ -22,7 +22,15 @@ export function cappedPostgrest(tables: Record<string, Row[]>, options: Options 
     const url = new URL(typeof input === "string" ? input : input instanceof URL ? input : input.url);
     if (options.maxUrlBytes) assert.ok(url.href.length <= options.maxUrlBytes, `encoded request exceeds ${options.maxUrlBytes} bytes`);
     const table = url.pathname.split("/").at(-1)!;
-    const rows = tables[table] ?? [];
+    if (table === "read_generation_estimates" && url.pathname.includes("/rpc/")) {
+      const body = JSON.parse(String(init?.body)) as { p_generation: string | null; p_ids: string[] };
+      assert.equal(body.p_generation, null, "legacy fixture is explicit; generation SQL is tested in isolated databases");
+      const result = (tables.reading_sessions ?? []).filter(row => body.p_ids.includes(String(row.id)))
+        .map(row => ({ id: row.id, words_estimated: row.words_estimated ?? null, word_estimation_method: row.word_estimation_method ?? null }));
+      requests.push({ table, url, ids: result.map(row => row.id), rowCount: result.length, responseBytes: Buffer.byteLength(JSON.stringify(result)) });
+      return Response.json(result);
+    }
+    const rows = tables[table] ?? (table === "reading_generation_control" ? [{ active: null }] : []);
     const request = { table, url, rows, number: requests.filter((r) => r.table === table).length + 1 };
     options.before?.(request);
     let result = [...rows];

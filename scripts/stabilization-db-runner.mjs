@@ -12,10 +12,12 @@ import { CONTINUATION_TABLES, CONTINUATION_FUNCTION_SIGNATURES } from "./matter-
 
 import { REQUEST_TABLES, REQUEST_FUNCTION_SIGNATURES } from "./matter-request-inventory.mjs";
 
+import { GENERATION_TABLES, GENERATION_FUNCTION_SIGNATURES } from "./reading-generation-inventory.mjs";
+
 export const INVENTORIED_TABLES = [
   "matter_items", "reading_sessions", "matter_tags", "item_tags", "annotations",
   "daily_stats", "sync_runs", "sync_state", "app_sessions", "app_login_attempts",
-  "matter_sync_streams", "matter_sync_leases", ...PAGE_TABLES, ...CONTINUATION_TABLES, ...REQUEST_TABLES,
+  "matter_sync_streams", "matter_sync_leases", ...PAGE_TABLES, ...CONTINUATION_TABLES, ...REQUEST_TABLES, ...GENERATION_TABLES,
 ];
 
 export function catalogSql(tables = INVENTORIED_TABLES) {
@@ -32,6 +34,10 @@ BEGIN
       RAISE EXCEPTION 'RLS is disabled on public.%', table_name;
     END IF;
     FOREACH privilege_name IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE'] LOOP
+      IF (table_name='reading_generation_control' AND privilege_name IN ('INSERT','DELETE')) OR (table_name='reading_repair_source' AND privilege_name IN ('UPDATE','DELETE')) THEN
+        IF has_table_privilege('service_role', format('public.%I', table_name), privilege_name) THEN RAISE EXCEPTION 'unexpected generation privilege'; END IF;
+        CONTINUE;
+      END IF;
       IF table_name IN ('matter_sync_leases','matter_sync_continuation','matter_quota','matter_request_work') AND privilege_name IN ('INSERT', 'DELETE') THEN
         IF has_table_privilege('service_role', format('public.%I', table_name), privilege_name) THEN
           RAISE EXCEPTION 'service_role can reset durable lease/intent public.% via %', table_name, privilege_name;
@@ -64,7 +70,7 @@ BEGIN
   END IF;
   IF has_table_privilege('service_role','public.matter_sync_continuation','TRUNCATE') THEN RAISE EXCEPTION 'continuation can be truncated'; END IF;
   IF has_table_privilege('service_role','public.matter_quota','TRUNCATE') OR has_table_privilege('service_role','public.matter_request_work','TRUNCATE') THEN RAISE EXCEPTION 'request state can be truncated'; END IF;
-  FOREACH function_signature IN ARRAY ARRAY[${[...LEASE_FUNCTION_SIGNATURES, ...PAGE_FUNCTION_SIGNATURES, ...CONTINUATION_FUNCTION_SIGNATURES, ...REQUEST_FUNCTION_SIGNATURES].map((signature) => `'public.${signature}'`).join(", ")}] LOOP
+  FOREACH function_signature IN ARRAY ARRAY[${[...LEASE_FUNCTION_SIGNATURES, ...PAGE_FUNCTION_SIGNATURES, ...CONTINUATION_FUNCTION_SIGNATURES, ...REQUEST_FUNCTION_SIGNATURES, ...GENERATION_FUNCTION_SIGNATURES].map((signature) => `'public.${signature}'`).join(", ")}] LOOP
     IF to_regprocedure(function_signature) IS NULL THEN
       RAISE EXCEPTION 'missing lease function %', function_signature;
     END IF;

@@ -368,3 +368,13 @@ real sync, repair, token rotation, merge or deployment.
 ## Task 19 provenance and preservation gate
 
 The additive columns inherit existing server-only RLS/table grants. Replaced RPC/helper signatures remain in the exact inventories with invoker/empty-search-path and explicit server execute ACLs. Both fresh/upgrade paths now run the historical preview suite, compare independent whole-database before/after fingerprints, exercise concurrent source changes and test writer metadata. Upgrade separately confirms legacy metadata stays NULL. No production read role or permissive policy is installed here; a dedicated SELECT-only server reader is an explicit later provisioning gate. See [Task 19 operator/security guide](task-19-preview.md) and [validation](task-19-validation.md).
+
+
+Task 20's [operator guide](task-20-operator-guide.md) adds seven RLS-protected server-only
+tables and fourteen exact-signature invoker functions with empty search paths, inventoried in
+`scripts/reading-generation-inventory.mjs`. Browser table/RPC denials and production-used
+page/rollup/read behavior join both full fresh and upgrade gates. No service-role TRUNCATE
+is granted; immutable capture allows SELECT/INSERT only and the singleton SELECT/UPDATE
+only. Privileged direct administrative writes remain a trusted boundary. Draining older
+reader/writer deployments, backup/export and tested isolated restore precede any separately
+authorized production run; Task 20 performs none of those production operations.
