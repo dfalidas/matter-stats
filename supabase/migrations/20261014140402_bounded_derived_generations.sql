@@ -17,6 +17,7 @@ create table public.reading_generations (
   captured_sessions bigint not null default 0, captured_days bigint not null default 0,
   checked_sessions bigint not null default 0, checked_days bigint not null default 0,
   staged_sessions bigint not null default 0, verify_attempt bigint not null default 0,
+  refresh_original_days boolean not null default false,
   invalid_rows bigint not null default 0, mismatches bigint not null default 0, active_differences bigint not null default 0,
   source_identity uuid not null default gen_random_uuid(), captured_revision bigint not null,
   reconciled_revision bigint, reconciled_epoch bigint, cutover_epoch bigint, rollback_epoch bigint,
@@ -137,6 +138,9 @@ begin
     -- Only the selected active/rollback pair is maintained; older history is retained.
     for gid in select distinct x from unnest(array[c.active,c.previous]) x where x is not null loop
       perform public.repair_replace_session(gid,ident,row_data);
+      -- An unknown old calendar cannot identify all obsolete buckets. Conservatively
+      -- reconcile ALL baseline reading dates after any source mutation, via one flag.
+      update public.reading_generations set refresh_original_days=true where id=gid and parent is null;
     end loop;
     update public.reading_generation_control set source_revision=source_revision+1 where singleton returning * into c;
     if c.building is not null then
@@ -222,8 +226,12 @@ begin
   if c.building is distinct from p_id then raise exception 'Repair no longer selected' using errcode='40001'; end if;
   until_time:=clock_timestamp()+p_milliseconds*interval '1 millisecond';
   if g.state='capture_sessions' then
-    for r in select s.id,to_jsonb(s) data from public.reading_sessions s
+    for r in select s.id,
+      to_jsonb(s) || case when g.parent is null then '{}'::jsonb else
+        jsonb_build_object('words_estimated',b.words_estimated,'word_estimation_method',b.word_estimation_method) end data,
+      b.id baseline_id from public.reading_sessions s left join public.reading_generation_sessions b on b.generation=g.parent and b.id=s.id
       where g.session_cursor is null or s.id>g.session_cursor order by s.id limit p_rows loop
+      if g.parent is not null and r.baseline_id is null then raise exception 'Selected old generation input unavailable' using errcode='55000'; end if;
       reasons:=public.repair_invalid(r.data);
       insert into public.reading_repair_source(generation,kind,key,row_data,invalid_reasons) values(p_id,'session',r.id,r.data,reasons);
       if cardinality(reasons)=0 then
@@ -235,8 +243,13 @@ begin
     end loop;
     if n=0 then g.state:='capture_days'; end if;
   elsif g.state='capture_days' then
-    for r in select s.date,to_jsonb(s) data from public.daily_stats s
-      where g.day_cursor is null or s.date>g.day_cursor order by s.date limit p_rows loop
+    for r in
+      select s.date,to_jsonb(s) data from public.daily_stats s
+        where g.parent is null and (g.day_cursor is null or s.date>g.day_cursor)
+      union all
+      select (v->>'date')::date date,v data from jsonb_array_elements(case when g.parent is null then '[]'::jsonb
+        else public.read_generation_days(g.parent,g.day_cursor,null,p_rows) end) v
+      order by date limit p_rows loop
       reasons:='{}';
       if r.data->'reading_provenance'->>'calendarMethod'='local-occurrence-day-v1' and not exists
         (select 1 from pg_catalog.pg_timezone_names where name=r.data->'reading_provenance'->>'timezone') then
@@ -312,7 +325,7 @@ begin
       if coalesce(actual.reading_time_seconds,0)<>coalesce(chk.seconds,0) or coalesce(actual.words_read,0)<>coalesce(chk.words,0)
         or coalesce(actual.sessions_count,0)<>coalesce(chk.sessions,0) then g.mismatches:=g.mismatches+1; end if;
       select * into actual from public.reading_generation_days where generation=c.active and date=r.date;
-      if actual.preserve_original then
+      if actual.preserve_original and not coalesce((select refresh_original_days from public.reading_generations where id=c.active),false) then
         if (actual.original_reading->>'reading_time_seconds')::bigint is distinct from coalesce(chk.seconds,0)
           or (actual.original_reading->>'words_read')::bigint is distinct from coalesce(chk.words,0)
           or (actual.original_reading->>'sessions_count')::bigint is distinct from coalesce(chk.sessions,0)
@@ -372,7 +385,8 @@ begin
     raise exception 'Conflicting or stale transition' using errcode='40001'; end if;
   if p_rollback then
     if c.active<>p_id or c.previous is distinct from g.parent or c.building is not null
-      or not exists(select 1 from public.reading_generations where id=g.parent and state='retained') then
+      or not exists(select 1 from public.reading_generations where id=g.parent and state='retained'
+        and staged_sessions=(select staged_sessions from public.reading_generations where id=p_id)) then
       raise exception 'Rollback target unavailable or no longer maintained' using errcode='55000'; end if;
     target:=g.parent;
     update public.reading_generations set rollback_epoch=c.epoch+1 where id=p_id;
@@ -421,14 +435,14 @@ begin
     select dates.date,
       coalesce(to_jsonb(d),jsonb_build_object('date',dates.date,'items_read_count',0,'highlights_count',0,'top_source',null,'created_at',g.created_at,'updated_at',g.completed_at))
       || case when p_generation is null then '{}'::jsonb
-        when v.preserve_original and v.original_reading is not null then
+        when v.preserve_original and not g.refresh_original_days and v.original_reading is not null then
           jsonb_build_object('reading_time_seconds',v.original_reading->'reading_time_seconds','words_read',v.original_reading->'words_read',
             'sessions_count',v.original_reading->'sessions_count','reading_provenance',v.original_reading->'reading_provenance')
         else jsonb_build_object('reading_time_seconds',coalesce(v.reading_time_seconds,0),'words_read',coalesce(v.words_read,0),
           'sessions_count',coalesce(v.sessions_count,0),'reading_provenance',jsonb_build_object('wordMethod',g.word_method,'calendarMethod',g.calendar_method,'timezone',g.timezone)) end row_data
     from (
       select date from (select date from public.daily_stats union select date from public.reading_generation_days
-        where generation=p_generation and (not preserve_original or original_reading is not null)) all_dates
+        where generation=p_generation and (not preserve_original or original_reading is not null or g.refresh_original_days)) all_dates
       where (p_after is null or date>p_after) and (p_since is null or date>=p_since) order by date limit p_limit
     ) dates left join public.daily_stats d using(date)
       left join public.reading_generation_days v on v.generation=p_generation and v.date=dates.date

@@ -338,7 +338,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     const repairReport=JSON.parse(repairOutput.trim().split(/\r?\n/).at(-1));
     assert.equal(repairReport.status,"passed");assert.equal(repairReport.realSqlAndDataApi,true);assert.equal(repairReport.cleanup,"passed");
     assert.ok(repairReport.reference.sessions>10000);
-    repairEvidence={checks:repairReport.checks,reference:repairReport.reference,afterIngestion:repairReport.afterIngestion,realSqlAndDataApi:true,syntheticOnly:true,cleanup:"passed"};
+    repairEvidence={checks:repairReport.checks,checkCounts:repairReport.checkCounts,reference:repairReport.reference,afterIngestion:repairReport.afterIngestion,reconciliation:repairReport.reconciliation,boundaryCases:repairReport.boundaryCases,range:repairReport.range,browserDenials:repairReport.browserDenials,realSqlAndDataApi:true,syntheticOnly:true,cleanup:"passed"};
 
   };
   if (upgrade) {
