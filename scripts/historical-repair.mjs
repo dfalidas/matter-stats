@@ -49,11 +49,11 @@ export async function repairReport(config, a) {
   validateScope(a); const id = uuid(a.run), reducer = createReconciliation(a), prints = {session:fingerprint(),daily:fingerprint()};
   const child = spawn(config.command,config.args,{env:config.env,stdio:['pipe','pipe','pipe']}); child.stderr.resume();child.stdin.on('error',()=>{});
   const done = new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',code=>code===0?resolve():reject(new Error('Captured report source query failed')));});done.catch(()=>{});
-  let header, ended=false;
+  let header, ended=false; const captureReasons={};
   const timer=setTimeout(()=>child.kill(),120000);
   child.stdin.end(`BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL statement_timeout='60s'; SET LOCAL timezone='UTC';
     COPY (select jsonb_build_object('kind','header','data',to_jsonb(g))::text from public.reading_generations g where id=${id}) TO STDOUT;
-    COPY (select jsonb_build_object('kind',kind,'data',row_data)::text from public.reading_repair_source where generation=${id} order by kind,key) TO STDOUT;
+    COPY (select jsonb_build_object('kind',kind,'data',row_data,'invalidReasons',invalid_reasons)::text from public.reading_repair_source where generation=${id} order by kind,key) TO STDOUT;
     COPY (select '{"kind":"end"}'::text) TO STDOUT; COMMIT;`);
   try {
     for await(const line of createInterface({input:child.stdout,crlfDelay:Infinity})) {
@@ -61,13 +61,17 @@ export async function repairReport(config, a) {
       if(event.kind==='header') {if(header || event.data.timezone!==a.timezone || event.data.word_method!==contract.wordMethod || event.data.calendar_method!==contract.calendarMethod)throw new Error('Captured report contract mismatch');header=event.data;continue;}
       if(event.kind==='end'){ended=true;continue;}
       if(!header || !prints[event.kind] || ended) throw new Error('Incomplete captured report');
+      if(!Array.isArray(event.invalidReasons))throw new Error('Captured invalid reasons unavailable');
+      for(const reason of event.invalidReasons)captureReasons[reason]=(captureReasons[reason]??0)+1;
       prints[event.kind].row(event.data); reducer[event.kind==='session'?'session':'daily'](event.data);
     }
     await done;
     if(!ended || !header || ['capture_sessions','capture_days','cancelled'].includes(header.state)) throw new Error('Capture is incomplete');
     const hashes={session:prints.session.finish(),daily:prints.daily.finish()};
     if(hashes.session.rows!==header.captured_sessions || hashes.daily.rows!==header.captured_days) throw new Error('Incomplete captured source counts');
-    return {...reducer.finish({snapshot:header.source_identity,asOf:header.created_at,transport:'Durable immutable capture under a persistent writer barrier',hashes}),run:header,
+    const report=reducer.finish({snapshot:header.source_identity,asOf:header.created_at,transport:'Durable immutable capture under a persistent writer barrier',hashes});
+    if(header.invalid_rows>0 || header.mismatches>0 || header.state==='blocked')report.completion='complete_read_incomplete_reconciliation';
+    return {...report,captureQuality:{invalidRows:header.invalid_rows,invalidReasons:captureReasons,targetMismatches:header.mismatches},run:header,
       limitation:'Daily/monthly old/new/delta describes the immutable capture. Cutover separately requires current-source reconciliation; unknown old semantics remain unavailable.'};
   } finally {clearTimeout(timer);child.kill();await done.catch(()=>{});}
 }

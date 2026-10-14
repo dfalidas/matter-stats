@@ -96,6 +96,7 @@ begin
   if cardinality(public.repair_invalid(p_row))>0 then raise exception 'Invalid required repair input' using errcode='22023'; end if;
   seconds:=(p_row->>'duration_seconds')::bigint; words:=public.repair_words(seconds);
   day:=((p_row->>'started_at')::timestamptz at time zone g.timezone)::date;
+  if extract(year from day) not between 1 and 9999 then raise exception 'Unsupported local calendar date' using errcode='22023'; end if;
   insert into public.reading_generation_sessions(generation,id,date,duration_seconds,words_estimated,word_estimation_method,canonical_words)
     values(p_gen,p_id,day,seconds,case when p_original then (p_row->>'words_estimated')::bigint else words end,
       case when p_original then p_row->>'word_estimation_method' else g.word_method end,words);
@@ -151,6 +152,8 @@ begin
       update public.reading_generations set reconciled_revision=null,state=case when state='ready' then 'catchup' else state end where id=c.building;
     end if;
   elsif tg_table_name='daily_stats' then
+    if c.active is not null and tg_op<>'DELETE' and extract(year from new.date) not between 1 and 9999 then
+      raise exception 'Unsupported daily calendar date' using errcode='22023'; end if;
     update public.reading_generation_control set source_revision=source_revision+1 where singleton returning * into c;
     if c.building is not null then
       update public.reading_generations set reconciled_revision=null,state=case when state='ready' then 'catchup' else state end where id=c.building;
@@ -245,6 +248,8 @@ begin
       where g.session_cursor is null or s.id>g.session_cursor order by s.id limit p_rows loop
       if g.parent is not null and r.baseline_id is null then raise exception 'Selected old generation input unavailable' using errcode='55000'; end if;
       reasons:=public.repair_invalid(r.data);
+      if cardinality(reasons)=0 and extract(year from ((r.data->>'started_at')::timestamptz at time zone g.timezone)) not between 1 and 9999 then
+        reasons:=array_append(reasons,'unsupported_local_date'); end if;
       insert into public.reading_repair_source(generation,kind,key,row_data,invalid_reasons) values(p_id,'session',r.id,r.data,reasons);
       if cardinality(reasons)=0 then
         perform public.repair_replace_session(p_id,r.id,r.data);
@@ -263,10 +268,12 @@ begin
         else public.read_generation_days(g.parent,g.day_cursor,null,p_rows) end) v
       order by date limit p_rows loop
       reasons:='{}';
+      if extract(year from r.date) not between 1 and 9999 then reasons:=array_append(reasons,'invalid_date'); end if;
       if r.data->'reading_provenance'->>'calendarMethod'='local-occurrence-day-v1' and not exists
         (select 1 from pg_catalog.pg_timezone_names where name=r.data->'reading_provenance'->>'timezone') then
-        reasons:=array['invalid_provenance_timezone']; g.invalid_rows:=g.invalid_rows+1;
+        reasons:=array_append(reasons,'invalid_provenance_timezone');
       end if;
+      if cardinality(reasons)>0 then g.invalid_rows:=g.invalid_rows+1; end if;
       insert into public.reading_repair_source(generation,kind,key,row_data,invalid_reasons) values(p_id,'daily',r.date::text,r.data,reasons);
       insert into public.reading_generation_days(generation,date) values(p_id,r.date) on conflict do nothing;
       if g.parent is null then

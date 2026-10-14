@@ -114,13 +114,17 @@ try {
   assert.equal(await sql(`select count(*) from public.reading_sessions where id like '${prefix}%';`),'0');
   assert.equal(await sql(`select count(*) from public.daily_stats where date between '2400-12-31' and '2401-01-04';`),'0');owned=true;
   assert.equal(await sql("select count(*) from public.reading_sessions where id='';"),'0');
+  assert.equal(await sql("select count(*) from public.daily_stats where date='10000-01-01';"),'0');
   // An unresolved null duration/timestamp visibly blocks readiness, with retained reasons.
-  await sql(`insert into public.reading_sessions(id,started_at,duration_seconds) values('${prefix}-invalid',null,null),('${prefix}-infinite','infinity',1);
+  await sql(`insert into public.reading_sessions(id,started_at,duration_seconds) values('${prefix}-invalid',null,null),('${prefix}-infinite','infinity',1),('${prefix}-unsupported-local','9999-12-31T23:00:00Z',1);
+    insert into public.daily_stats(date,top_source) values('10000-01-01','${prefix}');
     insert into public.reading_sessions(id,started_at,duration_seconds,source_device) values('','2401-01-01T10:00:00Z',1,'${prefix}');`);
-  let bad=await capture(await prepare(true));assert.equal(bad.state,'blocked');assert.equal(bad.invalid_rows,3);
+  let bad=await capture(await prepare(true));assert.equal(bad.state,'blocked');assert.equal(bad.invalid_rows,5);
   assert.deepEqual(await json(`select to_jsonb(invalid_reasons) from public.reading_repair_source where generation='${bad.id}' and key='${prefix}-invalid';`),['invalid_duration','invalid_timestamp']);
+  const invalidPreview=await repairReport(config,{run:bad.id,start:'2400-12-31',end:'2401-01-04',timezone:'Europe/Athens'});
+  assert.equal(invalidPreview.completion,'complete_read_incomplete_reconciliation');assert.equal(invalidPreview.captureQuality.invalidRows,5);assert.equal(invalidPreview.captureQuality.invalidReasons.unsupported_local_date,1);assert.equal(invalidPreview.captureQuality.invalidReasons.invalid_date,1);
   await expectFailure(transition(bad));cli('cancel',{run:bad.id,owner:bad.owner,fence:bad.fence});
-  await sql(`delete from public.reading_sessions where id in ('${prefix}-invalid','${prefix}-infinite') or (id='' and source_device='${prefix}');`);
+  await sql(`delete from public.reading_sessions where id in ('${prefix}-invalid','${prefix}-infinite','${prefix}-unsupported-local') or (id='' and source_device='${prefix}');delete from public.daily_stats where date='10000-01-01' and top_source='${prefix}';`);
   checks.push('Unresolved invalid historical input remains explicit; capture completes blocked, cutover rejected, owned seed removed without automatic correction');
   await sql(`insert into public.matter_items(id,title,source,word_count,progress) values('${prefix}-item','Synthetic repair item','preserve-metadata.example',999999,0.4);
     insert into public.reading_sessions(id,item_id,started_at,duration_seconds,words_estimated) values('${prefix}-linked','${prefix}-item','2401-01-02T10:00:00Z',130,0);
@@ -274,7 +278,7 @@ try {
     const all=await json('select coalesce(jsonb_agg(id),\'[]\') from public.reading_generations;');assert.ok(all.every(id=>ids.has(id)),'Refuse unrelated generation cleanup');
     await sql('update public.reading_generation_control set active=null,previous=null,building=null,frozen=null where singleton;');
     if(lease){if(receipt)assert.equal(await sql(`delete from public.matter_page_receipts where receipt_id='${receipt}' returning receipt_id;`),receipt);await admin.upsertMatterSyncStream(originalStream,lease);assert.equal(await rpc('release_matter_sync_lease',{p_account_scope:'matter',p_owner:lease.owner,p_generation:lease.generation}),true);}
-    await sql(`delete from public.reading_sessions where id='' and source_device='${prefix}';delete from public.matter_dirty_rollups where date between '2400-12-31' and '2401-01-04';delete from public.reading_sessions where id like '${prefix}%';delete from public.daily_stats where date between '2400-12-31' and '2401-01-04';delete from public.matter_items where id='${prefix}-item';
+    await sql(`delete from public.daily_stats where date='10000-01-01' and top_source='${prefix}';delete from public.reading_sessions where id='' and source_device='${prefix}';delete from public.matter_dirty_rollups where date between '2400-12-31' and '2401-01-04';delete from public.reading_sessions where id like '${prefix}%';delete from public.daily_stats where date between '2400-12-31' and '2401-01-04';delete from public.matter_items where id='${prefix}-item';
       delete from public.reading_repair_changes;delete from public.reading_repair_check_days;delete from public.reading_repair_source;delete from public.reading_generation_sessions;delete from public.reading_generation_days;delete from public.reading_generations;`);
   }
 }
