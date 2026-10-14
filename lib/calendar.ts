@@ -1,3 +1,7 @@
+import contract from "./estimation-contract.json";
+
+export const DAILY_CALENDAR_METHOD = contract.calendarMethod;
+
 export const DEFAULT_APP_TIMEZONE = "Europe/Athens";
 
 export function isValidTimezone(timezone: string): boolean {

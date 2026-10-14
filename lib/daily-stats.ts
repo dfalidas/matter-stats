@@ -63,7 +63,7 @@ export async function calculateDailyStat(date: string, timezone: string = getApp
     throw new Error("Invalid complete annotation count response");
   }
 
-  return buildDailyStat(date, (sessions ?? []) as unknown as DailyStatsSession[], highlightsCount);
+  return buildDailyStat(date, (sessions ?? []) as unknown as DailyStatsSession[], highlightsCount, timezone);
 }
 
 async function upsertInBatches<Row>(rows: Row[], upsert: (batch: Row[], lease: MatterSyncLease) => Promise<unknown>, lease: MatterSyncLease) {

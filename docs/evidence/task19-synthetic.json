@@ -1,0 +1,547 @@
+{
+  "schemaVersion": 1,
+  "completion": "complete_read_incomplete_reconciliation",
+  "source": {
+    "snapshot": "synthetic-fixture-v1",
+    "asOf": "2026-10-14T00:00:00Z"
+  },
+  "scope": {
+    "start": "2025-01-01",
+    "end": "2027-01-02",
+    "timezone": "Europe/Athens",
+    "range": "[start,end)",
+    "sessions": "All stored sessions scanned, including invalid/unlocatable and outside-range rows for trustworthy old-zone counterfactuals",
+    "daily": "All stored daily rows fingerprinted; reconciliation limited to calendar range"
+  },
+  "methods": {
+    "wordMethod": "session-duration-225-round-v1",
+    "calendarMethod": "local-occurrence-day-v1",
+    "formula": "Math.round(duration_seconds / 60 * 225)",
+    "wpm": 225,
+    "rounding": "Round each valid session, then sum; never round an aggregate duration.",
+    "calendar": "APP_TIMEZONE (default Europe/Athens); [start,end); whole duration on occurrence date; UTC source unchanged; no interval splitting."
+  },
+  "provenance": {
+    "canonical": 2,
+    "legacyUnknown": 12,
+    "other": 1
+  },
+  "invalid": {
+    "sessions": {
+      "invalid_duration": 2,
+      "invalid_timestamp": 2
+    },
+    "daily": {},
+    "sessionRows": 4,
+    "dailyRows": 0,
+    "unlocatableSessions": 2,
+    "affectedLocalDays": {
+      "2026-01-06": 2
+    }
+  },
+  "excludedFields": [
+    "items_read_count",
+    "highlights_count",
+    "top_source",
+    "matter_items.word_count"
+  ],
+  "daily": [
+    {
+      "date": "2025-12-31",
+      "proposed": {
+        "reading_time_seconds": 0,
+        "words_read": 0,
+        "sessions_count": 0
+      },
+      "storedSessionWords": 0,
+      "unavailableStoredSessionWords": 0,
+      "old": {
+        "reading_time_seconds": 60,
+        "words_read": 1000,
+        "sessions_count": 1
+      },
+      "oldProvenance": {
+        "calendarMethod": "local-occurrence-day-v1",
+        "wordMethod": "session-duration-225-round-v1",
+        "timezone": "UTC"
+      },
+      "sessionWordDelta": 0,
+      "delta": {
+        "reading_time_seconds": -60,
+        "words_read": -1000,
+        "sessions_count": -1
+      },
+      "missingRollup": false,
+      "staleDateWouldBecomeEmpty": true,
+      "explanation": {
+        "status": "known_calendar_counterfactual",
+        "wordMethodDifference": {
+          "reading_time_seconds": 0,
+          "words_read": 0,
+          "sessions_count": 0
+        },
+        "timezoneReassignment": {
+          "reading_time_seconds": -60,
+          "words_read": -225,
+          "sessions_count": -1
+        },
+        "unexplainedResidual": {
+          "reading_time_seconds": 0,
+          "words_read": -775,
+          "sessions_count": 0
+        }
+      }
+    },
+    {
+      "date": "2026-01-01",
+      "proposed": {
+        "reading_time_seconds": 240,
+        "words_read": 900,
+        "sessions_count": 4
+      },
+      "storedSessionWords": 2450,
+      "unavailableStoredSessionWords": 0,
+      "old": {
+        "reading_time_seconds": 180,
+        "words_read": 3000,
+        "sessions_count": 3
+      },
+      "oldProvenance": null,
+      "sessionWordDelta": -1550,
+      "delta": {
+        "reading_time_seconds": 60,
+        "words_read": -2100,
+        "sessions_count": 1
+      },
+      "missingRollup": false,
+      "staleDateWouldBecomeEmpty": false,
+      "explanation": {
+        "status": "unavailable",
+        "wordMethodDifference": null,
+        "timezoneReassignment": null,
+        "unexplainedResidual": null,
+        "reason": "Old calendar provenance or stored session-word baseline unavailable; equality does not identify a method."
+      }
+    },
+    {
+      "date": "2026-01-02",
+      "proposed": {
+        "reading_time_seconds": 3,
+        "words_read": 12,
+        "sessions_count": 3
+      },
+      "storedSessionWords": 9,
+      "unavailableStoredSessionWords": 0,
+      "old": {
+        "reading_time_seconds": 3,
+        "words_read": 10,
+        "sessions_count": 3
+      },
+      "oldProvenance": {
+        "calendarMethod": "local-occurrence-day-v1",
+        "wordMethod": "session-duration-225-round-v1",
+        "timezone": "Europe/Athens"
+      },
+      "sessionWordDelta": 3,
+      "delta": {
+        "reading_time_seconds": 0,
+        "words_read": 2,
+        "sessions_count": 0
+      },
+      "missingRollup": false,
+      "staleDateWouldBecomeEmpty": false,
+      "explanation": {
+        "status": "known_calendar_counterfactual",
+        "wordMethodDifference": {
+          "reading_time_seconds": 0,
+          "words_read": 3,
+          "sessions_count": 0
+        },
+        "timezoneReassignment": {
+          "reading_time_seconds": 0,
+          "words_read": 0,
+          "sessions_count": 0
+        },
+        "unexplainedResidual": {
+          "reading_time_seconds": 0,
+          "words_read": -1,
+          "sessions_count": 0
+        }
+      }
+    },
+    {
+      "date": "2026-01-03",
+      "proposed": {
+        "reading_time_seconds": 0,
+        "words_read": 0,
+        "sessions_count": 1
+      },
+      "storedSessionWords": 0,
+      "unavailableStoredSessionWords": 0,
+      "old": null,
+      "oldProvenance": null,
+      "sessionWordDelta": 0,
+      "delta": null,
+      "missingRollup": true,
+      "staleDateWouldBecomeEmpty": false,
+      "explanation": {
+        "status": "unavailable",
+        "wordMethodDifference": null,
+        "timezoneReassignment": null,
+        "unexplainedResidual": null,
+        "reason": "Old calendar provenance or stored session-word baseline unavailable; equality does not identify a method."
+      }
+    },
+    {
+      "date": "2026-01-04",
+      "proposed": {
+        "reading_time_seconds": 0,
+        "words_read": 0,
+        "sessions_count": 0
+      },
+      "storedSessionWords": 0,
+      "unavailableStoredSessionWords": 0,
+      "old": {
+        "reading_time_seconds": 60,
+        "words_read": 225,
+        "sessions_count": 1
+      },
+      "oldProvenance": {
+        "calendarMethod": "local-occurrence-day-v1",
+        "wordMethod": "session-duration-225-round-v1",
+        "timezone": "UTC"
+      },
+      "sessionWordDelta": 0,
+      "delta": {
+        "reading_time_seconds": -60,
+        "words_read": -225,
+        "sessions_count": -1
+      },
+      "missingRollup": false,
+      "staleDateWouldBecomeEmpty": true,
+      "explanation": {
+        "status": "known_calendar_counterfactual",
+        "wordMethodDifference": {
+          "reading_time_seconds": 0,
+          "words_read": 0,
+          "sessions_count": 0
+        },
+        "timezoneReassignment": {
+          "reading_time_seconds": -60,
+          "words_read": -225,
+          "sessions_count": -1
+        },
+        "unexplainedResidual": {
+          "reading_time_seconds": 0,
+          "words_read": 0,
+          "sessions_count": 0
+        }
+      }
+    },
+    {
+      "date": "2026-01-05",
+      "proposed": {
+        "reading_time_seconds": 60,
+        "words_read": 225,
+        "sessions_count": 1
+      },
+      "storedSessionWords": 225,
+      "unavailableStoredSessionWords": 0,
+      "old": null,
+      "oldProvenance": null,
+      "sessionWordDelta": 0,
+      "delta": null,
+      "missingRollup": true,
+      "staleDateWouldBecomeEmpty": false,
+      "explanation": {
+        "status": "unavailable",
+        "wordMethodDifference": null,
+        "timezoneReassignment": null,
+        "unexplainedResidual": null,
+        "reason": "Old calendar provenance or stored session-word baseline unavailable; equality does not identify a method."
+      }
+    },
+    {
+      "date": "2026-02-01",
+      "proposed": {
+        "reading_time_seconds": 1,
+        "words_read": 4,
+        "sessions_count": 1
+      },
+      "storedSessionWords": 4,
+      "unavailableStoredSessionWords": 0,
+      "old": null,
+      "oldProvenance": null,
+      "sessionWordDelta": 0,
+      "delta": null,
+      "missingRollup": true,
+      "staleDateWouldBecomeEmpty": false,
+      "explanation": {
+        "status": "unavailable",
+        "wordMethodDifference": null,
+        "timezoneReassignment": null,
+        "unexplainedResidual": null,
+        "reason": "Old calendar provenance or stored session-word baseline unavailable; equality does not identify a method."
+      }
+    },
+    {
+      "date": "2026-03-29",
+      "proposed": {
+        "reading_time_seconds": 120,
+        "words_read": 450,
+        "sessions_count": 2
+      },
+      "storedSessionWords": 450,
+      "unavailableStoredSessionWords": 0,
+      "old": null,
+      "oldProvenance": null,
+      "sessionWordDelta": 0,
+      "delta": null,
+      "missingRollup": true,
+      "staleDateWouldBecomeEmpty": false,
+      "explanation": {
+        "status": "unavailable",
+        "wordMethodDifference": null,
+        "timezoneReassignment": null,
+        "unexplainedResidual": null,
+        "reason": "Old calendar provenance or stored session-word baseline unavailable; equality does not identify a method."
+      }
+    },
+    {
+      "date": "2026-10-25",
+      "proposed": {
+        "reading_time_seconds": 120,
+        "words_read": 450,
+        "sessions_count": 2
+      },
+      "storedSessionWords": 450,
+      "unavailableStoredSessionWords": 0,
+      "old": null,
+      "oldProvenance": null,
+      "sessionWordDelta": 0,
+      "delta": null,
+      "missingRollup": true,
+      "staleDateWouldBecomeEmpty": false,
+      "explanation": {
+        "status": "unavailable",
+        "wordMethodDifference": null,
+        "timezoneReassignment": null,
+        "unexplainedResidual": null,
+        "reason": "Old calendar provenance or stored session-word baseline unavailable; equality does not identify a method."
+      }
+    },
+    {
+      "date": "2027-01-01",
+      "proposed": {
+        "reading_time_seconds": 1,
+        "words_read": 4,
+        "sessions_count": 1
+      },
+      "storedSessionWords": 4,
+      "unavailableStoredSessionWords": 0,
+      "old": null,
+      "oldProvenance": null,
+      "sessionWordDelta": 0,
+      "delta": null,
+      "missingRollup": true,
+      "staleDateWouldBecomeEmpty": false,
+      "explanation": {
+        "status": "unavailable",
+        "wordMethodDifference": null,
+        "timezoneReassignment": null,
+        "unexplainedResidual": null,
+        "reason": "Old calendar provenance or stored session-word baseline unavailable; equality does not identify a method."
+      }
+    }
+  ],
+  "monthly": [
+    {
+      "month": "2025-12",
+      "old": {
+        "reading_time_seconds": 60,
+        "words_read": 1000,
+        "sessions_count": 1
+      },
+      "proposed": {
+        "reading_time_seconds": 0,
+        "words_read": 0,
+        "sessions_count": 0
+      },
+      "storedSessionWords": 0,
+      "unavailableStoredSessionWords": 0,
+      "missingRollups": 0,
+      "staleDates": 1,
+      "unexplainedDays": 0,
+      "explanation": {
+        "status": "known_calendar_counterfactual",
+        "wordMethodDifference": {
+          "reading_time_seconds": 0,
+          "words_read": 0,
+          "sessions_count": 0
+        },
+        "timezoneReassignment": {
+          "reading_time_seconds": -60,
+          "words_read": -225,
+          "sessions_count": -1
+        },
+        "unexplainedResidual": {
+          "reading_time_seconds": 0,
+          "words_read": -775,
+          "sessions_count": 0
+        }
+      },
+      "delta": {
+        "reading_time_seconds": -60,
+        "words_read": -1000,
+        "sessions_count": -1
+      },
+      "oldBaseline": "Sum of existing rows only; missing rollups remain unavailable",
+      "partialCalendarMonth": false
+    },
+    {
+      "month": "2026-01",
+      "old": {
+        "reading_time_seconds": 243,
+        "words_read": 3235,
+        "sessions_count": 7
+      },
+      "proposed": {
+        "reading_time_seconds": 303,
+        "words_read": 1137,
+        "sessions_count": 9
+      },
+      "storedSessionWords": 2684,
+      "unavailableStoredSessionWords": 0,
+      "missingRollups": 2,
+      "staleDates": 1,
+      "unexplainedDays": 3,
+      "explanation": {
+        "status": "unavailable",
+        "unavailableDays": 3
+      },
+      "delta": {
+        "reading_time_seconds": 60,
+        "words_read": -2098,
+        "sessions_count": 2
+      },
+      "oldBaseline": "Sum of existing rows only; missing rollups remain unavailable",
+      "partialCalendarMonth": false
+    },
+    {
+      "month": "2026-02",
+      "old": {
+        "reading_time_seconds": 0,
+        "words_read": 0,
+        "sessions_count": 0
+      },
+      "proposed": {
+        "reading_time_seconds": 1,
+        "words_read": 4,
+        "sessions_count": 1
+      },
+      "storedSessionWords": 4,
+      "unavailableStoredSessionWords": 0,
+      "missingRollups": 1,
+      "staleDates": 0,
+      "unexplainedDays": 1,
+      "explanation": {
+        "status": "unavailable",
+        "unavailableDays": 1
+      },
+      "delta": {
+        "reading_time_seconds": 1,
+        "words_read": 4,
+        "sessions_count": 1
+      },
+      "oldBaseline": "Sum of existing rows only; missing rollups remain unavailable",
+      "partialCalendarMonth": false
+    },
+    {
+      "month": "2026-03",
+      "old": {
+        "reading_time_seconds": 0,
+        "words_read": 0,
+        "sessions_count": 0
+      },
+      "proposed": {
+        "reading_time_seconds": 120,
+        "words_read": 450,
+        "sessions_count": 2
+      },
+      "storedSessionWords": 450,
+      "unavailableStoredSessionWords": 0,
+      "missingRollups": 1,
+      "staleDates": 0,
+      "unexplainedDays": 1,
+      "explanation": {
+        "status": "unavailable",
+        "unavailableDays": 1
+      },
+      "delta": {
+        "reading_time_seconds": 120,
+        "words_read": 450,
+        "sessions_count": 2
+      },
+      "oldBaseline": "Sum of existing rows only; missing rollups remain unavailable",
+      "partialCalendarMonth": false
+    },
+    {
+      "month": "2026-10",
+      "old": {
+        "reading_time_seconds": 0,
+        "words_read": 0,
+        "sessions_count": 0
+      },
+      "proposed": {
+        "reading_time_seconds": 120,
+        "words_read": 450,
+        "sessions_count": 2
+      },
+      "storedSessionWords": 450,
+      "unavailableStoredSessionWords": 0,
+      "missingRollups": 1,
+      "staleDates": 0,
+      "unexplainedDays": 1,
+      "explanation": {
+        "status": "unavailable",
+        "unavailableDays": 1
+      },
+      "delta": {
+        "reading_time_seconds": 120,
+        "words_read": 450,
+        "sessions_count": 2
+      },
+      "oldBaseline": "Sum of existing rows only; missing rollups remain unavailable",
+      "partialCalendarMonth": false
+    },
+    {
+      "month": "2027-01",
+      "old": {
+        "reading_time_seconds": 0,
+        "words_read": 0,
+        "sessions_count": 0
+      },
+      "proposed": {
+        "reading_time_seconds": 1,
+        "words_read": 4,
+        "sessions_count": 1
+      },
+      "storedSessionWords": 4,
+      "unavailableStoredSessionWords": 0,
+      "missingRollups": 1,
+      "staleDates": 0,
+      "unexplainedDays": 1,
+      "explanation": {
+        "status": "unavailable",
+        "unavailableDays": 1
+      },
+      "delta": {
+        "reading_time_seconds": 1,
+        "words_read": 4,
+        "sessions_count": 1
+      },
+      "oldBaseline": "Sum of existing rows only; missing rollups remain unavailable",
+      "partialCalendarMonth": true
+    }
+  ]
+}

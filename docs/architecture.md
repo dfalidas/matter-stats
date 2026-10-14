@@ -395,3 +395,7 @@ remain before protected reads. Reuse improves agreement on shared inputs but
 is not an MVCC snapshot across pages, metadata or independent reads. See
 [Task 18 validation](task-18-validation.md) for measured HTTP counts, rows/bytes,
 output equivalence, request-isolation tests and consistency limitations.
+
+## Task 19 estimation provenance and snapshot preview
+
+Session and daily reading methods are explicitly versioned, with NULL historical provenance retained. Real fenced session/page and rollup/ack writers persist metadata. The historical preview streams a single read-only repeatable-read PostgreSQL snapshot, computes daily/monthly reconciliation and never invokes sync. See [the contract and operator guide](task-19-preview.md). Task 20 owns execution/cutover.

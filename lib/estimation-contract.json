@@ -1,0 +1,8 @@
+{
+  "wordMethod": "session-duration-225-round-v1",
+  "calendarMethod": "local-occurrence-day-v1",
+  "formula": "Math.round(duration_seconds / 60 * 225)",
+  "wpm": 225,
+  "rounding": "Round each valid session, then sum; never round an aggregate duration.",
+  "calendar": "APP_TIMEZONE (default Europe/Athens); [start,end); whole duration on occurrence date; UTC source unchanged; no interval splitting."
+}

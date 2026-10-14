@@ -120,11 +120,11 @@ insert into public.sync_state (id,active_phase,sync_mode,item_cursor,recent_acti
 
 export const preservationSql = String.raw`select jsonb_build_object(
   'matter_items', (select coalesce(jsonb_agg(to_jsonb(t) order by id), '[]'::jsonb) from public.matter_items t),
-  'reading_sessions', (select coalesce(jsonb_agg(to_jsonb(t) order by id), '[]'::jsonb) from public.reading_sessions t),
+  'reading_sessions', (select coalesce(jsonb_agg(to_jsonb(t) - 'word_estimation_method' order by id), '[]'::jsonb) from public.reading_sessions t),
   'matter_tags', (select coalesce(jsonb_agg(to_jsonb(t) order by id), '[]'::jsonb) from public.matter_tags t),
   'item_tags', (select coalesce(jsonb_agg(to_jsonb(t) order by item_id, tag_id), '[]'::jsonb) from public.item_tags t),
   'annotations', (select coalesce(jsonb_agg(to_jsonb(t) order by id), '[]'::jsonb) from public.annotations t),
-  'daily_stats', (select coalesce(jsonb_agg(to_jsonb(t) order by date), '[]'::jsonb) from public.daily_stats t),
+  'daily_stats', (select coalesce(jsonb_agg(to_jsonb(t) - 'reading_provenance' order by date), '[]'::jsonb) from public.daily_stats t),
   'sync_runs', (select coalesce(jsonb_agg(to_jsonb(t) order by id), '[]'::jsonb) from public.sync_runs t),
   'sync_state', (select coalesce(jsonb_agg(to_jsonb(t) order by id), '[]'::jsonb) from public.sync_state t),
   'counts', jsonb_build_object('items',(select count(*) from public.matter_items),'sessions',(select count(*) from public.reading_sessions),'tags',(select count(*) from public.matter_tags),'links',(select count(*) from public.item_tags),'annotations',(select count(*) from public.annotations),'daily',(select count(*) from public.daily_stats),'runs',(select count(*) from public.sync_runs),'sync_state',(select count(*) from public.sync_state)),
@@ -259,6 +259,8 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     assertLegacyPreserved(JSON.parse(before), JSON.parse(after));
     preservation = "passed";
   }
+  if (upgrade) assert.equal(containerPsql(projectId, "select count(*) from public.reading_sessions where id='legacy-session' and word_estimation_method is null;").trim(), "1");
+  if (upgrade) assert.equal(containerPsql(projectId, "select count(*) from public.daily_stats where date='2026-05-19' and reading_provenance is null;").trim(), "1");
   const gatewayTransport = configureDisposableGateway(projectId);
   const status = parseStatusEnv(cli(["status", "--workdir", workdir, "-o", "env"], { env: sanitizedEnvironment() }));
   const versions = await catalog(projectId, path.join(workdir, "supabase/migrations"));
@@ -266,6 +268,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   let pageEvidence;
   let continuationEvidence;
   let requestEvidence;
+  let previewEvidence;
   const runIntegration = () => {
     command(process.execPath, [path.join(repoRoot, "node_modules/typescript/bin/tsc"), "-p", "tests/tsconfig.json"], { env: sanitizedEnvironment() });
     const env = integrationEnvironment(status, projectId);
@@ -300,11 +303,15 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     const requestReport=JSON.parse(requestOutput.trim().split(/\r?\n/).at(-1));
     assert.equal(requestReport.status,"passed"); assert.equal(requestReport.realSqlAndDataApi,true); assert.equal(requestReport.cleanup,"passed");
     requestEvidence={checks:requestReport.checks,realSqlAndDataApi:true,syntheticMatterOnly:true,cleanup:"passed"};
+    const previewOutput=command(process.execPath,[path.join(repoRoot,"tests/integration/historical-preview.mjs")],{env});
+    const previewReport=JSON.parse(previewOutput.trim().split(/\r?\n/).at(-1));
+    assert.equal(previewReport.status,"passed");assert.equal(previewReport.realSql,true);assert.equal(previewReport.cleanup,"passed");
+    previewEvidence={checks:previewReport.checks,realSql:true,syntheticOnly:true,cleanup:"passed"};
   };
   if (upgrade) {
     await removeOwnedLegacySingleton({ query: (sql) => Promise.resolve(containerPsql(projectId, sql)), ownershipMarker, runIntegration });
   } else runIntegration();
-  return { name, catalog: "passed", dataApi: "passed", gatewayTransport, accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, boundedContinuationAndHistory: "passed", continuationEvidence, sharedQuotaAndRetries:"passed", requestEvidence, requestPreservation, preservation, streamPreservation, leasePreservation, pagePreservation, migrationHistory: versions };
+  return { name, catalog: "passed", dataApi: "passed", gatewayTransport, accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, boundedContinuationAndHistory: "passed", continuationEvidence, sharedQuotaAndRetries:"passed", requestEvidence, historicalPreview:"passed", previewEvidence, requestPreservation, preservation, streamPreservation, leasePreservation, pagePreservation, migrationHistory: versions };
 }
 
 export async function runStabilizationDatabases({ evidenceRoot = path.join(repoRoot, "artifacts/stabilization-db"), hasDocker = dockerAvailable } = {}) {
