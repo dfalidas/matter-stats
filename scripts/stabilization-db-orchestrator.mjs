@@ -269,6 +269,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   let continuationEvidence;
   let requestEvidence;
   let previewEvidence;
+  let wordMethodEvidence;
   const runIntegration = () => {
     command(process.execPath, [path.join(repoRoot, "node_modules/typescript/bin/tsc"), "-p", "tests/tsconfig.json"], { env: sanitizedEnvironment() });
     const env = integrationEnvironment(status, projectId);
@@ -288,13 +289,18 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     assert.equal(pageReport.syntheticMatterOnly, true);
     assert.equal(pageReport.cleanup, "passed");
     pageEvidence = { checks: pageReport.checks, realSqlAndDataApi: true, syntheticMatterOnly: true, cleanup: "passed" };
+    const wordMethodOutput=command(process.execPath,[path.join(repoRoot,"tests/integration/session-word-method.mjs")],{env});
+    const wordMethodReport=JSON.parse(wordMethodOutput.trim().split(/\r?\n/).at(-1));
+    assert.equal(wordMethodReport.status,"passed");assert.equal(wordMethodReport.realSqlAndDataApi,true);assert.equal(wordMethodReport.cleanup,"passed");
+    assert.deepEqual(wordMethodReport.range,{start:0,endInclusive:600,rows:601,committedPages:7,rejectedPages:10});
+    wordMethodEvidence={checks:wordMethodReport.checks,range:wordMethodReport.range,boundaries:wordMethodReport.boundaries,realSqlAndDataApi:true,cleanup:"passed"};
     const continuationOutput = command(process.execPath, [path.join(repoRoot, "tests/integration/matter-continuation.mjs")], { env });
     const continuationReport = JSON.parse(continuationOutput.trim().split(/\r?\n/).at(-1));
     assert.equal(continuationReport.status, "passed");
     assert.equal(continuationReport.realSqlAndDataApi, true);
     assert.equal(continuationReport.syntheticMatterOnly, true);
     assert.equal(continuationReport.cleanup, "passed");
-    const referenceFields = ["count","distinct","mismatches","duration","referenceDuration","sessionPages","invocations"];
+    const referenceFields = ["count","distinct","mismatches","wordMismatches","duration","referenceDuration","sessionPages","invocations"];
     assert.ok(referenceFields.every((field)=>Number.isSafeInteger(continuationReport.historyReference?.[field]) && continuationReport.historyReference[field]>=0));
     continuationEvidence = { checks: continuationReport.checks,
       historyReference:Object.fromEntries(referenceFields.map((field)=>[field,continuationReport.historyReference[field]])),
@@ -311,7 +317,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   if (upgrade) {
     await removeOwnedLegacySingleton({ query: (sql) => Promise.resolve(containerPsql(projectId, sql)), ownershipMarker, runIntegration });
   } else runIntegration();
-  return { name, catalog: "passed", dataApi: "passed", gatewayTransport, accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, boundedContinuationAndHistory: "passed", continuationEvidence, sharedQuotaAndRetries:"passed", requestEvidence, historicalPreview:"passed", previewEvidence, requestPreservation, preservation, streamPreservation, leasePreservation, pagePreservation, migrationHistory: versions };
+  return { name, catalog: "passed", dataApi: "passed", gatewayTransport, accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, boundedContinuationAndHistory: "passed", continuationEvidence, sharedQuotaAndRetries:"passed", requestEvidence, historicalPreview:"passed", previewEvidence, sessionWordMethod:"passed", wordMethodEvidence, requestPreservation, preservation, streamPreservation, leasePreservation, pagePreservation, migrationHistory: versions };
 }
 
 export async function runStabilizationDatabases({ evidenceRoot = path.join(repoRoot, "artifacts/stabilization-db"), hasDocker = dockerAvailable } = {}) {

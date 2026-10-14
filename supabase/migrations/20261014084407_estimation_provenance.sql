@@ -8,7 +8,16 @@ alter table public.reading_sessions add constraint session_word_method_valid che
   word_estimation_method is null or (length(word_estimation_method) between 1 and 128 and
   (word_estimation_method <> 'session-duration-225-round-v1' or
     (duration_seconds is not null and duration_seconds >= 0 and words_estimated is not null and
-     words_estimated = floor(duration_seconds::numeric / 60 * 225 + 0.5))))
+     -- Match JS Number (binary64) division THEN multiplication; do not simplify
+     -- to seconds * 3.75 or use numeric arithmetic. Math.round ties go upward,
+     -- unlike round(float8)'s nearest-even ties. Compare the fractional part
+     -- without adding 0.5 to the float (which can itself round at a boundary).
+     words_estimated =
+       floor((duration_seconds::double precision / 60::double precision) * 225::double precision)
+       + case when
+         (duration_seconds::double precision / 60::double precision) * 225::double precision
+         - floor((duration_seconds::double precision / 60::double precision) * 225::double precision)
+         >= 0.5::double precision then 1 else 0 end)))
 );
 alter table public.daily_stats add constraint reading_provenance_valid check (
   reading_provenance is null or (jsonb_typeof(reading_provenance) = 'object'

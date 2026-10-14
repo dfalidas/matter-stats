@@ -33,7 +33,9 @@ legacy/unknown even if the stored value happens to match. An explicit unfamiliar
 session version is `other`; an unknown daily calendar version cannot be used to
 infer the old timezone. Old-compatible writers omit metadata and overwrite it
 with NULL rather than retaining a stale canonical claim. A constraint rejects a
-canonical session tag whose words do not match the duration formula. Provenance
+canonical session tag whose words do not match the duration formula. It uses
+binary64 division then multiplication and explicit ties-up rounding to match
+JavaScript, rather than PostgreSQL numeric arithmetic or float ties-to-even. Provenance
 is a trusted writer assertion, not cryptographic proof of historical correctness.
 
 Apply `20261014084407_estimation_provenance.sql` after the complete existing chain
@@ -194,6 +196,10 @@ DISPOSABLE_DB_ACK=yes npm run test:stabilization-db
 
 Both fresh and upgrade paths include `tests/integration/historical-preview.mjs`,
 existing real Data API/browser denials and production page/ack/writer suites.
+Both stacks also verify all 0–600-second normalizer outputs through real fenced
+page commits, boundary false-tag rejection and independent word agreement for
+all 5,000 continuation fixture rows.
+
 Upgrade preserves every original column, explicitly excludes only the newly
 added nullable fields from the old-schema comparison, and separately verifies
 legacy provenance remains NULL. New metadata uses existing RLS/table grants and
