@@ -165,7 +165,9 @@ unavailable; locatable invalid rows have affected-day counts. Invalid rows are
 excluded from proposed **valid-row subtotals** and force
 `complete_read_incomplete_reconciliation`. This is conservative even for invalid
 rows outside the selected range. Invalid stored session words produce unavailable
-baselines, never silently zero. Report completeness describes stored input, not
+baselines, never silently zero. A stale date means its reading aggregation is empty; it does not propose deleting the entire row or its unrelated article/highlight/source fields.
+
+Report completeness describes stored input, not
 Matter history coverage. No session-to-article attribution is inferred.
 
 Committed [synthetic JSON](evidence/task19-synthetic.json) and

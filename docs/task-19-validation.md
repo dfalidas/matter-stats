@@ -2,8 +2,8 @@
 
 Base: `e69b2f342eba91a6b0530a10e317c768349eaeed` (latest fetched origin/main,
 2026-10-14, PR #81). No subsequent main changes existed at initial inspection.
-Tasks 01–18 remained the starting implementation. The final tested head and
-exact final command results are recorded in the draft PR; evidence files are
+Tasks 01–18 remained the starting implementation. Runtime implementation tested at clean SHA `8f627fda896084c4472ec46157300d40dd17fd20`.
+The final documentation-only head and exact command results are recorded in the draft PR; evidence files are
 keyed by `git rev-parse HEAD` and the supplemental runner records dirty state.
 A SHA recorded during development with a dirty worktree is **not** proof that
 that committed SHA contains the tested Task 19 code.
@@ -18,9 +18,9 @@ that committed SHA contains the tested Task 19 code.
 | `npm run lint` | PASSED | Zero errors; four existing warnings in `.agents/skills/visual-explainer` and `lib/overview-service.ts`. |
 | `npm run test` | PASSED | 343 tests in development rerun; final-head count/results in draft PR. First run had one outdated exact normalizer expectation, corrected to include explicit method. |
 | `npm run build` | PASSED | Production Next build, static/dynamic route generation. |
-| `npm run audit:ci` | PASSED latest development rerun; one intermediate FAILED | Full: seven high development findings deriving from GHSA-vfj7-8cjw-p6xm; production: zero. One response reported `tailwindcss-animate.fixAvailable=true`, so the unchanged enforcement correctly failed. The subsequent response passed with no compatible remedy. Record this changing registry remediation metadata rather than concealing the failed run or weakening enforcement. Recheck final head and review if it recurs. |
+| `npm run audit:ci` | FAILED at clean implementation SHA; earlier PASSED responses | Full: seven high development findings deriving from GHSA-vfj7-8cjw-p6xm; production: zero. One response reported `tailwindcss-animate.fixAvailable=true`, so the unchanged enforcement correctly failed. The subsequent response passed with no compatible remedy. Record this changing registry remediation metadata rather than concealing the failed run or weakening enforcement. It recurred at the clean implementation SHA; audit enforcement is an open gate, not waived. |
 | `git diff --check` | PASSED | No whitespace errors. |
-| Focused real PostgreSQL 17 fresh/upgrade | PASSED | Pinned image, all migrations, catalog/RLS/ACL/signatures, original-column upgrade preservation, NULL provenance even when words equal canonical, production writer metadata and false-tag rejection, preview/CLI/source concurrency/preservation and owned cleanup. Supplemental SQL gate only. |
+| Focused real PostgreSQL 17 fresh/upgrade | PASSED at clean implementation SHA on rerun | Pinned image, all migrations, catalog/RLS/ACL/signatures, original-column upgrade preservation, NULL provenance even when words equal canonical, production writer metadata and false-tag rejection, preview/CLI/source concurrency/preservation and owned cleanup. Supplemental SQL gate only. First final-head invocation exited nonzero with generic failure; diagnostic and unchanged official reruns passed, with clean worktree and owned cleanup. The first failing layer remains unidentified. |
 | Full `DISPOSABLE_DB_ACK=yes npm run test:stabilization-db` | FAILED setup / BLOCKED database evidence | At base HEAD with Task 19 dirty worktree: fresh startup never created its stack; image extraction failed `no space left on device`. The runner wrote sanitized failure/cleanup evidence, with automatic stack cleanup marked FAILED. No stack containers remained. Upgrade/Data API/real browser HTTP/page/ack regressions did not execute; do not count them as passed. |
 | Production read preview, migration, sync, deployment | NOT EXECUTED | Explicit assignment boundary. |
 | Task 20 repair/shadow/catch-up/cutover/rollback | TODO / OUT OF SCOPE | Handoff in the operator guide. |
@@ -87,8 +87,8 @@ HTTP low-cap/pagination/tie regressions remain in the application test run.
 
 Run the full owned Supabase fresh/upgrade stacks on an executor with enough image
 storage and retain successful Data API/security/page/ack/cleanup evidence at the
-reviewed final SHA. Investigate any recurring audit-remediation metadata failure;
-do not bypass it. Production reader provisioning, production preview, migration
+reviewed final SHA. Resolve the current audit-remediation metadata failure through the reviewed dependency-security workflow; dependencies/audit policy were preserved for Task 19.
+Do not bypass it. Production reader provisioning, production preview, migration
 and deployment remain separately authorized later operations. Task 20 must
 resolve invalid/unavailable baselines, implement its repair/catch-up/cutover and
 rollback semantics, and obtain production approvals. This PR stays **draft** and
