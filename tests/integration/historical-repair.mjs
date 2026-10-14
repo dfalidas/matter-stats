@@ -150,7 +150,15 @@ try {
   await sql(`update public.reading_generations set expires_at=clock_timestamp()-interval '1 second' where id='${g.id}';`);
   g=cli('claim',{run:g.id,owner:successor,fence:g.fence});
   await assert.rejects(batch(staleWorker));await assert.rejects(transition(g));
-  g=await capture(g);assert.equal(g.state,'catchup');assert.equal(await snapshot(),before);
+  // Simulate an incompatible privileged actor losing the barrier between chunks.
+  // Restoring its flag cannot turn those chunks back into a consistent capture.
+  await sql(`update public.reading_generation_control set frozen=null where singleton;
+    insert into public.reading_sessions(id,started_at,duration_seconds,words_estimated) values('${prefix}-inconsistent','2401-01-01T12:00:00Z',1,4);
+    update public.reading_generation_control set frozen='${g.id}' where singleton;`);
+  const interrupted=await run(g.id);await assert.rejects(batch(g));assert.deepEqual(await run(g.id),interrupted);await assert.rejects(transition(g));
+  await rpc('repair_cancel',args(g));await sql(`delete from public.reading_sessions where id='${prefix}-inconsistent';`);
+  assert.equal(await snapshot(),before);g=await capture(await prepare());assert.equal(g.state,'catchup');assert.equal(await snapshot(),before);
+  checks.push('A restored barrier cannot certify capture chunks after source revision changes; lost consistency rejects further progress and activation and requires explicit cancellation/new immutable capture');
   checks.push('10000+ tied sessions; atomic batch rollback/checkpoint; committed-response loss/SIGKILL; fresh-process resume; interrupted capture barrier; competing owner/stale fence/expiry takeover; no partial activation');
   const corrupt=g;
   await sql(`update public.reading_generation_sessions set words_estimated=words_estimated+1 where generation='${corrupt.id}' and id='${prefix}-boundary-130';`);

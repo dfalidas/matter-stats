@@ -20,7 +20,7 @@ create table public.reading_generations (
   refresh_original_days boolean not null default false,
   invalid_rows bigint not null default 0, mismatches bigint not null default 0, active_differences bigint not null default 0,
   source_identity uuid not null default gen_random_uuid(), captured_revision bigint not null,
-  reconciled_revision bigint, reconciled_epoch bigint, cutover_epoch bigint, rollback_epoch bigint,
+  verification_revision bigint, reconciled_revision bigint, reconciled_epoch bigint, cutover_epoch bigint, rollback_epoch bigint,
   created_at timestamptz not null default clock_timestamp(), completed_at timestamptz,
   reconciliation jsonb
 );
@@ -149,6 +149,10 @@ begin
       update public.reading_generations set reconciled_revision=null,state=case when state='ready' then 'catchup' else state end where id=c.building;
     end if;
   elsif tg_table_name='daily_stats' then
+    update public.reading_generation_control set source_revision=source_revision+1 where singleton returning * into c;
+    if c.building is not null then
+      update public.reading_generations set reconciled_revision=null,state=case when state='ready' then 'catchup' else state end where id=c.building;
+    end if;
     -- Reading shadow totals come from session contributions. Daily writers keep metadata,
     -- dirty revision/ack semantics and cannot overwrite active reading aggregates.
     for gid in select distinct x from unnest(array[c.active,c.previous]) x where x is not null loop
@@ -224,6 +228,12 @@ begin
   g:=public.repair_assert(p_id,p_owner,p_fence);
   select * into c from public.reading_generation_control where singleton;
   if c.building is distinct from p_id then raise exception 'Repair no longer selected' using errcode='40001'; end if;
+  if g.state in ('capture_sessions','capture_days','verify_sessions','verify_days') and c.frozen is distinct from p_id then
+    raise exception 'Source barrier lost; cancel and restart, never combine captures' using errcode='55000'; end if;
+  if g.state in ('capture_sessions','capture_days') and c.source_revision<>g.captured_revision then
+    raise exception 'Captured source changed; cancel and restart' using errcode='55000'; end if;
+  if g.state in ('verify_sessions','verify_days') and c.source_revision is distinct from g.verification_revision then
+    raise exception 'Verification source changed; cancel and restart' using errcode='55000'; end if;
   until_time:=clock_timestamp()+p_milliseconds*interval '1 millisecond';
   if g.state='capture_sessions' then
     for r in select s.id,
@@ -365,7 +375,7 @@ begin
     raise exception 'Catch-up incomplete; resume before reconciliation' using errcode='55000'; end if;
   -- A completed verification becomes stale on ANY source revision; reverify explicitly.
   update public.reading_generations set state='verify_sessions',verify_attempt=verify_attempt+1,verify_cursor=null,verify_day_cursor=null,
-    checked_sessions=0,checked_days=0,mismatches=0,active_differences=0,reconciled_revision=null,reconciliation=null where id=p_id;
+    checked_sessions=0,checked_days=0,mismatches=0,active_differences=0,verification_revision=c.source_revision,reconciled_revision=null,reconciliation=null where id=p_id;
   update public.reading_generation_control set frozen=p_id where singleton;
   return (select to_jsonb(v) from public.reading_generations v where id=p_id);
 end;
