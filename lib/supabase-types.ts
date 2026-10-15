@@ -217,6 +217,10 @@ export type Database = {
           },
         ];
       };
+      reading_generation_control: {
+        Row: { singleton: boolean; active: string | null; previous: string | null; building: string | null; frozen: string | null; epoch: number; source_revision: number };
+        Insert: never; Update: never; Relationships: [];
+      };
       daily_stats: {
         Row: {
           date: string;
@@ -451,6 +455,8 @@ export type Database = {
       begin_matter_history: { Args: LeaseRpcArgs & { p_limit: number; p_started_at: string }; Returns: MatterSyncStream };
       turn_matter_continuation: { Args: LeaseRpcArgs & { p_stream: string }; Returns: undefined };
       complete_matter_history: { Args: Record<string, never>; Returns: unknown };
+      read_generation_days: { Args: { p_generation: string | null; p_after: string | null; p_since: string | null; p_limit: number }; Returns: Json[] };
+      read_generation_estimates: { Args: { p_generation: string | null; p_ids: string[] }; Returns: Json[] };
       commit_matter_page: {
         Args: LeaseRpcArgs & { p_receipt_id: string; p_previous_receipt_id: string | null; p_expected: TablesInsert<"matter_sync_streams">; p_plan: import("./matter-page-plan").MatterPagePlan; p_has_more: boolean; p_next_cursor: string | null; p_timezone: string };
         Returns: MatterSyncStream;

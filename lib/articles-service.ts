@@ -1,3 +1,4 @@
+import { createDerivedGenerationContext, readDerivedEstimates } from "./derived-generation";
 import { postgrestIn, quotePostgrest, readCompleteMetadata, readIdBatches } from "./complete-metadata-query";
 import { readCompleteSessions } from "./complete-session-query";
 import type { MatterItem, MatterTag, ReadingSession } from "@/lib/supabase-types";
@@ -194,6 +195,8 @@ export async function getArticleDetail(client: MatterStatsSupabaseClient, id: st
     return null;
   }
 
+  const derivedContext = createDerivedGenerationContext(client);
+  await derivedContext.generation;
   const [tagsByItemId, annotations, sessionsResult, relatedArticles, sourcePerformance] = await Promise.all([
     fetchTagsByItemId(client, [id]),
     readCompleteMetadata<ArticleDetail["annotations"][number]>(() => client
@@ -216,11 +219,12 @@ export async function getArticleDetail(client: MatterStatsSupabaseClient, id: st
     throw sessionsResult.error;
   }
 
+  const estimates = await readDerivedEstimates(client, (sessionsResult.data ?? []).map(row => row.id), derivedContext);
   return {
     ...item,
     tags: tagsByItemId.get(id) ?? [],
     annotations,
-    sessions: sessionsResult.data ?? [],
+    sessions: (sessionsResult.data ?? []).map(row => ({ ...row, words_estimated: estimates.get(row.id) ?? null })),
     relatedArticles,
     sourcePerformance,
   };

@@ -265,3 +265,11 @@ code; its presence alone does not grant older consumers shared quota coordinatio
 ## Task 19 migration and read-only operator compatibility
 
 Apply `20261014084407_estimation_provenance.sql` after the complete prior chain and before new writers. Disable/drain older writers for a reviewed rollout. No historical rows are tagged canonical by the migration. Dedicated preview libpq service configuration never falls back to application or production credentials. Production read capability is prepared but was not exercised here. Follow [exact commands and compatibility requirements](task-19-preview.md) and [validation gates](task-19-validation.md).
+
+
+Task 20 adds `20261014140402_bounded_derived_generations.sql` after the unchanged Task 19
+provenance migration. See the [operator guide](task-20-operator-guide.md) for compatible
+application ordering, old-reader/writer exclusion, tested restore prerequisites and fenced
+rollback limits. Migration installation alone starts no historical work. This implementation
+and its operator executable authorize only disposable synthetic targets; production operations
+remain separately gated in Tasks 23–24.

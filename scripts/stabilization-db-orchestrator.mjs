@@ -5,7 +5,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
 import path from "node:path";
-import { verifyCatalog } from "./stabilization-db-runner.mjs";
+import { GENERATION_TABLES } from "./reading-generation-inventory.mjs";
+import { verifyCatalog, INVENTORIED_TABLES } from "./stabilization-db-runner.mjs";
 
 export const SUPABASE_CLI_VERSION = "2.48.3";
 export const UPGRADE_BASELINE = "20260519090000";
@@ -194,6 +195,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   let streamPreservation = null;
   let leasePreservation = null;
   let pagePreservation = null;
+  let generationPreservation = "not applicable";
   let requestPreservation = null;
   const ownershipMarker = `task05-${projectId}`;
   if (upgrade) {
@@ -232,10 +234,28 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     pagePreservation = "passed";
     const task14SnapshotSql = "select jsonb_build_object('prior',("+task13SnapshotSql.replace(/;$/,"")+"),'intent',(select to_jsonb(c) from public.matter_sync_continuation c))::text;";
     const beforeTask15 = containerPsql(projectId,task14SnapshotSql);
-    await copyMigrations(workdir,(filename)=>filename.slice(0,14)>="20261008000000");
+    await copyMigrations(workdir,(filename)=>filename.slice(0,14)>="20261008000000" && filename.slice(0,14)<"20261014140402");
     cli(["migration","up","--local","--workdir",workdir],{env:sanitizedEnvironment()});
     assert.deepEqual(JSON.parse(containerPsql(projectId,task14SnapshotSql)),JSON.parse(beforeTask15),"Task 15 changed Task 11–14 durable state");
     requestPreservation="passed";
+    // Genuine Task 19 -> Task 20 upgrade: retain known provenance plus all source/progress fields.
+    const upgradeId=`task20-upgrade-${ownershipMarker}`;
+    assert.equal(containerPsql(projectId,"select count(*) from public.daily_stats where date='2098-12-31';").trim(),"0");
+    containerPsql(projectId,`insert into public.reading_sessions(id,started_at,duration_seconds,words_estimated,word_estimation_method,source_device)
+      values('${upgradeId}','2098-12-31T10:00:00Z',60,225,'session-duration-225-round-v1','owned-upgrade');
+      insert into public.daily_stats(date,reading_time_seconds,words_read,sessions_count,items_read_count,highlights_count,top_source,reading_provenance)
+      values('2098-12-31',60,225,1,19,20,'owned-upgrade.example','{"wordMethod":"session-duration-225-round-v1","calendarMethod":"local-occurrence-day-v1","timezone":"Europe/Athens"}');`);
+    const task19SnapshotSql=INVENTORIED_TABLES.filter(t=>!GENERATION_TABLES.includes(t)).map(t=>`select jsonb_build_object('table','${t}','count',count(*),'hash',md5(coalesce(string_agg(to_jsonb(r)::text,E'\\n' order by to_jsonb(r)::text),'')))::text from public.${t} r;`).join("\n");
+    const beforeTask20=containerPsql(projectId,task19SnapshotSql);
+    await copyMigrations(workdir,filename=>filename.slice(0,14)>="20261014140402");
+    cli(["migration","up","--local","--workdir",workdir],{env:sanitizedEnvironment()});
+    assert.equal(containerPsql(projectId,task19SnapshotSql),beforeTask20,"Task 20 migration changed Task 19/source/provenance/progress fields");
+    assert.equal(containerPsql(projectId,"select count(*) from public.reading_generations;").trim(),"0");
+    assert.equal(containerPsql(projectId,"select active is null and building is null and frozen is null and epoch=0 from public.reading_generation_control;").trim(),"t");
+    assert.equal(containerPsql(projectId,`delete from public.reading_sessions where id='${upgradeId}' and source_device='owned-upgrade' returning id;`).trim(),upgradeId);
+    assert.equal(containerPsql(projectId,"delete from public.daily_stats where date='2098-12-31' and top_source='owned-upgrade.example' returning date;").trim(),"2098-12-31");
+    generationPreservation="passed";
+
     // Only this disposable path owns the synthetic 2099 quota seed copied
     // from its pre-upgrade stream fixture; clear it after verifying preservation.
     containerPsql(projectId,"update public.matter_quota set not_before=null where account_scope='matter';");
@@ -270,6 +290,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   let requestEvidence;
   let previewEvidence;
   let wordMethodEvidence;
+  let repairEvidence;
   const runIntegration = () => {
     command(process.execPath, [path.join(repoRoot, "node_modules/typescript/bin/tsc"), "-p", "tests/tsconfig.json"], { env: sanitizedEnvironment() });
     const env = integrationEnvironment(status, projectId);
@@ -313,11 +334,17 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     const previewReport=JSON.parse(previewOutput.trim().split(/\r?\n/).at(-1));
     assert.equal(previewReport.status,"passed");assert.equal(previewReport.realSql,true);assert.equal(previewReport.cleanup,"passed");
     previewEvidence={checks:previewReport.checks,realSql:true,syntheticOnly:true,cleanup:"passed"};
+    const repairOutput=command(process.execPath,[path.join(repoRoot,"tests/integration/historical-repair.mjs")],{env});
+    const repairReport=JSON.parse(repairOutput.trim().split(/\r?\n/).at(-1));
+    assert.equal(repairReport.status,"passed");assert.equal(repairReport.realSqlAndDataApi,true);assert.equal(repairReport.cleanup,"passed");
+    assert.ok(repairReport.reference.sessions>10000);
+    repairEvidence={checks:repairReport.checks,checkCounts:repairReport.checkCounts,reference:repairReport.reference,afterIngestion:repairReport.afterIngestion,reconciliation:repairReport.reconciliation,boundaryCases:repairReport.boundaryCases,range:repairReport.range,browserDenials:repairReport.browserDenials,realSqlAndDataApi:true,syntheticOnly:true,cleanup:"passed"};
+
   };
   if (upgrade) {
     await removeOwnedLegacySingleton({ query: (sql) => Promise.resolve(containerPsql(projectId, sql)), ownershipMarker, runIntegration });
   } else runIntegration();
-  return { name, catalog: "passed", dataApi: "passed", gatewayTransport, accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, boundedContinuationAndHistory: "passed", continuationEvidence, sharedQuotaAndRetries:"passed", requestEvidence, historicalPreview:"passed", previewEvidence, sessionWordMethod:"passed", wordMethodEvidence, requestPreservation, preservation, streamPreservation, leasePreservation, pagePreservation, migrationHistory: versions };
+  return { name, catalog: "passed", dataApi: "passed", gatewayTransport, accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, boundedContinuationAndHistory: "passed", continuationEvidence, sharedQuotaAndRetries:"passed", requestEvidence, historicalPreview:"passed", previewEvidence, sessionWordMethod:"passed", wordMethodEvidence, historicalRepair:"passed", repairEvidence, generationPreservation, requestPreservation, preservation, streamPreservation, leasePreservation, pagePreservation, migrationHistory: versions };
 }
 
 export async function runStabilizationDatabases({ evidenceRoot = path.join(repoRoot, "artifacts/stabilization-db"), hasDocker = dockerAvailable } = {}) {
