@@ -5,7 +5,7 @@ Base: `18985cc639c03c5de6cd28d366bbaed7d90f142b` (fetched main, no subsequent co
 ## Local commands and evidence
 
 - `npm ci`: passed, exact unchanged lockfile, 456 packages; Node 24.19.0 / npm 11.9.0 in the managed workspace. CI uses the repository's Node 22 setup.
-- `npm run test`: 361 tests passed, zero failures/skips at code tree through `5bcc980` (including shared-surface and metric/CSV/payload regression checks). A later focused run covers configured-timezone retry wording added at `cf34713`; final-head CI reruns the full suite.
+- `npm run test`: 362 tests passed, zero failures/skips at runtime source `320f235`, including configured-timezone feedback, shared surfaces and metric/CSV/payload regressions. Final-head CI reruns the full suite and extended integration fixtures.
 - `npm run typecheck`: passed.
 - `npm run lint`: passed (zero errors; three pre-existing local `.agents/skills/visual-explainer` warnings, outside changed files).
 - `npm run build`: passed; final screenshot run rebuilds the production application.

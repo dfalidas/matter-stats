@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
+const testedSourceSha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { createWriteStream } from 'node:fs';
@@ -55,6 +56,6 @@ try{
  assert.ok(failedResources.every(r=>new URL(r.url).pathname==='/favicon.ico' && r.status===404),JSON.stringify(failedResources));
  console.log(JSON.stringify({consoleErrors,failedResources}));
  assert.ok(consoleErrors.every(error=>error.message==='Failed to load resource: the server responded with a status of 404 (Not Found)' && new URL(error.url).pathname==='/favicon.ico'),JSON.stringify(consoleErrors));
- await writeFile(`${output}/ui-validation.json`,JSON.stringify({syntheticOnly:true,productionData:false,pages:evidence,pageErrors:errors,consoleErrors,baselineResourceFailures:failedResources,externalBrowserRequests:requests},null,2)+'\n');
+ await writeFile(`${output}/ui-validation.json`,JSON.stringify({testedSourceSha,syntheticOnly:true,productionData:false,pages:evidence,pageErrors:errors,consoleErrors,baselineResourceFailures:failedResources,externalBrowserRequests:requests},null,2)+'\n');
  console.log(`Verified and captured ${evidence.length} synthetic page/viewport states; no page errors, external browser requests or horizontal viewport overflow. Baseline favicon console messages: ${consoleErrors.length}.`);
 }finally{await browser.close();for(const child of children)child.kill('SIGTERM');}
