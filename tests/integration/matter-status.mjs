@@ -22,7 +22,7 @@ const q=v=>`'${JSON.stringify(v).replaceAll("'","''")}'::jsonb`;
 const rpc=async(name,args={})=>{const r=await service.rpc(name,args);assertSuccessful(r,name);return r.data;};
 const read=async(table)=>{const r=await service.from(table).select('*');assertSuccessful(r,table);return r.data;};
 const checks=[];
-let originals,completions,attempts,lease,user;
+let originals,completions,attempts,receipts,lease,user;
 const args=()=>({p_account_scope:'matter',p_owner:lease.owner,p_generation:lease.generation});
 const acquire=async()=>{const owner=crypto.randomUUID();const rows=await rpc('acquire_matter_sync_lease',{p_account_scope:'matter',p_owner:owner,p_ttl_seconds:120});assert.equal(rows.length,1);lease={owner,generation:rows[0].generation};};
 const state=async(stream)=>(await read('matter_sync_streams')).find(s=>s.stream===stream);
@@ -30,7 +30,7 @@ const begin=async(stream)=>{const s=await state(stream);return rpc('sync_upsert_
 const plan={placeholders:[],items:[],sessions:[],tags:[],itemTagIds:[],itemTags:[],annotations:[]};
 const pageArgs=async(stream,more)=>({...args(),p_receipt_id:crypto.randomUUID(),p_previous_receipt_id:(await read('matter_page_receipts')).find(r=>r.stream===stream)?.receipt_id??null,p_expected:Object.fromEntries(Object.entries(await state(stream)).filter(([k])=>!['created_at','updated_at'].includes(k))),p_plan:plan,p_has_more:more,p_next_cursor:more?'synthetic-status-next':null,p_timezone:'Europe/Athens'});
 try{
-  originals=await read('matter_sync_streams');completions=await read('matter_cycle_completions');attempts=await read('matter_invocation_status');
+  originals=await read('matter_sync_streams');completions=await read('matter_cycle_completions');attempts=await read('matter_invocation_status');receipts=await read('matter_page_receipts');
   assertSuccessful(await service.from('matter_cycle_completions').delete().in('stream',['recent_sessions','library_items']),'clear disposable completion fixtures');
   await acquire();
   await begin('recent_sessions');await rpc('commit_matter_page',await pageArgs('recent_sessions',true));
@@ -77,6 +77,7 @@ try{
   await sql('drop trigger if exists disposable_status_fail on public.matter_cycle_completions;drop function if exists public.disposable_status_fail();');
   if(lease)await rpc('release_matter_sync_lease',args());
   if(originals)for(const s of originals)await sql(`update public.matter_sync_streams set cycle_active=${s.cycle_active},cycle_started_at=${s.cycle_started_at?`'${s.cycle_started_at}'`:'null'},cycle_generation=${s.cycle_generation},cursor=${s.cursor?`'${s.cursor.replaceAll("'","''")}'`:'null'},completed_watermark=${s.completed_watermark?`'${s.completed_watermark}'`:'null'},retry_at=${s.retry_at?`'${s.retry_at}'`:'null'} where stream='${s.stream}';`);
+  if(receipts){await sql('delete from public.matter_page_receipts;');for(const r of receipts)await sql(`insert into public.matter_page_receipts select * from jsonb_populate_record(null::public.matter_page_receipts,${q(r)});`);}
   if(completions){await sql('delete from public.matter_cycle_completions;');for(const r of completions)await sql(`insert into public.matter_cycle_completions select * from jsonb_populate_record(null::public.matter_cycle_completions,${q(r)});`);}
   if(attempts){await sql('delete from public.matter_invocation_status;');for(const r of attempts)await sql(`insert into public.matter_invocation_status select * from jsonb_populate_record(null::public.matter_invocation_status,${q(r)});`);}
   if(user)assertSuccessful(await service.auth.admin.deleteUser(user),'delete status security user');
