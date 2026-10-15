@@ -69,7 +69,9 @@ language sql stable security invoker set search_path='' as $$
    'pendingChanges',exists(select 1 from public.reading_repair_changes r where r.generation=g.id))
    from public.reading_generations g where g.id=c.building),
   'rolledBack',exists(select 1 from public.reading_generations g where g.id=c.previous and g.rollback_epoch=c.epoch))
- from public.reading_generation_control c where c.singleton;
+ from public.reading_generation_control c where c.singleton
+  and (c.active is null or exists(select 1 from public.reading_generations g where g.id=c.active))
+  and (c.building is null or exists(select 1 from public.reading_generations g where g.id=c.building));
 $$;
 
 -- Reduce bounded durable preparation (3 slots x <=256 entries) in SQL; never
@@ -85,7 +87,8 @@ language sql stable security invoker set search_path='' as $$
  select jsonb_build_object('nextEligibleAt',greatest(r.deadline,
   (public.evaluate_matter_quota(to_jsonb(q),p_now,false)->>'deadline')::timestamptz),
   'manualRecovery',r.manual,'pendingRequests',r.pending)
- from retry r cross join public.matter_quota q where q.account_scope='matter' and p_now is not null;
+ from retry r cross join public.matter_quota q where q.account_scope='matter' and p_now is not null
+  and (select count(*) from public.matter_request_work)=3;
 $$;
 revoke all on function public.record_matter_cycle_completion(),public.record_matter_invocation(uuid,text,text),public.read_matter_generation_status(),public.read_matter_retry_status(timestamptz) from public,anon,authenticated;
 grant execute on function public.record_matter_cycle_completion(),public.record_matter_invocation(uuid,text,text),public.read_matter_generation_status(),public.read_matter_retry_status(timestamptz) to service_role;

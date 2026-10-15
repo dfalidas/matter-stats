@@ -145,8 +145,22 @@ export async function readStatusEvidence<T>(query: PromiseLike<{data:T;error:unk
   try { const r = await query; return r.error ? unavailable : r.data === null ? absent : known(r.data as NonNullable<T>); }
   catch { return unavailable; }
 }
-function validRetry(v:unknown): v is RetryEvidence { return !!v && typeof v==='object' && 'pendingRequests' in v && Number.isSafeInteger(v.pendingRequests) && 'manualRecovery' in v && typeof v.manualRecovery==='boolean' && 'nextEligibleAt' in v && (v.nextEligibleAt===null || typeof v.nextEligibleAt==='string'); }
-function validGeneration(v:unknown): v is GenerationEvidence { return !!v && typeof v==='object' && 'epoch' in v && typeof v.epoch==='string' && 'frozen' in v && typeof v.frozen==='boolean' && 'active' in v && 'candidate' in v; }
+function object(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' && !Array.isArray(v); }
+function nullableInstant(v: unknown): boolean { return v === null || typeof v === 'string' && Number.isFinite(Date.parse(v)); }
+function validRetry(v: unknown): v is RetryEvidence {
+  return object(v) && Number.isSafeInteger(v.pendingRequests) && Number(v.pendingRequests) >= 0
+    && typeof v.manualRecovery === 'boolean' && nullableInstant(v.nextEligibleAt);
+}
+function validGeneration(v: unknown): v is GenerationEvidence {
+  if (!object(v) || typeof v.epoch !== 'string' || !/^\d+$/.test(v.epoch) || typeof v.frozen !== 'boolean'
+    || typeof v.rolledBack !== 'boolean' || !(v.activeId === null || typeof v.activeId === 'string')) return false;
+  if (v.active !== null && (!object(v.active) || v.active.id !== v.activeId || typeof v.active.state !== 'string'
+    || typeof v.active.timezone !== 'string' || typeof v.active.wordMethod !== 'string' || typeof v.active.calendarMethod !== 'string'
+    || typeof v.active.reconciled !== 'boolean' || typeof v.active.cutover !== 'boolean' || !nullableInstant(v.active.readinessAt))) return false;
+  if (v.activeId !== null && v.active === null) return false;
+  return v.candidate === null || object(v.candidate) && typeof v.candidate.state === 'string' && typeof v.candidate.timezone === 'string'
+    && typeof v.candidate.reconciled === 'boolean' && typeof v.candidate.pendingChanges === 'boolean' && nullableInstant(v.candidate.readinessAt);
+}
 export async function readStatusCount(query:PromiseLike<{count:number|null;error:unknown}>):Promise<Evidence<number>> {
   try { const {count,error}=await query; return error || count===null || !Number.isSafeInteger(count) || count<0 ? unavailable : known(count); } catch { return unavailable; }
 }
