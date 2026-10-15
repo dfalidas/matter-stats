@@ -1,0 +1,175 @@
+{
+  "syntheticOnly": true,
+  "productionData": false,
+  "pages": [
+    {
+      "scenario": "normal",
+      "route": "dashboard",
+      "width": 1440,
+      "height": 1000,
+      "screenshot": "docs/evidence/task21/normal-dashboard-desktop.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    },
+    {
+      "scenario": "normal",
+      "route": "settings",
+      "width": 1440,
+      "height": 1000,
+      "screenshot": "docs/evidence/task21/normal-settings-desktop.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    },
+    {
+      "scenario": "normal",
+      "route": "dashboard",
+      "width": 390,
+      "height": 844,
+      "screenshot": "docs/evidence/task21/normal-dashboard-mobile.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    },
+    {
+      "scenario": "normal",
+      "route": "settings",
+      "width": 390,
+      "height": 844,
+      "screenshot": "docs/evidence/task21/normal-settings-mobile.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    },
+    {
+      "scenario": "partial",
+      "route": "dashboard",
+      "width": 1440,
+      "height": 1000,
+      "screenshot": "docs/evidence/task21/partial-dashboard-desktop.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    },
+    {
+      "scenario": "partial",
+      "route": "settings",
+      "width": 1440,
+      "height": 1000,
+      "screenshot": "docs/evidence/task21/partial-settings-desktop.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    },
+    {
+      "scenario": "partial",
+      "route": "dashboard",
+      "width": 390,
+      "height": 844,
+      "screenshot": "docs/evidence/task21/partial-dashboard-mobile.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    },
+    {
+      "scenario": "partial",
+      "route": "settings",
+      "width": 390,
+      "height": 844,
+      "screenshot": "docs/evidence/task21/partial-settings-mobile.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    },
+    {
+      "scenario": "stale",
+      "route": "dashboard",
+      "width": 1440,
+      "height": 1000,
+      "screenshot": "docs/evidence/task21/stale-dashboard-desktop.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    },
+    {
+      "scenario": "stale",
+      "route": "settings",
+      "width": 1440,
+      "height": 1000,
+      "screenshot": "docs/evidence/task21/stale-settings-desktop.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    },
+    {
+      "scenario": "stale",
+      "route": "dashboard",
+      "width": 390,
+      "height": 844,
+      "screenshot": "docs/evidence/task21/stale-dashboard-mobile.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    },
+    {
+      "scenario": "stale",
+      "route": "settings",
+      "width": 390,
+      "height": 844,
+      "screenshot": "docs/evidence/task21/stale-settings-mobile.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    },
+    {
+      "scenario": "unavailable",
+      "route": "dashboard",
+      "width": 1440,
+      "height": 1000,
+      "screenshot": "docs/evidence/task21/unavailable-dashboard-desktop.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    },
+    {
+      "scenario": "unavailable",
+      "route": "settings",
+      "width": 1440,
+      "height": 1000,
+      "screenshot": "docs/evidence/task21/unavailable-settings-desktop.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    },
+    {
+      "scenario": "unavailable",
+      "route": "dashboard",
+      "width": 390,
+      "height": 844,
+      "screenshot": "docs/evidence/task21/unavailable-dashboard-mobile.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    },
+    {
+      "scenario": "unavailable",
+      "route": "settings",
+      "width": 390,
+      "height": 844,
+      "screenshot": "docs/evidence/task21/unavailable-settings-mobile.png",
+      "timezone": "Europe/Athens",
+      "browserTimezone": "America/New_York",
+      "horizontalOverflow": false
+    }
+  ],
+  "pageErrors": [],
+  "consoleErrors": [
+    {
+      "message": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "url": "http://127.0.0.1:3091/favicon.ico"
+    }
+  ],
+  "baselineResourceFailures": [],
+  "externalBrowserRequests": []
+}
