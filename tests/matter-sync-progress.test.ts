@@ -226,3 +226,8 @@ test("live sync path handles Matter session object mapping and explicit skip rea
   assert.match(source, /secondsReadType/);
   assert.match(source, /dateType/);
 });
+
+test("retry messages honor explicit APP_TIMEZONE projection instead of host or browser timezone", () => {
+  assert.match(buildMatterRateLimitMessage("2026-10-15T22:30:00Z", "Europe/Athens"), /Oct 16.*Europe\/Athens/);
+  assert.match(buildMatterRateLimitMessage("2026-10-15T22:30:00Z", "America/New_York"), /Oct 15.*America\/New_York/);
+});

@@ -49,9 +49,9 @@ export function SyncMatterButton({ showBackfill = false, timezone = "Europe/Athe
     if (state?.historyStatus) setHistoryStatus(state.historyStatus);
     if (state?.rateLimitedUntil !== undefined) {
       setRateLimitedUntil(state.rateLimitedUntil);
-      setAvailabilityMessage(state.rateLimitedUntil ? buildMatterRateLimitMessage(state.rateLimitedUntil) : null);
+      setAvailabilityMessage(state.rateLimitedUntil ? buildMatterRateLimitMessage(state.rateLimitedUntil, timezone) : null);
     }
-  }, [state]);
+  }, [state, timezone]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {

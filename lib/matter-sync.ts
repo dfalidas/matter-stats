@@ -199,7 +199,7 @@ export async function getMatterSyncAvailability(
 
   return {
     rateLimitedUntil,
-    message: buildMatterRateLimitMessage(rateLimitedUntil),
+    message: buildMatterRateLimitMessage(rateLimitedUntil, getAppTimezone()),
   };
 }
 
@@ -243,7 +243,7 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
     await deps.recoverRollups(lease, budget.canRecover);
     const invocationNow = deps.now();
     const rateLimitedUntil = await loadActiveMatterCooldown(deps, invocationNow);
-    if (rateLimitedUntil) return { ok: false, skippedReason: "rate_limited", message: buildMatterRateLimitMessage(rateLimitedUntil), rateLimitedUntil, historyStatus: intent.history_status };
+    if (rateLimitedUntil) return { ok: false, skippedReason: "rate_limited", message: buildMatterRateLimitMessage(rateLimitedUntil, getAppTimezone()), rateLimitedUntil, historyStatus: intent.history_status };
     if (explicitHistory && intent.history_status === "complete") return {
       ok: true, status: "complete", historyStatus: "complete", pagesCommitted: 0, requestsAttempted: 0,
       message: "The requested enumeration of all sessions available from Matter is complete. This does not establish retention or universal historical completeness.",
@@ -356,7 +356,7 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
     return { ok: budgetPartial, status: budgetPartial ? "partial" : undefined, hasMore: true, pagesCommitted: budget.pages, requestsAttempted: budget.requests,
       itemsSynced: counts.items, sessionsSynced: counts.sessions, annotationsSynced: counts.annotations, tagsSynced: counts.tags,
       syncRunId: syncRunId ?? undefined, rateLimitedUntil,
-      message: rateLimitedUntil ? buildMatterRateLimitMessage(rateLimitedUntil)
+      message: rateLimitedUntil ? buildMatterRateLimitMessage(rateLimitedUntil, getAppTimezone())
         : `Matter sync stopped safely. ${sanitizedError} Earlier committed work remains; continuation uses the stored contract.`,
     };
   } finally {

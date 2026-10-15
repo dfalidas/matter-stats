@@ -202,8 +202,8 @@ export function buildRateLimitedMatterSyncState<T extends MatterSyncStateSnapsho
   };
 }
 
-export function buildMatterRateLimitMessage(rateLimitedUntil: string | null): string {
-  return `Matter rate limit reached. Try again after ${formatMatterRetryTime(rateLimitedUntil)}.`;
+export function buildMatterRateLimitMessage(rateLimitedUntil: string | null, timezone = "Europe/Athens"): string {
+  return `Matter rate limit reached. Try again after ${formatMatterRetryTime(rateLimitedUntil, timezone)}.`;
 }
 
 export function isMatterRateLimitActive(rateLimitedUntil: string | null | undefined, now: Date = new Date()): boolean {
