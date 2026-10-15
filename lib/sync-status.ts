@@ -71,7 +71,7 @@ export function deriveSyncStatus(input: StatusInputs, now: Date, timezone: strin
     input.legacyCooldown.state === 'known' ? input.legacyCooldown.value : null,
     ...(input.streams.state === 'known' ? input.streams.value.map(s=>s.retry_at) : [])]
     .filter((v): v is string => !!v && Number.isFinite(Date.parse(v)) && Date.parse(v)>ms).sort((a,b)=>Date.parse(b)-Date.parse(a));
-  const retry = input.retry.state === 'unavailable' || input.legacyCooldown.state === 'unavailable' || input.streams.state === 'unavailable'
+  const retry = input.retry.state === 'unavailable' || input.legacyCooldown.state === 'unavailable' || activeStreams.state !== 'known'
     ? unavailable : known({nextEligibleAt:deadlines[0] ?? null, manualRecovery:input.retry.state === 'known' && input.retry.value.manualRecovery, pendingRequests:input.retry.state === 'known' ? input.retry.value.pendingRequests : 0});
   const gen = input.generation.state === 'known' ? input.generation.value : null;
   const derived = input.generation.state !== 'known' || input.dirtyRollups.state !== 'known' ? 'unavailable'

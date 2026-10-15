@@ -125,7 +125,7 @@ export type MatterSyncRuntimeDeps = {
 
 export const productionSyncDeps: MatterSyncRuntimeDeps = {
   recordInvocation: async (id, trigger, outcome) => {
-    const { error } = await getSupabaseAdminClient().rpc("record_matter_invocation", { p_id: id, p_trigger: trigger, p_outcome: outcome });
+    const { error } = await getSupabaseAdminClient().rpc("record_matter_invocation", { p_id: id, p_trigger: trigger, p_outcome: outcome }).abortSignal(AbortSignal.timeout(5_000));
     if (error) throw new Error("Invocation evidence unavailable");
   },
   prepareRequestWork: prepareMatterRequestWork,

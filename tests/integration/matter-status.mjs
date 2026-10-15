@@ -69,9 +69,10 @@ try{
       for(const [index,response] of [await client.from(table).select('*'),await client.from(table).insert(fixture),await client.from(table).update(fixture).eq(key,value),await client.from(table).delete().eq(key,value)].entries())assertGrantDenied(response,{role,operation:['SELECT','INSERT','UPDATE','DELETE'][index],kind:'table',name:table});
     }
     const payloads={'record_matter_cycle_completion':{},record_matter_invocation:{p_id:crypto.randomUUID(),p_trigger:'manual',p_outcome:'attempted'},read_matter_generation_status:{},read_matter_retry_status:{p_now:new Date().toISOString()}};
-    for(const signature of STATUS_FUNCTION_SIGNATURES){const name=signature.split('(')[0];assertGrantDenied(await client.rpc(name,payloads[name]),{role,operation:'EXECUTE',kind:'function',name});}
+    for(const signature of STATUS_FUNCTION_SIGNATURES.filter(s=>s!=='record_matter_cycle_completion()')){const name=signature.split('(')[0];assertGrantDenied(await client.rpc(name,payloads[name]),{role,operation:'EXECUTE',kind:'function',name});}
   }
-  checks.push('Every new table CRUD and exact function signature denied through real Data API to anonymous and authenticated roles; service-role controls succeed.');
+  for(const role of ['anon','authenticated'])await assert.rejects(sql(`set role ${role};select public.record_matter_cycle_completion();`),/permission denied for function record_matter_cycle_completion/);
+  checks.push('Every new table CRUD and callable RPC denied through real Data API to anonymous and authenticated roles; service-role controls succeed.');
 }finally{
   await sql('drop trigger if exists disposable_status_fail on public.matter_cycle_completions;drop function if exists public.disposable_status_fail();');
   if(lease)await rpc('release_matter_sync_lease',args());

@@ -20,8 +20,9 @@ const output='docs/evidence/task21';await mkdir(output,{recursive:true});
 const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
 const context=await browser.newContext({timezoneId:'America/New_York'});
 await context.addCookies([{name:'matter_stats_session',value:'task21-synthetic-session-cookie-only',url:'http://127.0.0.1:3091'}]);
-const page=await context.newPage(),errors=[],requests=[];
-page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
+const page=await context.newPage(),errors=[],consoleErrors=[],requests=[],failedResources=[];
+page.on('response',res=>{if(res.status()>=400)failedResources.push({url:res.url(),status:res.status()});});
+page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());});
 page.on('pageerror',error=>errors.push(error.message));
 page.on('request',req=>{if(!req.url().startsWith('http://127.0.0.1:3091'))requests.push(req.url());});
 const evidence=[];
@@ -49,6 +50,10 @@ try{
   }
  }
  assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);
- await writeFile(`${output}/ui-validation.json`,JSON.stringify({syntheticOnly:true,productionData:false,pages:evidence,consoleErrors:errors,externalBrowserRequests:requests},null,2)+'\n');
- console.log(`Verified and captured ${evidence.length} synthetic page/viewport states; no console errors, external browser requests or horizontal viewport overflow.`);
+ // The unchanged baseline has no favicon asset. Retain its observed 404 and
+ // console message as a limitation; every application resource/error is checked.
+ assert.ok(failedResources.every(r=>new URL(r.url).pathname==='/favicon.ico' && r.status===404),JSON.stringify(failedResources));
+ assert.ok(consoleErrors.every(message=>message==='Failed to load resource: the server responded with a status of 404 (Not Found)') && consoleErrors.length===failedResources.length,JSON.stringify(consoleErrors));
+ await writeFile(`${output}/ui-validation.json`,JSON.stringify({syntheticOnly:true,productionData:false,pages:evidence,pageErrors:errors,consoleErrors,baselineResourceFailures:failedResources,externalBrowserRequests:requests},null,2)+'\n');
+ console.log(`Verified and captured ${evidence.length} synthetic page/viewport states; no page errors, external browser requests or horizontal viewport overflow. Baseline favicon failures: ${failedResources.length}.`);
 }finally{await browser.close();for(const child of children)child.kill('SIGTERM');}
