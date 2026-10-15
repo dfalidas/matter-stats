@@ -195,7 +195,13 @@ try {
     const oldContext=derived.createDerivedGenerationContext(service);const oldId=await oldContext.generation;
     const oldEstimates=await derived.readDerivedEstimates(service,[`${prefix}-boundary-130`],oldContext);assert.equal(oldEstimates.get(`${prefix}-boundary-130`),0);
     assert.equal((await articles.getArticleDetail(service,`${prefix}-item`)).sessions[0].words_estimated,0);
-    const switched=await transition(g);
+    const readyStatus=await rpc('read_matter_generation_status',{});
+    assert.equal(readyStatus.activeId,oldId);assert.equal(readyStatus.candidate.state,'ready');
+    const [switched,racingStatus]=await Promise.all([transition(g),rpc('read_matter_generation_status',{})]);
+    assert.ok([oldId,g.id].includes(racingStatus.activeId));assert.equal(racingStatus.active.id,racingStatus.activeId);
+    assert.equal(racingStatus.active.cutover,racingStatus.activeId===g.id);
+    const activeStatus=await rpc('read_matter_generation_status',{});
+    assert.equal(activeStatus.activeId,g.id);assert.equal(activeStatus.active.id,g.id);assert.equal(activeStatus.candidate,null);
     assert.equal((await articles.getArticleDetail(service,`${prefix}-item`)).sessions[0].words_estimated,487);assert.equal(switched.active,g.id);
     assert.equal((await derived.readDerivedEstimates(service,[`${prefix}-boundary-130`],oldContext)).get(`${prefix}-boundary-130`),0);
     assert.equal((await derived.readDerivedEstimates(service,[`${prefix}-boundary-130`],derived.createDerivedGenerationContext(service))).get(`${prefix}-boundary-130`),487);
@@ -206,6 +212,8 @@ try {
   assert.equal(await snapshot(),changedSnapshot);
   const cut=await control();assert.deepEqual(await transition(g,false,cut),cut);
   const rollback=await transition(g,true);assert.equal(rollback.active,g.parent);
+  if(!sqlOnly){const status=await rpc('read_matter_generation_status',{});assert.equal(status.activeId,g.parent);assert.equal(status.active.id,g.parent);assert.equal(status.rolledBack,true);}
+
   const rollbackDays=await rpc('read_generation_days',{p_generation:g.parent,p_after:null,p_since:'2400-12-31',p_limit:10});
   const obsoleteUtc=rollbackDays.find(d=>d.date==='2400-12-31');assert.equal(obsoleteUtc.reading_time_seconds,0);assert.equal(obsoleteUtc.words_read,0);assert.equal(obsoleteUtc.highlights_count,11);assert.equal(obsoleteUtc.items_read_count,7);assert.equal(obsoleteUtc.top_source,'unknown-utc.example');assert.equal((await estimates(g.parent,[`${prefix}-boundary-130`]))[0].words_estimated,0);
   assert.deepEqual(await transition(g,true),rollback);assert.equal(await snapshot(),changedSnapshot);
