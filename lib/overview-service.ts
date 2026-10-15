@@ -1,3 +1,4 @@
+import { readStatusEvidence } from "./sync-status";
 import { createAnalyticsQueryContext } from "./analytics-query-context";
 import { addCalendarDays } from "./calendar";
 export { formatOverviewRangeLabel } from "./overview-range";
@@ -6,7 +7,6 @@ import {
   localDateToUtc,
   resolvePeriodToDateRanges,
   type MetricsPeriodPreset,
-  type ReadingMetrics,
 } from "./metrics-service";
 import type { MatterStatsSupabaseClient } from "./supabase-queries";
 
@@ -59,3 +59,8 @@ export function toOverviewClientPayload(result: Awaited<ReturnType<typeof getOve
 }
 
 export type OverviewClientPayload = ReturnType<typeof toOverviewClientPayload>;
+
+/** Independent of analytics; a library failure is never an empty library. */
+export async function loadOverviewLibrary(client: MatterStatsSupabaseClient) {
+  return readStatusEvidence(client.from("matter_items").select("id,title,source,author,word_count,estimated_reading_time_minutes,progress,status").order("updated_at", { ascending: false }).limit(4));
+}

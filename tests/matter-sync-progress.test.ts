@@ -39,13 +39,13 @@ test("builds clear messaging when a bounded batch has more data remaining", () =
 
   assert.match(message, /Recent activity sync started/);
   assert.match(message, /Imported 0 reading sessions, 25 linked items, 4 annotations, and 12 tags/);
-  assert.match(message, /daily 06:00 UTC cron resumes/);
+  assert.match(message, /Cron is configured for 06:00 UTC/);
 });
 
 test("builds clear messaging when sync completes", () => {
   const message = buildMatterSyncMessage({ items: 0, sessions: 25, annotations: 0, tags: 0 }, false);
 
-  assert.match(message, /Recent activity sync enumeration complete/);
+  assert.match(message, /Recent activity sync invocation finished/);
   assert.match(message, /Imported 25 reading sessions, 0 linked items, 0 annotations, and 0 tags/);
   assert.doesNotMatch(message, /More data remains/);
 });
@@ -145,14 +145,14 @@ test("preserves checkpoints when storing Matter rate limits after a 429", () => 
 test("builds no-session guidance when recent activity returns zero sessions and no more pages", () => {
   const message = buildMatterSyncMessage({ items: 0, sessions: 0, annotations: 0, tags: 0 }, false, "recent_activity");
 
-  assert.equal(message, "No recent reading sessions found. Try expanding the sync window or confirm Matter has reading-session data.");
+  assert.match(message, /Imported 0 reading sessions.*Zero returned sessions.*Check durable cycle status/);
   assert.doesNotMatch(message, /Work remains/);
 });
 
 test("keeps more-remains messaging when Matter returns zero sessions with has_more", () => {
   const message = buildMatterSyncMessage({ items: 0, sessions: 0, annotations: 0, tags: 0 }, true, "recent_activity");
 
-  assert.match(message, /daily 06:00 UTC cron resumes/);
+  assert.match(message, /Cron is configured for 06:00 UTC/);
 });
 
 test("detects Matter pagination from either has_more or next_cursor", () => {
@@ -190,7 +190,7 @@ test("includes unavailable item metadata note when sessions import without item 
   );
 
   assert.match(message, /Imported 0 reading sessions/);
-  assert.match(message, /Item metadata unavailable for these sessions/);
+  assert.match(message, /Session-to-item attribution is unsupported/);
 });
 
 test("reports partial session skips without hiding successful imports", () => {

@@ -80,17 +80,17 @@ export function buildMatterSyncMessage(
   const withoutLinkedItem = diagnostics.sessionsWithoutLinkedItem ?? 0;
 
   const skippedSuffix = skipped > 0 ? ` Skipped ${skipped} sessions with missing required fields.` : "";
-  const unlinkedSuffix = withoutLinkedItem > 0 ? " Item metadata unavailable for these sessions." : "";
+  const unlinkedSuffix = withoutLinkedItem > 0 ? " Session-to-item attribution is unsupported for sessions without a documented item identifier; another metadata sync is not guaranteed to resolve it." : "";
 
   if (hasMore) {
-    return `${modeLabel} started. ${imported}${unlinkedSuffix}${skippedSuffix} Work remains; the daily 06:00 UTC cron resumes it in bounded chunks. You may resume sooner here.`;
+    return `${modeLabel} started. ${imported}${unlinkedSuffix}${skippedSuffix} Work remains. Cron is configured for 06:00 UTC; actual continuation depends on future eligible invocations. You may resume sooner here.`;
   }
 
   if (mode !== "backfill_library" && mode !== "backfill_sessions" && counts.sessions === 0) {
-    return "No recent reading sessions found. Try expanding the sync window or confirm Matter has reading-session data.";
+    return `${modeLabel} invocation finished. ${imported} Zero returned sessions do not establish no reading outside the enumerated scope. Check durable cycle status for completion and freshness.`;
   }
 
-  return `${modeLabel} enumeration complete. ${imported}${unlinkedSuffix}${skippedSuffix}`;
+  return `${modeLabel} invocation finished. ${imported}${unlinkedSuffix}${skippedSuffix} Check durable sessions and metadata cycle status separately; this invocation does not certify analytics readiness or complete Matter history.`;
 }
 
 export function getMatterSyncInitialPhase(mode: MatterSyncMode): MatterSyncPhase {
@@ -219,7 +219,7 @@ export function shouldDisableMatterSyncButton({ isPending, rateLimitedUntil, now
   return isPending || isMatterRateLimitActive(rateLimitedUntil, now);
 }
 
-export function formatMatterRetryTime(rateLimitedUntil: string | null): string {
+export function formatMatterRetryTime(rateLimitedUntil: string | null, timezone = "Europe/Athens"): string {
   if (!rateLimitedUntil) {
     return "the time Matter provides";
   }
@@ -236,8 +236,9 @@ export function formatMatterRetryTime(rateLimitedUntil: string | null): string {
     hour: "numeric",
     minute: "2-digit",
     second: "2-digit",
+    timeZone: timezone,
     timeZoneName: "short",
-  }).format(retryAt);
+  }).format(retryAt) + ` (${timezone})`;
 }
 
 function parseMatterSyncLimit(rawValue: string | undefined, fallback: number): number {

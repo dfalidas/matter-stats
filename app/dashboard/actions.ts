@@ -1,5 +1,7 @@
 "use server";
 
+import { loadSyncStatus, unavailableSyncStatus } from "@/lib/sync-status";
+import { getDefaultMetricsTimezone } from "@/lib/metrics-service";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
@@ -23,7 +25,14 @@ export async function syncMatterAction(previousState: SyncMatterActionState, for
 
   const result = await runAuthorizedSync({
     authorize: authorizeAction,
-    sync: () => syncMatterData(mode, { recentActivityWindow }),
+    sync: async () => {
+      const outcome = await syncMatterData(mode, { recentActivityWindow });
+      const now = new Date(), timezone = getDefaultMetricsTimezone();
+      let status;
+      try { status = await loadSyncStatus(getSupabaseAdminClient(), now, timezone); }
+      catch { status = unavailableSyncStatus(now, timezone); }
+      return { ...outcome, message: `${outcome.message} Durable status: ${status.view.summary}.` };
+    },
     afterSync: revalidateDashboardPaths,
   });
 

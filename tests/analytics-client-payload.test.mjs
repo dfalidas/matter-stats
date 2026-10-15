@@ -40,7 +40,7 @@ test('real server pages construct bounded client props; calendar CSV and totals 
     for(const count of [1200,10037]) {
       const fixture = cappedPostgrest({reading_sessions:sessions(count)},{cap:100});
       client = fixture.client;
-      const overview = (await DashboardPage({searchParams:Promise.resolve({period:'month'})})).props.children.props.metricsResult;
+      const overview = (await DashboardPage({searchParams:Promise.resolve({period:'month'})})).props.children.find(child=>child?.props?.metricsResult).props.metricsResult;
       assert.equal(overview.ok,true);
       assert.equal(overview.metrics.totals.sessionsCount,count);
       assert.equal('todayMetrics' in overview,false);

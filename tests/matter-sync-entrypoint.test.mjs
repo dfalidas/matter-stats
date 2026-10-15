@@ -112,15 +112,18 @@ test("R4 target (W4): manual→scheduled→manual preserves independent cursors 
   assert.equal(h.calls.length, calls); assert.deepEqual([...h.states], before);
 });
 
-test("busy account lease denies all trigger modes before any reads, writes or Matter", async () => {
+test("busy account lease records only invocation audit and denies ingestion or Matter", async () => {
   for (const mode of ["recent_activity_manual", "recent_activity_scheduled", "backfill_library", "backfill_sessions"]) {
-    const touched = [];
-    const deps = new Proxy({ acquireLease: async () => null, budgetClock: undefined }, {
+    const touched = [], audit = [];
+    const deps = new Proxy({ acquireLease: async () => null, budgetClock: undefined, recordInvocation: async (id, trigger, outcome) => audit.push({ id, trigger, outcome }) }, {
       get: (target, key) => key in target ? target[key] : async () => { touched.push(key); throw new Error("unexpected work"); },
     });
     const result = await syncMatterData(mode, {}, deps);
     assert.equal(result.skippedReason, "busy");
     assert.deepEqual(touched, []);
+    assert.deepEqual(audit.map(a => a.outcome), ["attempted", "skipped_locked"]);
+    assert.equal(audit[0].trigger, mode === "recent_activity_scheduled" ? "scheduled" : "manual");
+    assert.equal(audit[0].id, audit[1].id);
   }
 });
 

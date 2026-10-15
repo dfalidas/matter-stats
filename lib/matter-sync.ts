@@ -16,6 +16,7 @@ import {
   getMatterContinuation, requestMatterHistory, beginMatterHistory, turnMatterContinuation, cooldownMatterAccount,
   commitMatterPage,
   getMatterPageReceipt,
+  getSupabaseAdminClient,
   createSyncRun,
   getMatterSyncStream,
   getMatterSyncStreams,
@@ -94,6 +95,7 @@ type MatterSyncDiagnostics = {
 };
 
 export type MatterSyncRuntimeDeps = {
+  recordInvocation?: (id: string, trigger: string, outcome: string) => Promise<void>;
   prepareRequestWork?: typeof prepareMatterRequestWork;
   cooldownAccount: typeof cooldownMatterAccount;
   getContinuation: typeof getMatterContinuation;
@@ -122,6 +124,10 @@ export type MatterSyncRuntimeDeps = {
 };
 
 export const productionSyncDeps: MatterSyncRuntimeDeps = {
+  recordInvocation: async (id, trigger, outcome) => {
+    const { error } = await getSupabaseAdminClient().rpc("record_matter_invocation", { p_id: id, p_trigger: trigger, p_outcome: outcome });
+    if (error) throw new Error("Invocation evidence unavailable");
+  },
   prepareRequestWork: prepareMatterRequestWork,
   cooldownAccount: cooldownMatterAccount,
   getContinuation: getMatterContinuation, requestHistory: requestMatterHistory,
@@ -203,7 +209,17 @@ export async function syncMatterData(
   deps: MatterSyncRuntimeDeps = productionSyncDeps
 ): Promise<MatterSyncResult> {
   const budget = new MatterInvocationBudget(options.budget, deps.budgetClock);
-  return withMatterInvocationBudget(budget, () => runMatterInvocation(mode, options, deps, budget));
+  const id = randomUUID();
+  const trigger = mode === "recent_activity_scheduled" ? "scheduled" : mode === "recent_activity" ? "unknown" : "manual";
+  const record = async (outcome: string) => {
+    try { await deps.recordInvocation?.(id, trigger, outcome); }
+    catch { console.error("Matter invocation evidence unavailable"); }
+  };
+  await record("attempted");
+  const result = await withMatterInvocationBudget(budget, () => runMatterInvocation(mode, options, deps, budget));
+  await record(result.skippedReason === "busy" ? "skipped_locked" : result.skippedReason === "rate_limited" ? "skipped_rate_limited"
+    : result.status === "partial" ? "partial" : result.ok ? "complete" : "error");
+  return result;
 }
 
 async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivityWindow?: MatterRecentActivityWindow },

@@ -199,7 +199,9 @@ test("actual dashboard actions revalidate all paths after authorized success and
     reset(); await seedSession(); syncState.result = result;
     assert.deepEqual(await dashboardActions.getMatterSyncAvailabilityAction(), { rateLimitedUntil: null, message: null });
     const returned = await dashboardActions.syncMatterAction(null);
-    assert.strictEqual(returned, result);
+    assert.equal(returned.ok, result.ok);
+    assert.match(returned.message, /Durable status: Sessions status unavailable/);
+    assert.ok(returned.message.startsWith(result.message));
     assert.equal(syncState.availabilityCalls, 1); assert.equal(syncState.syncCalls, 1);
     assert.equal(syncState.partialWrites, result.ok ? 0 : 1);
     assert.deepEqual(revalidated, paths);

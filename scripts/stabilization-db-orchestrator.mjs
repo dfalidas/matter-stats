@@ -291,6 +291,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   let previewEvidence;
   let wordMethodEvidence;
   let repairEvidence;
+  let statusEvidence;
   const runIntegration = () => {
     command(process.execPath, [path.join(repoRoot, "node_modules/typescript/bin/tsc"), "-p", "tests/tsconfig.json"], { env: sanitizedEnvironment() });
     const env = integrationEnvironment(status, projectId);
@@ -334,6 +335,9 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     const previewReport=JSON.parse(previewOutput.trim().split(/\r?\n/).at(-1));
     assert.equal(previewReport.status,"passed");assert.equal(previewReport.realSql,true);assert.equal(previewReport.cleanup,"passed");
     previewEvidence={checks:previewReport.checks,realSql:true,syntheticOnly:true,cleanup:"passed"};
+    const statusOutput=command(process.execPath,[path.join(repoRoot,"tests/integration/matter-status.mjs")],{env});
+    statusEvidence=JSON.parse(statusOutput.trim().split(/\r?\n/).at(-1));
+    assert.equal(statusEvidence.status,"passed");assert.equal(statusEvidence.realSqlAndDataApi,true);assert.equal(statusEvidence.cleanup,"passed");
     const repairOutput=command(process.execPath,[path.join(repoRoot,"tests/integration/historical-repair.mjs")],{env});
     const repairReport=JSON.parse(repairOutput.trim().split(/\r?\n/).at(-1));
     assert.equal(repairReport.status,"passed");assert.equal(repairReport.realSqlAndDataApi,true);assert.equal(repairReport.cleanup,"passed");
@@ -344,7 +348,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   if (upgrade) {
     await removeOwnedLegacySingleton({ query: (sql) => Promise.resolve(containerPsql(projectId, sql)), ownershipMarker, runIntegration });
   } else runIntegration();
-  return { name, catalog: "passed", dataApi: "passed", gatewayTransport, accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, boundedContinuationAndHistory: "passed", continuationEvidence, sharedQuotaAndRetries:"passed", requestEvidence, historicalPreview:"passed", previewEvidence, sessionWordMethod:"passed", wordMethodEvidence, historicalRepair:"passed", repairEvidence, generationPreservation, requestPreservation, preservation, streamPreservation, leasePreservation, pagePreservation, migrationHistory: versions };
+  return { name, catalog: "passed", dataApi: "passed", gatewayTransport, accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, boundedContinuationAndHistory: "passed", continuationEvidence, sharedQuotaAndRetries:"passed", requestEvidence, historicalPreview:"passed", previewEvidence, sessionWordMethod:"passed", wordMethodEvidence, historicalRepair:"passed", repairEvidence, truthfulStatus:"passed", statusEvidence, generationPreservation, requestPreservation, preservation, streamPreservation, leasePreservation, pagePreservation, migrationHistory: versions };
 }
 
 export async function runStabilizationDatabases({ evidenceRoot = path.join(repoRoot, "artifacts/stabilization-db"), hasDocker = dockerAvailable } = {}) {
