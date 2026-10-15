@@ -35,6 +35,7 @@ Copy `.env.example` to `.env.local` and replace every placeholder locally. Confi
 | `CRON_SECRET` | Bearer secret required by scheduled sync. |
 | `MATTER_SYNC_ITEMS_LIMIT` | Optional positive item page limit; defaults to `25`. |
 | `MATTER_SYNC_SESSIONS_LIMIT` | Optional positive session page limit; defaults to `25`. |
+| `MATTER_SYNC_STALE_HOURS` | Optional positive elapsed-hour sessions-completion warning threshold; defaults to `36`, warning at `>=`. |
 
 ## Local development
 

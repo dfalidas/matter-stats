@@ -1,5 +1,7 @@
 "use server";
 
+import { loadSyncStatus, unavailableSyncStatus } from "@/lib/sync-status";
+import { getDefaultMetricsTimezone } from "@/lib/metrics-service";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
@@ -23,7 +25,17 @@ export async function syncMatterAction(previousState: SyncMatterActionState, for
 
   const result = await runAuthorizedSync({
     authorize: authorizeAction,
-    sync: () => syncMatterData(mode, { recentActivityWindow }),
+    sync: async () => {
+      const outcome = await syncMatterData(mode, { recentActivityWindow });
+      const now = new Date(), timezone = getDefaultMetricsTimezone();
+      let status;
+      try { status = await loadSyncStatus(getSupabaseAdminClient(), now, timezone); }
+      catch { status = unavailableSyncStatus(now, timezone); }
+      const clientOutcome = { ...outcome };
+      delete clientOutcome.syncRunId; // Run IDs are also lease owners; the UI does not need them.
+      const attempt = status.view.details.find(detail => detail.label === "Last recorded invocation attempt")!;
+      return { ...clientOutcome, message: `${outcome.message} Durable status: ${status.view.summary}. ${attempt.label}: ${attempt.value}.` };
+    },
     afterSync: revalidateDashboardPaths,
   });
 

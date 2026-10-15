@@ -1,0 +1,115 @@
+{
+  "baselinePrHead": "0bc90d7dd8a5356ee51be0f3e8ca429853b0471a",
+  "testedRuntimeCommit": "ab71fdb56f73a86c1e033ef9fb03005615c3bf49",
+  "scope": "PR 84 latest recorded invocation selection/correlation correction only",
+  "environment": {
+    "node": "24.19.0",
+    "npm": "11.9.0",
+    "registry": "https://registry.npmjs.org/",
+    "cache": "fresh writable task-local npm cache",
+    "data": "synthetic fixtures only; no real Matter sync or production SQL"
+  },
+  "checks": [
+    {
+      "command": "npm ci",
+      "exitCode": 0,
+      "packages": 456
+    },
+    {
+      "command": "npx --no-install next typegen",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run typecheck",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run lint",
+      "exitCode": 0,
+      "errors": 0,
+      "warnings": 3,
+      "warningScope": "existing local .agents/skills/visual-explainer files"
+    },
+    {
+      "command": "npx --no-install tsc -p tests/tsconfig.json",
+      "exitCode": 0
+    },
+    {
+      "command": "node --test --test-reporter=tap .test-build/tests/sync-status.test.js tests/sync-status-surfaces.test.mjs tests/matter-sync-entrypoint.test.mjs tests/matter-invocation-lease.test.mjs",
+      "exitCode": 0,
+      "tests": 43,
+      "passed": 43,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "command": "env -u DISPOSABLE_DB_ACK npm run test",
+      "exitCode": 0,
+      "tests": 373,
+      "passed": 373,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    {
+      "command": "npm_config_cache=<task-local-cache> npm run audit:ci",
+      "exitCode": 0,
+      "productionVulnerabilities": 0,
+      "fullHighEntries": 7,
+      "allowedDevelopmentAdvisory": "GHSA-vfj7-8cjw-p6xm",
+      "policyChanged": false
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "environment": "synthetic server configuration; no live database or Matter access"
+    },
+    {
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "coverage": [
+    "Older successful audit plus newer failed or unfinished independent run",
+    "Audit-before-run exact-ID correlation retaining proven trigger and final outcome, including adjacent running-row snapshot",
+    "Initial-only audit with correlated failed, unfinished or successful run; contradictory terminal outcomes explicit",
+    "Newer audit-only skipped_locked and skipped_rate_limited, including an older correlated run created later",
+    "Different IDs one millisecond apart never correlate; equal/invalid/sub-millisecond timestamps explicitly uncertain; tied run and audit rows",
+    "Independent failure of either evidence source with available observations and unknown latest attempt",
+    "Actual bounded Supabase loader: 11 requests, at most 3 audit rows and 2 run rows; deterministic run order",
+    "Actual Overview/Settings pages and authorized manual action: ten scenarios share formatted attempt detail, preserve canonical totals, expose no private IDs or raw errors",
+    "Actual sync entrypoint: one random UUID shared by audit/lease/run even when audit writes fail; audit precedes acquisition/run",
+    "Actual lease helper RPC arguments retain scope, 120-second TTL and exact BIGINT generation; default callers still generate distinct UUIDs"
+  ],
+  "auditReportDigests": {
+    "full.json": "12e973a8a567380992ab71c3d2c1c20b5faf73610e0ad2f362201429a225006a",
+    "production.json": "31b90573b69000532cd0814cdaad5c24409299b1b2915c09085d2cb844233cfa"
+  },
+  "historicalEvidence": {
+    "priorCiHead": "0bc90d7dd8a5356ee51be0f3e8ca429853b0471a",
+    "priorApplicationMergeCheckout": "e1c26c103892f59ba1fa5a9d45c9c78717fc9c29",
+    "priorWorkflow": "https://github.com/dfalidas/matter-stats/actions/runs/38754563583",
+    "priorIsolatedDbTestedSha": "0bc90d7dd8a5356ee51be0f3e8ca429853b0471a",
+    "priorIsolatedDbArtifact": 11983413623,
+    "priorScreenshotsSource": "8153524e90730bfa74cb658f1bb961e872729cd3",
+    "note": "Retained prior evidence, not verification of this correction. See existing PR description for historical job logs and artifact digests."
+  },
+  "notRun": [
+    "Fresh/upgrade databases locally: no schema/RPC/grant changes; existing CI database harness remains enforced",
+    "Browser screenshot matrix not regenerated; actual page/action regressions executed instead"
+  ],
+  "limitations": [
+    "Independent evidence reads are live observations, not one MVCC snapshot",
+    "Best-effort audit may be missing or superseded per trigger; uncorrelated/legacy runs retain unknown trigger",
+    "Timestamp comparisons conservatively treat sub-millisecond distinctions as ambiguous",
+    "New-head CI results and final documentation-only head are recorded in existing draft PR 84"
+  ],
+  "unchanged": [
+    "dependencies and lockfile",
+    "audit policy and advisory exception",
+    "migrations and database functions",
+    "lease generation, TTL and fencing",
+    "auth, quotas, retry and continuation semantics",
+    "cycle completion, staleness, analytics generation controls and canonical metrics"
+  ]
+}

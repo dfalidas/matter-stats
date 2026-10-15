@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import os from "node:os";
 import path from "node:path";
+import { STATUS_TABLES } from "./matter-status-inventory.mjs";
 import { GENERATION_TABLES } from "./reading-generation-inventory.mjs";
 import { verifyCatalog, INVENTORIED_TABLES } from "./stabilization-db-runner.mjs";
 
@@ -12,6 +13,7 @@ export const SUPABASE_CLI_VERSION = "2.48.3";
 export const UPGRADE_BASELINE = "20260519090000";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsSource = path.join(repoRoot, "supabase/migrations");
+export const PRE_STATUS_TABLES = INVENTORIED_TABLES.filter(table => !STATUS_TABLES.includes(table));
 
 export function sanitizedEnvironment(extra = {}) {
   const keep = ["PATH", "HOME", "USER", "TMPDIR", "TEMP", "TMP", "SystemRoot", "COMSPEC", "NODE_EXTRA_CA_CERTS", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "npm_config_cache", "npm_config_https_proxy"];
@@ -196,6 +198,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   let leasePreservation = null;
   let pagePreservation = null;
   let generationPreservation = "not applicable";
+  let statusPreservation = "not applicable";
   let requestPreservation = null;
   const ownershipMarker = `task05-${projectId}`;
   if (upgrade) {
@@ -245,9 +248,9 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
       values('${upgradeId}','2098-12-31T10:00:00Z',60,225,'session-duration-225-round-v1','owned-upgrade');
       insert into public.daily_stats(date,reading_time_seconds,words_read,sessions_count,items_read_count,highlights_count,top_source,reading_provenance)
       values('2098-12-31',60,225,1,19,20,'owned-upgrade.example','{"wordMethod":"session-duration-225-round-v1","calendarMethod":"local-occurrence-day-v1","timezone":"Europe/Athens"}');`);
-    const task19SnapshotSql=INVENTORIED_TABLES.filter(t=>!GENERATION_TABLES.includes(t)).map(t=>`select jsonb_build_object('table','${t}','count',count(*),'hash',md5(coalesce(string_agg(to_jsonb(r)::text,E'\\n' order by to_jsonb(r)::text),'')))::text from public.${t} r;`).join("\n");
+    const task19SnapshotSql=PRE_STATUS_TABLES.filter(t=>!GENERATION_TABLES.includes(t)).map(t=>`select jsonb_build_object('table','${t}','count',count(*),'hash',md5(coalesce(string_agg(to_jsonb(r)::text,E'\\n' order by to_jsonb(r)::text),'')))::text from public.${t} r;`).join("\n");
     const beforeTask20=containerPsql(projectId,task19SnapshotSql);
-    await copyMigrations(workdir,filename=>filename.slice(0,14)>="20261014140402");
+    await copyMigrations(workdir,filename=>filename.slice(0,14)>="20261014140402" && filename.slice(0,14)<"20261015141435");
     cli(["migration","up","--local","--workdir",workdir],{env:sanitizedEnvironment()});
     assert.equal(containerPsql(projectId,task19SnapshotSql),beforeTask20,"Task 20 migration changed Task 19/source/provenance/progress fields");
     assert.equal(containerPsql(projectId,"select count(*) from public.reading_generations;").trim(),"0");
@@ -255,6 +258,16 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     assert.equal(containerPsql(projectId,`delete from public.reading_sessions where id='${upgradeId}' and source_device='owned-upgrade' returning id;`).trim(),upgradeId);
     assert.equal(containerPsql(projectId,"delete from public.daily_stats where date='2098-12-31' and top_source='owned-upgrade.example' returning date;").trim(),"2098-12-31");
     generationPreservation="passed";
+    // Genuine Task 20 -> 21 upgrade. Observe every already-installed source,
+    // derived generation and ingestion-control table, without inventing event times.
+    const task20SnapshotSql=PRE_STATUS_TABLES.map(t=>`select jsonb_build_object('table','${t}','count',count(*),'hash',md5(coalesce(string_agg(to_jsonb(r)::text,E'\\n' order by to_jsonb(r)::text),'')))::text from public.${t} r;`).join("\n");
+    const beforeTask21=containerPsql(projectId,task20SnapshotSql);
+    await copyMigrations(workdir,filename=>filename.slice(0,14)>="20261015141435");
+    cli(["migration","up","--local","--workdir",workdir],{env:sanitizedEnvironment()});
+    assert.equal(containerPsql(projectId,task20SnapshotSql),beforeTask21,"Task 21 changed existing Task 20/source/progress/generation state");
+    assert.equal(containerPsql(projectId,"select count(*) from public.matter_cycle_completions;").trim(),"0");
+    assert.equal(containerPsql(projectId,"select count(*) from public.matter_invocation_status;").trim(),"0");
+    statusPreservation="passed";
 
     // Only this disposable path owns the synthetic 2099 quota seed copied
     // from its pre-upgrade stream fixture; clear it after verifying preservation.
@@ -291,6 +304,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   let previewEvidence;
   let wordMethodEvidence;
   let repairEvidence;
+  let statusEvidence;
   const runIntegration = () => {
     command(process.execPath, [path.join(repoRoot, "node_modules/typescript/bin/tsc"), "-p", "tests/tsconfig.json"], { env: sanitizedEnvironment() });
     const env = integrationEnvironment(status, projectId);
@@ -334,6 +348,9 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     const previewReport=JSON.parse(previewOutput.trim().split(/\r?\n/).at(-1));
     assert.equal(previewReport.status,"passed");assert.equal(previewReport.realSql,true);assert.equal(previewReport.cleanup,"passed");
     previewEvidence={checks:previewReport.checks,realSql:true,syntheticOnly:true,cleanup:"passed"};
+    const statusOutput=command(process.execPath,[path.join(repoRoot,"tests/integration/matter-status.mjs")],{env});
+    statusEvidence=JSON.parse(statusOutput.trim().split(/\r?\n/).at(-1));
+    assert.equal(statusEvidence.status,"passed");assert.equal(statusEvidence.realSqlAndDataApi,true);assert.equal(statusEvidence.cleanup,"passed");
     const repairOutput=command(process.execPath,[path.join(repoRoot,"tests/integration/historical-repair.mjs")],{env});
     const repairReport=JSON.parse(repairOutput.trim().split(/\r?\n/).at(-1));
     assert.equal(repairReport.status,"passed");assert.equal(repairReport.realSqlAndDataApi,true);assert.equal(repairReport.cleanup,"passed");
@@ -344,7 +361,7 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   if (upgrade) {
     await removeOwnedLegacySingleton({ query: (sql) => Promise.resolve(containerPsql(projectId, sql)), ownershipMarker, runIntegration });
   } else runIntegration();
-  return { name, catalog: "passed", dataApi: "passed", gatewayTransport, accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, boundedContinuationAndHistory: "passed", continuationEvidence, sharedQuotaAndRetries:"passed", requestEvidence, historicalPreview:"passed", previewEvidence, sessionWordMethod:"passed", wordMethodEvidence, historicalRepair:"passed", repairEvidence, generationPreservation, requestPreservation, preservation, streamPreservation, leasePreservation, pagePreservation, migrationHistory: versions };
+  return { name, catalog: "passed", dataApi: "passed", gatewayTransport, accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, boundedContinuationAndHistory: "passed", continuationEvidence, sharedQuotaAndRetries:"passed", requestEvidence, historicalPreview:"passed", previewEvidence, sessionWordMethod:"passed", wordMethodEvidence, historicalRepair:"passed", repairEvidence, truthfulStatus:"passed", statusEvidence, statusPreservation, generationPreservation, requestPreservation, preservation, streamPreservation, leasePreservation, pagePreservation, migrationHistory: versions };
 }
 
 export async function runStabilizationDatabases({ evidenceRoot = path.join(repoRoot, "artifacts/stabilization-db"), hasDocker = dockerAvailable } = {}) {

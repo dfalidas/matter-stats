@@ -1,10 +1,11 @@
+import { SyncStatusPanel } from "@/components/sync-status";
+import { loadSyncStatus, unavailableSyncStatus } from "@/lib/sync-status";
 import { PageShell } from "../_components/page-shell";
 import { DashboardOverview } from "./dashboard-overview";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { requireAccessSession } from "@/lib/require-auth";
 import { getDefaultMetricsTimezone, METRICS_PERIOD_PRESETS, type MetricsPeriodPreset } from "@/lib/metrics-service";
-import { getOverviewReadingMetrics, toOverviewClientPayload } from "@/lib/overview-service";
-import type { MatterItem } from "@/lib/supabase-types";
+import { getOverviewReadingMetrics, toOverviewClientPayload, loadOverviewLibrary } from "@/lib/overview-service";
 import { validateCustomRange } from "@/lib/custom-range";
 
 const DEFAULT_PERIOD: MetricsPeriodPreset = "week";
@@ -35,7 +36,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       </PageShell>
     );
   }
-  const metricsResult = await getDashboardMetrics(period, start, end);
+  const now = new Date();
+  const timezone = getDefaultMetricsTimezone();
+  const statusRead = (async () => {
+    try { return await loadSyncStatus(getSupabaseAdminClient(), now, timezone); }
+    catch { return unavailableSyncStatus(now, timezone); }
+  })();
+  const [metricsResult, status] = await Promise.all([getDashboardMetrics(period, start, end, now, timezone), statusRead]);
 
   return (
     <PageShell
@@ -43,6 +50,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       title="A quieter view of your reading"
       description="Reliable time-based insights from your synced Matter reading sessions."
     >
+      <SyncStatusPanel view={status.view} />
       <DashboardOverview period={start && end ? "custom" : period} metricsResult={metricsResult} />
     </PageShell>
   );
@@ -61,29 +69,19 @@ function normalizePeriod(value: string | string[] | undefined): MetricsPeriodPre
   return METRICS_PERIOD_PRESETS.includes(candidate as MetricsPeriodPreset) ? (candidate as MetricsPeriodPreset) : DEFAULT_PERIOD;
 }
 
-async function getDashboardMetrics(period: MetricsPeriodPreset, start: string | null, end: string | null) {
+async function getDashboardMetrics(period: MetricsPeriodPreset, start: string | null, end: string | null, now: Date, timezone: string) {
   try {
     const client = getSupabaseAdminClient();
-    const timezone = getDefaultMetricsTimezone();
-    const now = new Date();
-    const [overviewMetrics, library, latestSync, syncState] = await Promise.all([
-      getOverviewReadingMetrics(client, period, start, end, now, timezone),
-      client.from("matter_items").select("id,title,source,author,word_count,estimated_reading_time_minutes,progress,status").order("updated_at", { ascending: false }).limit(4),
-      client.from("sync_runs").select("finished_at,started_at").eq("status", "success").order("finished_at", { ascending: false, nullsFirst: false }).limit(1).maybeSingle(),
-      client.from("sync_state").select("session_cursor,recent_activity_checkpoint").eq("id", "matter").maybeSingle(),
+    const [overviewMetrics, library] = await Promise.all([
+      getOverviewReadingMetrics(client, period, start, end, now, timezone)
+        .then(value => ({ ok: true as const, value }))
+        .catch(() => ({ ok: false as const })),
+      loadOverviewLibrary(client),
     ]);
-    return {
-      ok: true as const,
-      ...toOverviewClientPayload(overviewMetrics),
-      library: (library.data ?? []) as Pick<MatterItem, "id" | "title" | "source" | "author" | "word_count" | "estimated_reading_time_minutes" | "progress" | "status">[],
-      dataStatus: {
-        lastSuccessfulSync: latestSync.data?.finished_at ?? latestSync.data?.started_at ?? null,
-        coverage: syncState.data ? "unverified" as const : "unavailable" as const,
-      },
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to load dashboard metrics.";
-    return { ok: false as const, message };
+    if (!overviewMetrics.ok) return { ok: false as const, message: "Reading metrics query unavailable. No zero totals have been substituted.", library };
+    return { ok: true as const, ...toOverviewClientPayload(overviewMetrics.value), library };
+  } catch {
+    return { ok: false as const, message: "Reading metrics query unavailable. Retry this page.", library: { state: "unavailable" as const } };
   }
 }
 export const maxDuration = 180;

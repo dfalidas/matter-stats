@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { SESSION_METADATA_EMPTY_STATE, hasSessionMetadataCoverage } from "../lib/metadata-coverage";
 
 test("uses stable empty-state copy for missing session metadata", () => {
-  assert.equal(SESSION_METADATA_EMPTY_STATE, "Source analytics will appear once session-to-article metadata is available.");
+  assert.equal(SESSION_METADATA_EMPTY_STATE, "Session-to-item attribution is unsupported without a documented item identifier. Another metadata sync is not guaranteed to resolve it.");
 });
 
 test("detects missing metadata coverage when top rankings are empty", () => {

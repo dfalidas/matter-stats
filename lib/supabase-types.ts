@@ -371,6 +371,18 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["matter_sync_streams"]["Insert"]>;
         Relationships: [];
       };
+      matter_cycle_completions: {
+        Row: { stream: string; cycle_generation: number; source_boundary: string; completed_at: string };
+        Insert: { stream: string; cycle_generation: number; source_boundary: string; completed_at: string };
+        Update: Partial<Database["public"]["Tables"]["matter_cycle_completions"]["Insert"]>;
+        Relationships: [];
+      };
+      matter_invocation_status: {
+        Row: { trigger: string; id: string; attempted_at: string; outcome: string; finished_at: string | null };
+        Insert: { trigger: string; id: string; attempted_at: string; outcome: string; finished_at?: string | null };
+        Update: Partial<Database["public"]["Tables"]["matter_invocation_status"]["Insert"]>;
+        Relationships: [];
+      };
       sync_runs: {
         Row: {
           id: string;
@@ -446,6 +458,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      record_matter_invocation: { Args: { p_id: string; p_trigger: string; p_outcome: string }; Returns: undefined };
+      read_matter_generation_status: { Args: Record<string, never>; Returns: Json };
+      read_matter_retry_status: { Args: { p_now: string }; Returns: Json };
+
       prepare_matter_request_work: { Args: LeaseRpcArgs & { p_expected: Json }; Returns: undefined };
       admit_matter_request: { Args: { p_slot: string; p_key: string; p_markdown: boolean; p_recover: boolean; p_lease: Json | null }; Returns: Json };
       finish_matter_request: { Args: { p_slot: string; p_key: string; p_sequence: string; p_entry: Json; p_lease: Json | null }; Returns: undefined };

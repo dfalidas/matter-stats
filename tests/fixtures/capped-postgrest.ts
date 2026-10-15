@@ -103,7 +103,7 @@ export function cappedPostgrest(tables: Record<string, Row[]>, options: Options 
   const client = createClient<Database>("https://synthetic.invalid", "synthetic-test-key", {
     global: { fetch }, auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
-  return { client, requests };
+  return { client, requests, fetch };
 }
 
 function splitTerms(value: string): string[] {

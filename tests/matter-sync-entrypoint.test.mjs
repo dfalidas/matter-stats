@@ -112,15 +112,46 @@ test("R4 target (W4): manual→scheduled→manual preserves independent cursors 
   assert.equal(h.calls.length, calls); assert.deepEqual([...h.states], before);
 });
 
-test("busy account lease denies all trigger modes before any reads, writes or Matter", async () => {
+test("busy account lease records only invocation audit and denies ingestion or Matter", async () => {
   for (const mode of ["recent_activity_manual", "recent_activity_scheduled", "backfill_library", "backfill_sessions"]) {
-    const touched = [];
-    const deps = new Proxy({ acquireLease: async () => null, budgetClock: undefined }, {
+    const touched = [], audit = [];
+    const deps = new Proxy({ acquireLease: async () => null, budgetClock: undefined, recordInvocation: async (id, trigger, outcome) => audit.push({ id, trigger, outcome }) }, {
       get: (target, key) => key in target ? target[key] : async () => { touched.push(key); throw new Error("unexpected work"); },
     });
     const result = await syncMatterData(mode, {}, deps);
     assert.equal(result.skippedReason, "busy");
     assert.deepEqual(touched, []);
+    assert.deepEqual(audit.map(a => a.outcome), ["attempted", "skipped_locked"]);
+    assert.equal(audit[0].trigger, mode === "recent_activity_scheduled" ? "scheduled" : "manual");
+    assert.equal(audit[0].id, audit[1].id);
+  }
+});
+
+test("invocation audit, lease acquisition and run share one UUID without changing fencing", async () => {
+  for (const auditFails of [false, true]) {
+    const h = harness({ sessions: [page()] }), audit = [], events = [];
+    let owner;
+    h.deps.recordInvocation = async (id, trigger, outcome) => {
+      audit.push({ id, trigger, outcome }); events.push(outcome);
+      if (auditFails) throw new Error("synthetic audit unavailable");
+    };
+    h.deps.acquireLease = async (id) => {
+      owner = id; events.push("lease");
+      assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+      return { accountScope: "matter", owner: id, generation: "9007199254740993" };
+    };
+    h.deps.createRun = async (value, lease) => {
+      events.push("run"); assert.equal(lease.owner, owner); assert.equal(lease.generation, "9007199254740993");
+      return { ...value, id: lease.owner };
+    };
+    h.deps.updateRun = async (id, value, lease) => {
+      assert.equal(id, owner); assert.equal(lease.owner, owner); assert.equal(lease.generation, "9007199254740993");
+      return { id, ...value };
+    };
+    const result = await syncMatterData("recent_activity_scheduled", {}, h.deps);
+    assert.equal(result.ok, true); assert.equal(result.syncRunId, owner);
+    assert.deepEqual(audit.map(a => a.id), [owner, owner]); assert.equal(audit[0].trigger, "scheduled");
+    assert.deepEqual(events.slice(0, 3), ["attempted", "lease", "run"]);
   }
 });
 
