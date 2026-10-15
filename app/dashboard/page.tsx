@@ -1,12 +1,11 @@
 import { SyncStatusPanel } from "@/components/sync-status";
-import { loadSyncStatus, unavailableSyncStatus, type Evidence } from "@/lib/sync-status";
+import { loadSyncStatus, unavailableSyncStatus } from "@/lib/sync-status";
 import { PageShell } from "../_components/page-shell";
 import { DashboardOverview } from "./dashboard-overview";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { requireAccessSession } from "@/lib/require-auth";
 import { getDefaultMetricsTimezone, METRICS_PERIOD_PRESETS, type MetricsPeriodPreset } from "@/lib/metrics-service";
 import { getOverviewReadingMetrics, toOverviewClientPayload, loadOverviewLibrary } from "@/lib/overview-service";
-import type { MatterItem } from "@/lib/supabase-types";
 import { validateCustomRange } from "@/lib/custom-range";
 
 const DEFAULT_PERIOD: MetricsPeriodPreset = "week";
@@ -74,16 +73,15 @@ async function getDashboardMetrics(period: MetricsPeriodPreset, start: string | 
   try {
     const client = getSupabaseAdminClient();
     const [overviewMetrics, library] = await Promise.all([
-      getOverviewReadingMetrics(client, period, start, end, now, timezone),
+      getOverviewReadingMetrics(client, period, start, end, now, timezone)
+        .then(value => ({ ok: true as const, value }))
+        .catch(() => ({ ok: false as const })),
       loadOverviewLibrary(client),
     ]);
-    return {
-      ok: true as const,
-      ...toOverviewClientPayload(overviewMetrics),
-      library: library as Evidence<Pick<MatterItem, "id" | "title" | "source" | "author" | "word_count" | "estimated_reading_time_minutes" | "progress" | "status">[]>,
-    };
+    if (!overviewMetrics.ok) return { ok: false as const, message: "Reading metrics query unavailable. No zero totals have been substituted.", library };
+    return { ok: true as const, ...toOverviewClientPayload(overviewMetrics.value), library };
   } catch {
-    return { ok: false as const, message: "Reading metrics could not be queried. Synchronization status and library availability are independent; retry this page." };
+    return { ok: false as const, message: "Reading metrics query unavailable. Retry this page.", library: { state: "unavailable" as const } };
   }
 }
 export const maxDuration = 180;

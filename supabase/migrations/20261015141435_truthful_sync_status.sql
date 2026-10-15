@@ -47,7 +47,8 @@ begin
  if p_outcome='attempted' then
   insert into public.matter_invocation_status(trigger,id,attempted_at,outcome)
    values(p_trigger,p_id,clock_timestamp(),p_outcome)
-   on conflict(trigger) do update set id=excluded.id,attempted_at=excluded.attempted_at,outcome=excluded.outcome,finished_at=null;
+   on conflict(trigger) do update set id=excluded.id,attempted_at=excluded.attempted_at,outcome=excluded.outcome,finished_at=null
+   where public.matter_invocation_status.attempted_at<=excluded.attempted_at;
  else
   -- A late result cannot overwrite a newer attempt of the same trigger.
   update public.matter_invocation_status set outcome=p_outcome,finished_at=clock_timestamp()
@@ -76,15 +77,13 @@ $$;
 -- not a scheduling promise; exhausted/ambiguous chains need manual recovery.
 create function public.read_matter_retry_status(p_now timestamptz) returns jsonb
 language sql stable security invoker set search_path='' as $$
- with entries as (select e.value from public.matter_request_work w cross join lateral jsonb_each(w.requests) e),
+ with entries as (select w.slot,e.value from public.matter_request_work w cross join lateral jsonb_each(w.requests) e),
  retry as (select max((value->>'next_at')::timestamptz) deadline,
   coalesce(bool_or(value->>'pending'='true' or (value->>'attempts')::integer>=3 or value ? 'protocol' or value ? 'status'),false) manual,
-  count(*) filter(where not(value ? 'value')) pending
-  from entries where not(value ? 'value'))
- select jsonb_build_object('nextEligibleAt',greatest(r.deadline,q.not_before,
-  case when q.feedback_remaining=0 then q.feedback_until end,
-  case when cardinality(q.read_starts)>=120 then q.read_starts[1]+interval '60 seconds' end,
-  case when cardinality(q.burst_starts)>=5 then q.burst_starts[1]+interval '1 second' end),
+  count(*) pending from entries where not(value ? 'value')
+   and not(slot<>'bootstrap' and value ? 'status' and (value->>'status')::integer in (403,404)))
+ select jsonb_build_object('nextEligibleAt',greatest(r.deadline,
+  (public.evaluate_matter_quota(to_jsonb(q),p_now,false)->>'deadline')::timestamptz),
   'manualRecovery',r.manual,'pendingRequests',r.pending)
  from retry r cross join public.matter_quota q where q.account_scope='matter' and p_now is not null;
 $$;

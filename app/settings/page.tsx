@@ -58,7 +58,7 @@ export default async function SettingsPage() {
           <StatusCard
             title="Database connection"
             description="Server-side Supabase admin access used for sync diagnostics."
-            status={{ state: syncData.counts.every(c => c.result.state === "known") && syncData.status.freshness !== "unavailable" ? "connected" : "warning", label: syncData.counts.every(c => c.result.state === "known") && syncData.status.freshness !== "unavailable" ? "Reads available" : "Some reads unavailable", detail: "Each section reports its own availability. A failed query does not erase independent evidence." }}
+            status={{ state: syncData.counts.every(c => c.result.state === "known") && !syncData.status.hasUnavailableSections ? "connected" : "warning", label: syncData.counts.every(c => c.result.state === "known") && !syncData.status.hasUnavailableSections ? "Reads available" : "Some reads unavailable", detail: "Each section reports its own availability. A failed query does not erase independent evidence." }}
             icon={<Database className="h-5 w-5" aria-hidden />}
           />
         </div>

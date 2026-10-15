@@ -1,3 +1,4 @@
+import estimation from "./estimation-contract.json";
 import type { MatterStatsSupabaseClient } from './supabase-queries';
 import type { MatterSyncStream, Tables } from './supabase-types';
 
@@ -65,7 +66,7 @@ export function deriveSyncStatus(input: StatusInputs, now: Date, timezone: strin
       trigger: 'unknown', evidence: 'run log' });
   } else if (input.runs.state === 'unavailable') lastAttempt = unavailable;
   const lease = input.lease.state === 'known' ? known({ state: !input.lease.value.occupied ? 'idle' : input.lease.value.expiresAt && Date.parse(input.lease.value.expiresAt) > ms ? 'active' : 'expired', expiresAt: input.lease.value.expiresAt }) : input.lease;
-  const activeStreams = input.streams.state === 'known' ? known(input.streams.value.filter(s=>s.cycle_active).map(s=>({stream:s.stream, startedAt:s.cycle_started_at, window:s.coverage_window}))) : input.streams;
+  const activeStreams = input.streams.state === 'known' && !['recent_sessions','library_items'].every(name => input.streams.state === 'known' && input.streams.value.some(s => s.stream === name)) ? absent : input.streams.state === 'known' ? known(input.streams.value.filter(s=>s.cycle_active).map(s=>({stream:s.stream, startedAt:s.cycle_started_at, window:s.coverage_window}))) : input.streams;
   const deadlines = [input.retry.state === 'known' ? input.retry.value.nextEligibleAt : null,
     input.legacyCooldown.state === 'known' ? input.legacyCooldown.value : null,
     ...(input.streams.state === 'known' ? input.streams.value.map(s=>s.retry_at) : [])]
@@ -77,34 +78,42 @@ export function deriveSyncStatus(input: StatusInputs, now: Date, timezone: strin
     : gen?.frozen ? 'writer barrier frozen' : input.dirtyRollups.value > 0 ? 'pending dirty rollups'
     : gen?.candidate ? `historical repair ${gen.candidate.state}; not applied`
     : !gen?.active?.reconciled || !gen.active.cutover ? 'legacy / unverified'
-    : gen.active.timezone !== timezone ? 'timezone mismatch' : 'ready';
+    : gen.active.timezone !== timezone ? 'timezone mismatch'
+    : gen.active.wordMethod !== estimation.wordMethod || gen.active.calendarMethod !== estimation.calendarMethod ? 'calculation method mismatch' : 'ready';
   const completionText = (c: Completion) => c.state === 'known' ? statusTimestamp(c.at,timezone) : c.state === 'never' ? 'Never completed' : c.state === 'unknown' ? 'Unknown completion time' : 'Unavailable';
   const summary = freshness === 'fresh' ? 'Sessions completion is recent' : freshness === 'stale' ? 'Sessions completion is stale'
     : freshness === 'never' ? 'No completed sessions synchronization yet' : freshness === 'unknown' ? 'Sessions completion time unknown' : 'Sessions status unavailable';
   const details: StatusView['details'] = [
-    {label:'Last attempted invocation',value:lastAttempt.state === 'known' ? `${statusTimestamp(lastAttempt.value.attemptedAt,timezone)} · ${lastAttempt.value.outcome} · trigger ${lastAttempt.value.trigger} (${lastAttempt.value.evidence})` : lastAttempt.state === 'absent' ? 'No recorded invocation; unrecorded attempts unknown' : 'Unavailable'},
+    {label:'Last recorded invocation attempt',value:lastAttempt.state === 'known' ? `${statusTimestamp(lastAttempt.value.attemptedAt,timezone)} · ${lastAttempt.value.outcome} · trigger ${lastAttempt.value.trigger} (${lastAttempt.value.evidence})` : lastAttempt.state === 'absent' ? 'No recorded invocation; unrecorded attempts unknown' : 'Unavailable'},
     {label:'Last completed sessions cycle',value:completionText(sessions)},
     {label:'Last completed metadata cycle',value:completionText(metadata)},
     {label:'Sessions freshness policy',value:`Warning at elapsed time ≥ ${thresholdHours} hours since proven sessions completion`},
-    {label:'Sessions source boundary',value:sessions.state === 'known' ? statusTimestamp(sessions.sourceBoundary,timezone) : 'Unknown; not a completion timestamp'},
-    {label:'Metadata source boundary',value:metadata.state === 'known' ? statusTimestamp(metadata.sourceBoundary,timezone) : 'Unknown; not a completion timestamp'},
+    {label:'Sessions source boundary',value:sessions.state === 'known' ? statusTimestamp(sessions.sourceBoundary,timezone) : sourceBoundary(input,'recent_sessions',timezone)},
+    {label:'Metadata source boundary',value:metadata.state === 'known' ? statusTimestamp(metadata.sourceBoundary,timezone) : sourceBoundary(input,'library_items',timezone)},
     {label:'Newest imported session occurrence',value:input.newestSession.state === 'known' ? statusTimestamp(input.newestSession.value,timezone) : input.newestSession.state === 'absent' ? 'No dated imported sessions' : 'Unavailable'},
-    {label:'Ingestion / continuation',value:activeStreams.state === 'known' ? activeStreams.value.length ? `Partial ingestion; pending continuation: ${activeStreams.value.map(s=>`${s.stream} (${s.window ?? 'pinned scope'})`).join(', ')}` : 'No active stream cycle' : 'Unavailable'},
+    {label:'Ingestion / continuation',value:activeStreams.state === 'known' ? activeStreams.value.length ? `Partial ingestion; pending continuation: ${activeStreams.value.map(s=>`${s.stream} (${s.window ?? 'pinned scope'})`).join(', ')}` : 'No active stream cycle' : activeStreams.state === 'absent' ? 'Stream state absent; continuation unknown' : 'Unavailable'},
     {label:'Session history intent',value:input.continuation.state === 'known' ? `${input.continuation.value.history_status} · available-session enumeration only` : 'Unavailable'},
     {label:'Lease',value:lease.state === 'known' ? `${lease.value.state}${lease.value.expiresAt ? ` · expiry ${statusTimestamp(lease.value.expiresAt,timezone)}` : ''}. Lease validity does not prove worker progress.` : 'Unavailable'},
     {label:'Retry / cooldown',value:retry.state === 'known' ? `${retry.value.nextEligibleAt ? `Next eligible ${statusTimestamp(retry.value.nextEligibleAt,timezone)}` : 'No future cooldown recorded'}; ${retry.value.pendingRequests} pending request chains${retry.value.manualRecovery ? '; deliberate manual recovery required' : ''}` : 'Unavailable'},
     {label:'Pending dirty rollups',value:input.dirtyRollups.state === 'known' ? `${input.dirtyRollups.value} dates` : 'Unavailable'},
     {label:'Analytics reader',value:`Overview / Activity / Reports calculate canonical values from imported raw sessions: round each session duration / 60 × 225, then sum; local occurrence day in ${timezone}. Historical persisted repair does not gate these metrics. Query failures are shown by the serving page.`},
     {label:'Persisted derived readiness',value:derived},
-    {label:'Active derived generation',value:gen ? `${gen.activeId ?? 'legacy'} · epoch ${gen.epoch}${gen.rolledBack ? ' · rollback applied' : ''}${gen.active ? ` · ${gen.active.timezone} · ${gen.active.wordMethod} · ${gen.active.calendarMethod}` : ''}` : 'Unavailable'},
-    {label:'Derived readiness evidence time',value:gen?.active?.reconciled && gen.active.cutover && gen.active.readinessAt ? `${statusTimestamp(gen.active.readinessAt,timezone)} · active generation reconciliation; current readiness also requires no pending work` : gen ? 'Unknown; no proven active canonical reconciliation time' : 'Unavailable'},
+    {label:'Active derived generation',value:gen ? `${gen.activeId ?? 'legacy'} · epoch ${gen.epoch}${gen.rolledBack ? ' · rollback applied' : gen.active?.cutover ? ' · active cutover applied' : ''}${gen.active ? ` · ${gen.active.timezone} · ${gen.active.wordMethod} · ${gen.active.calendarMethod}` : ''}` : 'Unavailable'},
+    {label:'Active reconciliation evidence time',value:gen?.active?.reconciled && gen.active.cutover && gen.active.readinessAt ? `${statusTimestamp(gen.active.readinessAt,timezone)} · active generation reconciliation; current readiness also requires no pending work` : gen ? 'Unknown; no proven active canonical reconciliation time' : 'Unavailable'},
+    {label:'Current derived readiness time',value:gen ? 'Unknown; no durable timestamp records when the last dirty acknowledgement made current data ready.' : 'Unavailable'},
     {label:'Historical repair',value:gen ? gen.candidate ? `${gen.candidate.state}${gen.candidate.reconciled && !gen.candidate.pendingChanges ? ' · reconciled candidate' : ' · reconciliation unresolved'}; not applied${gen.frozen ? ' · session/daily writers frozen' : ''}` : `No candidate${gen.frozen ? ' · session/daily writers frozen' : ''}` : 'Unavailable'},
     {label:'Upstream historical coverage',value:'Unverified. Imported dates/counts, incremental exhaustion and local reconciliation do not prove complete Matter history.'},
     {label:'Session-to-item attribution',value:'Unsupported for sessions without a documented item identifier. Another metadata sync is not guaranteed to resolve attribution.'},
     {label:'Scheduled execution',value:input.attempts.state === 'known' && input.attempts.value.some(a=>a.trigger==='scheduled') ? 'A scheduled-trigger invocation was observed; delivery reliability and production verification remain external gates.' : input.attempts.state === 'unavailable' ? 'Observation unavailable; cron configuration is not execution evidence.' : 'Cron configured for 06:00 UTC; no reliable scheduled-trigger evidence recorded. Production verification remains external.'},
   ];
-  return { sessions, metadata, freshness, lastAttempt, lease, activeStreams, retry, derived, coverage:'unverified' as const,
+  return { sessions, metadata, freshness, lastAttempt, lease, activeStreams, retry, derived, hasUnavailableSections: Object.values(input).some(e => e.state === 'unavailable'), coverage:'unverified' as const,
     view:{summary:`${summary} · Metadata: ${completionText(metadata)} · Coverage unverified`,warning:freshness!=='fresh',details} };
+}
+
+function sourceBoundary(input: StatusInputs, name: string, timezone: string) {
+  if (input.streams.state === 'unavailable') return 'Unavailable';
+  const value = input.streams.state === 'known' ? input.streams.value.find(s => s.stream === name)?.completed_watermark : null;
+  return value ? `${statusTimestamp(value, timezone)} · source boundary only; completion time unknown` : 'No recorded source boundary';
 }
 
 /** Server request-owned, bounded reads. Every section checks error/null data. */

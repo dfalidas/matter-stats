@@ -200,6 +200,7 @@ test("actual dashboard actions revalidate all paths after authorized success and
     assert.deepEqual(await dashboardActions.getMatterSyncAvailabilityAction(), { rateLimitedUntil: null, message: null });
     const returned = await dashboardActions.syncMatterAction(null);
     assert.equal(returned.ok, result.ok);
+    assert.equal("syncRunId" in returned, false);
     assert.match(returned.message, /Durable status: Sessions status unavailable/);
     assert.ok(returned.message.startsWith(result.message));
     assert.equal(syncState.availabilityCalls, 1); assert.equal(syncState.syncCalls, 1);

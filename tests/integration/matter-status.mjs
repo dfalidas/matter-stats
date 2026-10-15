@@ -62,14 +62,14 @@ try{
   const password=`synthetic-${crypto.randomUUID()}`;
   const created=await service.auth.admin.createUser({email:`status-${crypto.randomUUID()}@example.test`,password,email_confirm:true});assertSuccessful(created,'create status security user');user=created.data.user.id;
   assertSuccessful(await authenticated.auth.signInWithPassword({email:created.data.user.email,password}),'authenticate status security user');
-  for(const client of [anon,authenticated]){
+  for(const [role,client] of [["anon",anon],["authenticated",authenticated]]){
     for(const table of STATUS_TABLES){
       const fixture=table==='matter_cycle_completions'?{stream:'recent_sessions',cycle_generation:1,source_boundary:'2026-10-01T00:00:00Z',completed_at:'2026-10-01T01:00:00Z'}:{trigger:'manual',id:crypto.randomUUID(),attempted_at:'2026-10-01T00:00:00Z',outcome:'attempted'};
       const key=table==='matter_cycle_completions'?'stream':'trigger',value=fixture[key];
-      for(const response of [await client.from(table).select('*'),await client.from(table).insert(fixture),await client.from(table).update(fixture).eq(key,value),await client.from(table).delete().eq(key,value)])assertGrantDenied(response,table);
+      for(const [index,response] of [await client.from(table).select('*'),await client.from(table).insert(fixture),await client.from(table).update(fixture).eq(key,value),await client.from(table).delete().eq(key,value)].entries())assertGrantDenied(response,{role,operation:['SELECT','INSERT','UPDATE','DELETE'][index],kind:'table',name:table});
     }
     const payloads={'record_matter_cycle_completion':{},record_matter_invocation:{p_id:crypto.randomUUID(),p_trigger:'manual',p_outcome:'attempted'},read_matter_generation_status:{},read_matter_retry_status:{p_now:new Date().toISOString()}};
-    for(const signature of STATUS_FUNCTION_SIGNATURES){const name=signature.split('(')[0];assertGrantDenied(await client.rpc(name,payloads[name]),name);}
+    for(const signature of STATUS_FUNCTION_SIGNATURES){const name=signature.split('(')[0];assertGrantDenied(await client.rpc(name,payloads[name]),{role,operation:'EXECUTE',kind:'function',name});}
   }
   checks.push('Every new table CRUD and exact function signature denied through real Data API to anonymous and authenticated roles; service-role controls succeed.');
 }finally{

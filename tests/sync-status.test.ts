@@ -103,3 +103,8 @@ test('status queries do not change canonical metric totals',async()=>{
   await loadSyncStatus(client,now,'Europe/Athens');const after=await getOverviewReadingMetrics(client,'all-time',null,null,now,'Europe/Athens');
   assert.equal(first.metrics.totals.wordsRead,225);assert.equal(first.metrics.totals.totalReadingTimeSeconds,60);assert.deepEqual(after,first);
 });
+
+test('an absent stream is explicit and cannot certify idle ingestion',()=>{
+  const i=inputs();i.streams=known([]);const s=derive(i);
+  assert.equal(s.activeStreams.state,'absent');assert.match(s.view.details.find(d=>d.label==='Ingestion / continuation')!.value,/absent.*unknown/);
+});

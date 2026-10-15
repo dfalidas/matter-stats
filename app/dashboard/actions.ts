@@ -31,7 +31,9 @@ export async function syncMatterAction(previousState: SyncMatterActionState, for
       let status;
       try { status = await loadSyncStatus(getSupabaseAdminClient(), now, timezone); }
       catch { status = unavailableSyncStatus(now, timezone); }
-      return { ...outcome, message: `${outcome.message} Durable status: ${status.view.summary}.` };
+      const clientOutcome = { ...outcome };
+      delete clientOutcome.syncRunId; // Run IDs are also lease owners; the UI does not need them.
+      return { ...clientOutcome, message: `${outcome.message} Durable status: ${status.view.summary}.` };
     },
     afterSync: revalidateDashboardPaths,
   });
