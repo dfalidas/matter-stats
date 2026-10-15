@@ -96,3 +96,11 @@ test("complete legacy snapshot comparison detects tag, run, and session changes"
     assert.throws(() => assertLegacyPreserved(snapshot, changed), /upgrade changed legacy/);
   }
 });
+
+test("Task 20 upgrade snapshot excludes not-yet-installed Task 21 evidence but includes generation state", async () => {
+  const { PRE_STATUS_TABLES } = await import("../scripts/stabilization-db-orchestrator.mjs");
+  assert.ok(PRE_STATUS_TABLES.includes("reading_generation_control"));
+  assert.ok(PRE_STATUS_TABLES.includes("matter_sync_streams"));
+  assert.ok(!PRE_STATUS_TABLES.includes("matter_cycle_completions"));
+  assert.ok(!PRE_STATUS_TABLES.includes("matter_invocation_status"));
+});
