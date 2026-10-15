@@ -33,7 +33,8 @@ export async function syncMatterAction(previousState: SyncMatterActionState, for
       catch { status = unavailableSyncStatus(now, timezone); }
       const clientOutcome = { ...outcome };
       delete clientOutcome.syncRunId; // Run IDs are also lease owners; the UI does not need them.
-      return { ...clientOutcome, message: `${outcome.message} Durable status: ${status.view.summary}.` };
+      const attempt = status.view.details.find(detail => detail.label === "Last recorded invocation attempt")!;
+      return { ...clientOutcome, message: `${outcome.message} Durable status: ${status.view.summary}. ${attempt.label}: ${attempt.value}.` };
     },
     afterSync: revalidateDashboardPaths,
   });

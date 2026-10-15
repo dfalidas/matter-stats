@@ -216,14 +216,14 @@ export async function syncMatterData(
     catch { console.error("Matter invocation evidence unavailable"); }
   };
   await record("attempted");
-  const result = await withMatterInvocationBudget(budget, () => runMatterInvocation(mode, options, deps, budget));
+  const result = await withMatterInvocationBudget(budget, () => runMatterInvocation(mode, options, deps, budget, id));
   await record(result.skippedReason === "busy" ? "skipped_locked" : result.skippedReason === "rate_limited" ? "skipped_rate_limited"
     : result.status === "partial" ? "partial" : result.ok ? "complete" : "error");
   return result;
 }
 
 async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivityWindow?: MatterRecentActivityWindow },
-  deps: MatterSyncRuntimeDeps, budget: MatterInvocationBudget): Promise<MatterSyncResult> {
+  deps: MatterSyncRuntimeDeps, budget: MatterInvocationBudget, invocationId: string): Promise<MatterSyncResult> {
   let lease: MatterSyncLease | null = null;
   let syncRunId: string | null = null;
   let activeCycle: ActiveMatterCycle | null = null;
@@ -235,7 +235,7 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
     || ((mode === "recent_activity_manual" || mode === "recent_activity") && options.recentActivityWindow === "all");
   let stop: MatterBudgetStop | null = null;
   try {
-    lease = await deps.acquireLease();
+    lease = await deps.acquireLease(invocationId);
     if (!lease) return { ok: false, skippedReason: "busy", message: "Matter sync is already running for this account. Try again shortly." };
     leaseRpcArgs(lease);
     let intent = explicitHistory ? await deps.requestHistory(lease) : await deps.getContinuation();

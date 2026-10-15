@@ -14,12 +14,14 @@ export type GenerationEvidence = {
   candidate: { state: string; timezone: string; readinessAt: string | null; reconciled: boolean; pendingChanges: boolean } | null;
 };
 type RetryEvidence = { nextEligibleAt: string | null; manualRecovery: boolean; pendingRequests: number };
-type Attempt = { attemptedAt: string; outcome: string; trigger: string; evidence: 'invocation' | 'run log' };
+type Attempt = { attemptedAt: string; outcome: string; trigger: string; evidence: 'invocation' | 'run log' | 'invocation + run log' };
+type AttemptEvidence = Evidence<Attempt> | { state: 'uncertain'; reason: string; observations: Attempt[] };
+type RunEvidence = Pick<Tables<'sync_runs'>, 'id' | 'started_at' | 'finished_at' | 'status' | 'matter_has_more'>;
 export type StatusInputs = {
   streams: Evidence<Pick<MatterSyncStream, 'stream' | 'cycle_active' | 'cycle_started_at' | 'completed_watermark' | 'retry_at' | 'coverage_window' | 'transition_status'>[]>;
   completions: Evidence<Tables<'matter_cycle_completions'>[]>;
   attempts: Evidence<Tables<'matter_invocation_status'>[]>;
-  runs: Evidence<Pick<Tables<'sync_runs'>, 'started_at' | 'finished_at' | 'status' | 'matter_has_more'>[]>;
+  runs: Evidence<RunEvidence[]>;
   newestSession: Evidence<string>;
   continuation: Evidence<{ history_status: string; requested_at: string | null }>;
   lease: Evidence<{ occupied: boolean; expiresAt: string | null }>;
@@ -39,6 +41,50 @@ export function statusTimestamp(value: string, timezone: string): string {
   if (!Number.isFinite(Date.parse(value))) return 'Unknown';
   return `${new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone }).format(new Date(value))} (${timezone})`;
 }
+
+function runOutcome(run: RunEvidence): string {
+  return run.status === 'success' ? run.matter_has_more === true ? 'partial' : 'success (cycle completion not established)'
+    : run.status === 'running' ? 'outcome unknown (unfinished log)' : run.status;
+}
+
+/** IDs are used only here for exact correlation; never returned to the client.
+ * An audit starts before its run, so correlated records use the audit start.
+ * Legacy/different IDs are independent evidence, regardless of time proximity.
+ */
+function selectLastAttempt(attempts: StatusInputs['attempts'], runs: StatusInputs['runs']): AttemptEvidence {
+  const audits = attempts.state === 'known' ? attempts.value : [];
+  const logs = runs.state === 'known' ? runs.value : [];
+  const observations: Attempt[] = audits.map(a => {
+    const run = logs.find(r => r.id === a.id);
+    let outcome = a.outcome;
+    if (run && a.outcome === 'attempted') outcome = runOutcome(run);
+    // A terminal audit may follow a running-row snapshot. An error row cannot
+    // support a contradictory successful audit, even when the IDs match.
+    else if (run && (run.status === 'error' && a.outcome !== 'error'
+      || run.status === 'success' && a.outcome.startsWith('skipped_'))) {
+      outcome = `Conflicting outcomes: invocation ${a.outcome}; run log ${runOutcome(run)}`;
+    }
+    return { attemptedAt: a.attempted_at, outcome, trigger: a.trigger, evidence: run ? 'invocation + run log' : 'invocation' };
+  });
+  for (const run of logs) {
+    if (!audits.some(a => a.id === run.id)) observations.push({ attemptedAt: run.started_at,
+      outcome: runOutcome(run), trigger: 'unknown', evidence: 'run log' });
+  }
+  const missing = attempts.state === 'unavailable' || runs.state === 'unavailable';
+  if (!observations.length) return missing ? unavailable : absent;
+  const invalid = observations.some(a => !Number.isFinite(Date.parse(a.attemptedAt)));
+  const latest = invalid ? observations : observations.filter(a => Date.parse(a.attemptedAt)
+    === Math.max(...observations.map(a => Date.parse(a.attemptedAt))));
+  if (missing || invalid || latest.length !== 1) return { state: 'uncertain', observations: latest,
+    reason: missing ? 'Latest attempt unknown: invocation or run evidence unavailable'
+      : 'Latest attempt unknown: timestamp ordering ambiguous' };
+  return known(latest[0]);
+}
+
+function attemptText(attempt: Attempt, timezone: string): string {
+  return `${statusTimestamp(attempt.attemptedAt,timezone)} · ${attempt.outcome} · trigger ${attempt.trigger} (${attempt.evidence})`;
+}
+
 export function deriveSyncStatus(input: StatusInputs, now: Date, timezone: string, thresholdHours = staleHours()) {
   const ms = now.getTime();
   const completion = (stream: string): Completion => {
@@ -56,15 +102,7 @@ export function deriveSyncStatus(input: StatusInputs, now: Date, timezone: strin
   const freshness = sessions.state === 'known'
     ? ms - Date.parse(sessions.at) >= thresholdHours * 3_600_000 ? 'stale' : 'fresh'
     : sessions.state;
-  let lastAttempt: Evidence<Attempt> = input.attempts.state === 'unavailable' ? unavailable : absent;
-  if (input.attempts.state === 'known' && input.attempts.value.length) {
-    const a = [...input.attempts.value].sort((a,b) => Date.parse(b.attempted_at)-Date.parse(a.attempted_at))[0];
-    lastAttempt = known({ attemptedAt: a.attempted_at, outcome: a.outcome, trigger: a.trigger, evidence: 'invocation' });
-  } else if (input.attempts.state !== 'unavailable' && input.runs.state === 'known' && input.runs.value.length) {
-    const r = input.runs.value[0];
-    lastAttempt = known({ attemptedAt: r.started_at, outcome: r.status === 'success' ? r.matter_has_more === true ? 'partial' : 'success (cycle completion not established)' : r.status === 'running' ? 'outcome unknown (unfinished log)' : r.status,
-      trigger: 'unknown', evidence: 'run log' });
-  } else if (input.runs.state === 'unavailable') lastAttempt = unavailable;
+  const lastAttempt = selectLastAttempt(input.attempts, input.runs);
   const lease = input.lease.state === 'known' ? known({ state: !input.lease.value.occupied ? 'idle' : input.lease.value.expiresAt && Date.parse(input.lease.value.expiresAt) > ms ? 'active' : 'expired', expiresAt: input.lease.value.expiresAt }) : input.lease;
   const activeStreams = input.streams.state === 'known' && !['recent_sessions','library_items'].every(name => input.streams.state === 'known' && input.streams.value.some(s => s.stream === name)) ? absent : input.streams.state === 'known' ? known(input.streams.value.filter(s=>s.cycle_active).map(s=>({stream:s.stream, startedAt:s.cycle_started_at, window:s.coverage_window}))) : input.streams;
   const deadlines = [input.retry.state === 'known' ? input.retry.value.nextEligibleAt : null,
@@ -84,7 +122,9 @@ export function deriveSyncStatus(input: StatusInputs, now: Date, timezone: strin
   const summary = freshness === 'fresh' ? 'Sessions completion is recent' : freshness === 'stale' ? 'Sessions completion is stale'
     : freshness === 'never' ? 'No completed sessions synchronization yet' : freshness === 'unknown' ? 'Sessions completion time unknown' : 'Sessions status unavailable';
   const details: StatusView['details'] = [
-    {label:'Last recorded invocation attempt',value:lastAttempt.state === 'known' ? `${statusTimestamp(lastAttempt.value.attemptedAt,timezone)} · ${lastAttempt.value.outcome} · trigger ${lastAttempt.value.trigger} (${lastAttempt.value.evidence})` : lastAttempt.state === 'absent' ? 'No recorded invocation; unrecorded attempts unknown' : 'Unavailable'},
+    {label:'Last recorded invocation attempt',value:lastAttempt.state === 'known' ? attemptText(lastAttempt.value,timezone)
+      : lastAttempt.state === 'uncertain' ? `${lastAttempt.reason}. Available observations: ${lastAttempt.observations.map(a => attemptText(a,timezone)).join('; ')}`
+      : lastAttempt.state === 'absent' ? 'No recorded invocation; unrecorded attempts unknown' : 'Unavailable; latest attempt unknown'},
     {label:'Last completed sessions cycle',value:completionText(sessions)},
     {label:'Last completed metadata cycle',value:completionText(metadata)},
     {label:'Sessions freshness policy',value:`Warning at elapsed time ≥ ${thresholdHours} hours since proven sessions completion`},
@@ -123,7 +163,8 @@ export async function loadSyncStatus(client: MatterStatsSupabaseClient, now: Dat
     read(client.from('matter_sync_streams').select('stream,cycle_active,cycle_started_at,completed_watermark,retry_at,coverage_window,transition_status').limit(2)),
     read(client.from('matter_cycle_completions').select('stream,cycle_generation,source_boundary,completed_at').limit(2)),
     read(client.from('matter_invocation_status').select('trigger,id,attempted_at,outcome,finished_at').limit(3)),
-    read(client.from('sync_runs').select('started_at,finished_at,status,matter_has_more').order('started_at',{ascending:false}).limit(1)),
+    // Two rows expose tied latest starts instead of silently choosing one.
+    read(client.from('sync_runs').select('id,started_at,finished_at,status,matter_has_more').order('started_at',{ascending:false}).order('id').limit(2)),
     read(client.from('reading_sessions').select('started_at').not('started_at','is',null).order('started_at',{ascending:false}).limit(1).maybeSingle()),
     read(client.from('matter_sync_continuation').select('history_status,requested_at').eq('account_scope','matter').single()),
     // No owner token is selected. expires_at is set exactly when occupied.

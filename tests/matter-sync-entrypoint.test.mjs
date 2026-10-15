@@ -127,6 +127,34 @@ test("busy account lease records only invocation audit and denies ingestion or M
   }
 });
 
+test("invocation audit, lease acquisition and run share one UUID without changing fencing", async () => {
+  for (const auditFails of [false, true]) {
+    const h = harness({ sessions: [page()] }), audit = [], events = [];
+    let owner;
+    h.deps.recordInvocation = async (id, trigger, outcome) => {
+      audit.push({ id, trigger, outcome }); events.push(outcome);
+      if (auditFails) throw new Error("synthetic audit unavailable");
+    };
+    h.deps.acquireLease = async (id) => {
+      owner = id; events.push("lease");
+      assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+      return { accountScope: "matter", owner: id, generation: "9007199254740993" };
+    };
+    h.deps.createRun = async (value, lease) => {
+      events.push("run"); assert.equal(lease.owner, owner); assert.equal(lease.generation, "9007199254740993");
+      return { ...value, id: lease.owner };
+    };
+    h.deps.updateRun = async (id, value, lease) => {
+      assert.equal(id, owner); assert.equal(lease.owner, owner); assert.equal(lease.generation, "9007199254740993");
+      return { id, ...value };
+    };
+    const result = await syncMatterData("recent_activity_scheduled", {}, h.deps);
+    assert.equal(result.ok, true); assert.equal(result.syncRunId, owner);
+    assert.deepEqual(audit.map(a => a.id), [owner, owner]); assert.equal(audit[0].trigger, "scheduled");
+    assert.deepEqual(events.slice(0, 3), ["attempted", "lease", "run"]);
+  }
+});
+
 test("lease infrastructure and invalid context fail closed before Matter or writes", async () => {
   for (const acquireLease of [async () => { throw new Error("RPC unavailable"); }, async () => ({ accountScope: "matter", owner: "bad", generation: "1" })]) {
     const h = harness();

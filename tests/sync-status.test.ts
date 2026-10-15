@@ -12,7 +12,7 @@ function inputs(): StatusInputs {
   return {streams:known(['recent_sessions','library_items'].map(stream=>({stream,cycle_active:false,cycle_started_at:null,completed_watermark:'2026-10-12T00:00:00Z',retry_at:null,coverage_window:null,transition_status:'native'}))),
     completions:known([{stream:'recent_sessions',cycle_generation:1,source_boundary:'2026-10-12T00:00:00Z',completed_at:completed}]),
     attempts:known([{id:'new',trigger:'manual',attempted_at:'2026-10-15T11:59:00Z',finished_at:'2026-10-15T11:59:30Z',outcome:'partial'}]),
-    runs:known([{started_at:'2026-10-15T11:59:00Z',finished_at:'2026-10-15T11:59:30Z',status:'success',matter_has_more:true}]),
+    runs:known([{id:'new',started_at:'2026-10-15T11:59:00Z',finished_at:'2026-10-15T11:59:30Z',status:'success',matter_has_more:true}]),
     newestSession:known('2026-10-15T11:55:00Z'),continuation:known({history_status:'none',requested_at:null}),lease:known({occupied:false,expiresAt:null}),retry:known({nextEligibleAt:null,manualRecovery:false,pendingRequests:0}),legacyCooldown:absent,dirtyRollups:known(0),generation:known(structuredClone(gen))};
 }
 const derive = (input:StatusInputs, clock=now, hours=36)=>deriveSyncStatus(input,clock,'Europe/Athens',hours);
@@ -45,7 +45,7 @@ test('missing history, never completed, legacy timestamps and unavailable reads 
   i.completions=unavailable;assert.equal(derive(i).freshness,'unavailable');assert.equal(derive(i).lastAttempt.state,'absent');
 });
 test('unknown legacy trigger and old running log never imply active worker',()=>{
-  const i=inputs();i.attempts=known([]);i.runs=known([{started_at:completed,finished_at:null,status:'running',matter_has_more:null}]);
+  const i=inputs();i.attempts=known([]);i.runs=known([{id:'legacy-private-run',started_at:completed,finished_at:null,status:'running',matter_has_more:null}]);
   const s=derive(i);assert.equal(s.lease.state,'known');assert.ok(s.lastAttempt.state==='known');assert.equal(s.lastAttempt.value.trigger,'unknown');assert.match(s.lastAttempt.value.outcome,/unknown/);
 });
 test('lease expiry boundary and pending retry/manual recovery are explicit',()=>{
@@ -107,4 +107,95 @@ test('status queries do not change canonical metric totals',async()=>{
 test('an absent stream is explicit and cannot certify idle ingestion',()=>{
   const i=inputs();i.streams=known([]);const s=derive(i);
   assert.equal(s.activeStreams.state,'absent');assert.match(s.view.details.find(d=>d.label==='Ingestion / continuation')!.value,/absent.*unknown/);
+});
+
+const audit = (id: string, at: string, outcome = 'complete', trigger = 'manual') => ({
+  id, attempted_at: at, outcome, trigger, finished_at: outcome === 'attempted' ? null : at,
+});
+const run = (id: string, at: string, status = 'error', more: boolean | null = null) => ({
+  id, started_at: at, status, finished_at: status === 'running' ? null : at, matter_has_more: more,
+});
+const attemptDetail = (s: ReturnType<typeof derive>) => s.view.details[0].value;
+const earlier = '2026-10-15T10:00:00Z', later = '2026-10-15T11:00:00Z';
+test('newer failed or unfinished run cannot be hidden by an older successful audit', () => {
+  for (const status of ['error', 'running']) {
+    const i = inputs(); i.attempts = known([audit('private-old', earlier)]);
+    i.runs = known([run('private-new', later, status)]);
+    const s = derive(i); assert.ok(s.lastAttempt.state === 'known');
+    assert.equal(s.lastAttempt.value.evidence, 'run log'); assert.equal(s.lastAttempt.value.trigger, 'unknown');
+    assert.match(attemptDetail(s), status === 'error' ? /error/ : /unknown \(unfinished log\)/);
+    assert.doesNotMatch(attemptDetail(s), /complete|private/);
+    assert.deepEqual(s.sessions, derive(inputs()).sessions); assert.equal(s.derived, derive(inputs()).derived);
+    assert.equal(s.freshness, 'stale');
+  }
+});
+test('exact ID correlation retains audit trigger/outcome despite normal audit-before-run ordering', () => {
+  for (const [outcome, status, more] of [['complete', 'success', false], ['partial', 'success', true], ['error', 'error', null], ['complete', 'running', null]] as const) {
+    const i = inputs(); i.attempts = known([audit('private-shared', earlier, outcome, 'scheduled')]);
+    i.runs = known([run('private-shared', later, status, more)]);
+    const s = derive(i); assert.ok(s.lastAttempt.state === 'known');
+    assert.deepEqual(s.lastAttempt.value, { attemptedAt: earlier, outcome, trigger: 'scheduled', evidence: 'invocation + run log' });
+    assert.doesNotMatch(JSON.stringify(s), /private-shared/);
+  }
+});
+test('an initial-only correlated audit retains trigger but uses failed/unfinished run evidence', () => {
+  for (const status of ['error', 'running', 'success']) {
+    const i = inputs(); i.attempts = known([audit('private-shared', earlier, 'attempted', 'scheduled')]);
+    i.runs = known([run('private-shared', later, status)]);
+    const s = derive(i); assert.ok(s.lastAttempt.state === 'known'); assert.equal(s.lastAttempt.value.trigger, 'scheduled');
+    assert.match(s.lastAttempt.value.outcome, status === 'error' ? /error/ : status === 'running' ? /unknown/ : /cycle completion not established/);
+    assert.equal(s.freshness, 'stale'); assert.doesNotMatch(JSON.stringify(s), /private-shared/);
+  }
+});
+test('conflicting correlated outcomes remain explicit instead of presenting a success', () => {
+  const i = inputs(); i.attempts = known([audit('shared', earlier)]); i.runs = known([run('shared', later)]);
+  assert.match(attemptDetail(derive(i)), /Conflicting outcomes: invocation complete; run log error/);
+});
+test('newer audit-only skipped attempts win even if the older correlated run was created later', () => {
+  for (const outcome of ['skipped_locked', 'skipped_rate_limited']) {
+    const i = inputs(); i.attempts = known([audit('private-new', later, outcome, 'scheduled'), audit('private-old', earlier)]);
+    i.runs = known([run('private-old', '2026-10-15T11:01:00Z', 'success', false)]);
+    const s = derive(i); assert.ok(s.lastAttempt.state === 'known'); assert.equal(s.lastAttempt.value.outcome, outcome);
+    assert.equal(s.lastAttempt.value.evidence, 'invocation'); assert.equal(s.lastAttempt.value.trigger, 'scheduled');
+  }
+});
+test('close timestamps never correlate distinct IDs; equal/invalid/sub-millisecond ordering stays explicit', () => {
+  const i = inputs(); i.attempts = known([audit('private-audit', earlier)]);
+  i.runs = known([run('private-run', '2026-10-15T10:00:00.001Z')]);
+  let s = derive(i); assert.ok(s.lastAttempt.state === 'known'); assert.equal(s.lastAttempt.value.trigger, 'unknown');
+  for (const at of [earlier, 'not-an-instant', '2026-10-15T10:00:00.000001Z']) {
+    i.runs = known([run('private-run', at)]); s = derive(i);
+    assert.equal(s.lastAttempt.state, 'uncertain'); assert.match(attemptDetail(s), /ordering ambiguous/);
+    assert.match(attemptDetail(s), /error/); assert.doesNotMatch(JSON.stringify(s), /private-audit|private-run/);
+  }
+  i.runs = known([run('private-audit', earlier, 'success', false)]);
+  assert.equal(derive(i).lastAttempt.state, 'known'); // Equal timestamps are safe only with exact identity.
+  i.attempts = known([audit('first', earlier), audit('second', earlier, 'error', 'scheduled')]); i.runs = known([]);
+  assert.equal(derive(i).lastAttempt.state, 'uncertain');
+});
+test('either source unavailable qualifies available evidence and cannot claim a latest successful attempt', () => {
+  for (const source of ['attempts', 'runs'] as const) {
+    const i = inputs(); i[source] = unavailable; const s = derive(i);
+    assert.equal(s.lastAttempt.state, 'uncertain'); assert.match(attemptDetail(s), /Latest attempt unknown.*unavailable/);
+    assert.match(attemptDetail(s), /Available observations/); assert.equal(s.hasUnavailableSections, true);
+    i.attempts = unavailable; i.runs = unavailable; assert.equal(derive(i).lastAttempt.state, 'unavailable');
+  }
+});
+test('actual bounded loader exposes tied runs and failure of either source while preserving privacy', async () => {
+  for (const fail of [undefined, 'sync_runs', 'matter_invocation_status']) {
+    const { client, requests } = cappedPostgrest({
+      matter_invocation_status: [audit('private-audit', earlier)],
+      sync_runs: [run('private-success', later, 'success', false), run('private-error', later), run('private-older', earlier)],
+    }, { respond: ({ table }) => table === fail ? Response.json({ message: 'private-db-error' }, { status: 500 }) : undefined });
+    const s = await loadSyncStatus(client, now, 'Europe/Athens');
+    assert.equal(s.lastAttempt.state, 'uncertain');
+    assert.match(attemptDetail(s), fail ? /unavailable/ : /ordering ambiguous/);
+    if (fail !== 'sync_runs') assert.match(attemptDetail(s), /error/);
+    assert.doesNotMatch(JSON.stringify(s), /private-/);
+    const query = requests.find(r => r.table === 'sync_runs')!;
+    assert.equal(query.url.searchParams.get('select'), 'id,started_at,finished_at,status,matter_has_more');
+    assert.equal(query.url.searchParams.get('limit'), '2');
+    assert.equal(query.url.searchParams.get('order'), 'started_at.desc,id.asc');
+    assert.equal(requests.length, 11);
+  }
 });
