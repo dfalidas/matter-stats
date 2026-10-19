@@ -36,6 +36,7 @@ if (output.startsWith("docs/")) {
     "tests",
     "package.json",
     "package-lock.json",
+    "tailwind.config.ts",
   ]);
 }
 await mkdir(output, { recursive: true });
@@ -90,6 +91,8 @@ async function ready(url) {
 let browser;
 const evidence = [],
   pageErrors = [],
+  consoleErrors = [],
+  scrollChecks = [],
   resourceFailures = [],
   externalRequests = [],
   checks = [];
@@ -178,6 +181,13 @@ try {
       },
     ]);
     const page = await context.newPage();
+    page.on("console", (message) => {
+      if (message.type() === "error")
+        consoleErrors.push({
+          message: message.text(),
+          url: message.location().url,
+        });
+    });
     page.on("pageerror", (e) => pageErrors.push(e.message));
     page.on("response", (r) => {
       if (r.status() >= 400)
@@ -225,7 +235,13 @@ try {
       scenario,
       width,
       theme,
-      input: width < 1024 ? "touch + keyboard" : "mouse + keyboard",
+      height: page.viewportSize().height,
+      input:
+        scenario === "table-keyboard"
+          ? "keyboard"
+          : ["selected-day", "presets", "invalid-password"].includes(scenario)
+            ? "browser forms / pointer / keyboard"
+            : "render / scroll",
       horizontalOverflow: false,
     };
     if (screenshot) {
@@ -339,17 +355,39 @@ try {
           );
           if (await controls.count()) {
             const last = controls.last();
-            await last.scrollIntoViewIfNeeded();
+            await last.evaluate((el) => el.scrollIntoView({ block: "center" }));
+            const bottomNav = ui.page.locator(".fixed.bottom-0:visible");
+            const limit = (await bottomNav.count())
+              ? (await bottomNav.boundingBox()).y
+              : ui.page.viewportSize().height;
+            const rect = await last.boundingBox();
+            assert.ok(
+              rect && rect.y >= 0 && rect.y + rect.height <= limit,
+              `${width} ${route}: last control obstructed`,
+            );
             await ui.page.evaluate(() =>
               window.scrollTo(0, document.documentElement.scrollHeight),
             );
-            const rect = await last.boundingBox();
+            const content = await main
+              .locator(":scope > *")
+              .last()
+              .boundingBox();
             assert.ok(
-              rect &&
-                rect.y + rect.height <=
-                  (width < 1024 ? (width === 390 ? 844 : 1000) - 55 : 1000),
-              `${width} ${route}: last control obstructed`,
+              content &&
+                content.y + content.height > 0 &&
+                content.y + content.height <= limit,
+              `${width} ${route}: final content obstructed`,
             );
+            scrollChecks.push({
+              route,
+              width,
+              theme,
+              controlBottom: rect.y + rect.height,
+              contentBottom: content.y + content.height,
+              availableBottom: limit,
+            });
+            if (route === "/activity" && width === 390 && theme === "light")
+              await capture(ui, route, "scroll-end", true);
           }
           if (route === "/login")
             await ui.context.addCookies([
@@ -658,6 +696,22 @@ try {
   );
   await page.getByRole("button", { name: "Previous", exact: true }).click();
   await page.waitForURL("**page=1");
+  const searchDraft = page.getByRole("textbox", {
+    name: "Search articles by title, source, or author",
+  });
+  await searchDraft.fill("Synthetic");
+  await page.getByLabel("Author", { exact: true }).fill("Sample author");
+  await page.getByLabel("Content type", { exact: true }).focus();
+  await page.waitForURL("**author=Sample+author**");
+  assert.equal(await searchDraft.inputValue(), "Synthetic");
+  await page.getByLabel("Content type", { exact: true }).fill("article");
+  await page.getByRole("button", { name: "Search", exact: true }).tap();
+  await page.waitForURL(
+    (url) =>
+      url.searchParams.get("q") === "Synthetic" &&
+      url.searchParams.get("type") === "article",
+  );
+  assert.equal(new URL(page.url()).searchParams.get("author"), "Sample author");
   await ui.goto(
     "/articles?q=Synthetic&source=Example+journal&tag=synthetic-tag&status=queue&author=Sample+author&type=article&size=short",
   );
@@ -878,7 +932,31 @@ try {
   );
   await scenario("login-error");
   await page.getByLabel("Access password").fill("synthetic-password");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  let releaseLogin;
+  const loginGate = new Promise((resolve) => {
+    releaseLogin = resolve;
+  });
+  await page.route(`${origin}/login`, async (route) => {
+    if (route.request().method() === "POST") await loginGate;
+    await route.continue();
+  });
+  try {
+    await page.getByRole("button", { name: "Sign in" }).click();
+    const pending = page.getByRole("button", {
+      name: "Checking...",
+      exact: true,
+    });
+    await pending.waitFor();
+    assert.equal(await pending.isDisabled(), true);
+  } finally {
+    releaseLogin();
+  }
+  await page.unroute(`${origin}/login`);
+  await page
+    .locator("main")
+    .getByRole("alert")
+    .filter({ hasText: /temporarily unavailable/ })
+    .waitFor();
   assert.match(
     await page.locator("main").getByRole("alert").innerText(),
     /temporarily unavailable/,
@@ -907,6 +985,15 @@ try {
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(externalRequests, []);
   assert.ok(
+    consoleErrors.every(
+      (error) =>
+        error.message ===
+          "Failed to load resource: the server responded with a status of 404 (Not Found)" &&
+        error.url.endsWith("/favicon.ico"),
+    ),
+    JSON.stringify(consoleErrors),
+  );
+  assert.ok(
     resourceFailures.every(
       (r) => r.path === "/favicon.ico" || r.path === "/articles/missing",
     ),
@@ -924,6 +1011,8 @@ try {
         pages: evidence,
         checks,
         contrastChecks,
+        scrollChecks,
+        consoleErrors,
         pageErrors,
         resourceFailures,
         externalRequests,

@@ -12,6 +12,7 @@ const { cappedPostgrest } = require(
   path.join(root, "tests/fixtures/capped-postgrest.js"),
 );
 const React = require("react");
+let stateOverrides;
 let client,
   pathname = "/dashboard",
   params = new URLSearchParams(),
@@ -30,7 +31,10 @@ Module._load = function (request, parent, ...rest) {
       useTransition: () => [false, (fn) => fn()],
       useEffect: () => {},
       useMemo: (fn) => fn(),
-      useState: (value) => [value, () => {}],
+      useState: (value) => [
+        stateOverrides?.length ? stateOverrides.shift() : value,
+        () => {},
+      ],
     };
   if (request === "next/navigation")
     return {
@@ -289,4 +293,28 @@ test("Library keeps native table rows and actual title links for keyboard naviga
     },
   });
   assert.equal(stopped, true);
+});
+
+test("Library search submits draft text, author and content type together without losing other filters", () => {
+  pathname = "/articles";
+  params = new URLSearchParams("source=Science&page=2&context=keep");
+  stateOverrides = ["Synthetic", "Sample author", "article"];
+  try {
+    const view = ArticlesLibrary({
+      result: libraryResult,
+      timezone: "Europe/Athens",
+    });
+    all(view, (node) => node.type === "form")[0].props.onSubmit({
+      preventDefault() {},
+    });
+    const next = new URL(pushed, "https://synthetic.invalid");
+    assert.equal(next.searchParams.get("q"), "Synthetic");
+    assert.equal(next.searchParams.get("author"), "Sample author");
+    assert.equal(next.searchParams.get("type"), "article");
+    assert.equal(next.searchParams.get("source"), "Science");
+    assert.equal(next.searchParams.get("context"), "keep");
+    assert.equal(next.searchParams.has("page"), false);
+  } finally {
+    stateOverrides = undefined;
+  }
 });
