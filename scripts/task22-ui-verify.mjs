@@ -354,6 +354,44 @@ try {
               "none",
             );
             await capture(ui, route, "table-keyboard", true);
+            const tableScroll = ui.page.getByRole("table").locator("..");
+            assert.ok(
+              await tableScroll.evaluate(
+                (el) => el.scrollWidth > el.clientWidth,
+              ),
+            );
+            for (let i = 0; i < 15; i++)
+              await ui.page.keyboard.press("ArrowRight");
+            await ui.page.waitForFunction(
+              () =>
+                document.querySelector("table").parentElement.scrollLeft > 0,
+            );
+            const keyboardScroll = await tableScroll.evaluate(
+              (el) => el.scrollLeft,
+            );
+            for (let i = 0; i < 15; i++)
+              await ui.page.keyboard.press("ArrowLeft");
+            await ui.page.waitForFunction(
+              () =>
+                document.querySelector("table").parentElement.scrollLeft === 0,
+            );
+            await tableScroll.hover();
+            await ui.page.mouse.wheel(1000, 0);
+            await ui.page.waitForFunction(
+              () =>
+                document.querySelector("table").parentElement.scrollLeft > 0,
+            );
+            const trackpadScroll = await tableScroll.evaluate(
+              (el) => el.scrollLeft,
+            );
+            await capture(ui, route, "table-horizontal", true);
+            check("Library table horizontal keyboard and trackpad scrolling", {
+              width,
+              theme,
+              keyboardScroll,
+              trackpadScroll,
+            });
+            await title.focus();
             await ui.page.keyboard.press("Enter");
             await ui.page.waitForURL("**/articles/synthetic-item-000");
             await ui.page.goBack();
@@ -505,6 +543,25 @@ try {
               .getAttribute("aria-current"),
             "page",
           );
+        }
+        if (
+          (width === 390 && theme === "light") ||
+          (width === 768 && theme === "dark")
+        ) {
+          for (const control of [
+            ui.page.locator("details").getByRole("link", { name: "Settings" }),
+            ui.page.locator("details").getByRole("button", { name: "Log out" }),
+          ]) {
+            const rect = await control.boundingBox();
+            assert.ok(
+              rect &&
+                rect.height >= 44 &&
+                rect.x >= 0 &&
+                rect.x + rect.width <= width &&
+                rect.y >= 0,
+            );
+          }
+          await capture(ui, "/settings", "account", true);
         }
         check("navigation/account keyboard and pointer operation", {
           width,
@@ -740,6 +797,9 @@ try {
   assert.match(await page.locator("main").innerText(), /Matching articles\s+1/);
   await page.getByRole("button", { name: /Synthetic article 001/ }).tap();
   await page.waitForURL("**/articles/synthetic-item-001");
+  await page
+    .getByText(/Reading sessions are not attributed to this item/)
+    .waitFor();
   assert.match(
     await page.locator("main").innerText(),
     /Reading sessions are not attributed/,

@@ -134,6 +134,30 @@ test("primary navigation preserves its own deep link without sharing incompatibl
       .props.href,
     "/dashboard",
   );
+  assert.equal(
+    links.find((n) => n.props.children.at(-1).props.children === "Activity")
+      .props.href,
+    "/activity",
+  );
+  for (const [current, target, destination] of [
+    ["/dashboard", "Activity", "/activity"],
+    ["/activity", "Overview", "/dashboard"],
+  ]) {
+    pathname = current;
+    params = new URLSearchParams("period=month&context=keep");
+    const compatibleLinks = all(AppNavigation({}), (n) => n.props?.href);
+    assert.equal(
+      compatibleLinks.find(
+        (n) => n.props.children.at(-1).props.children === target,
+      ).props.href,
+      `${destination}?period=month`,
+    );
+    assert.equal(
+      compatibleLinks.find((n) => n.props["aria-current"] === "page").props
+        .href,
+      `${current}?period=month&context=keep`,
+    );
+  }
 });
 test("article detail distinguishes query failure from a missing item and does not decode a valid percent ID twice", async () => {
   client = cappedPostgrest(

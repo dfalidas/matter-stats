@@ -2,6 +2,23 @@
 
 Base: `300cf87cfa7454597e59a1619bcedc4da9af3681` (fetched main; no subsequent changes). Scope is presentation, route/input handling, directly necessary error mapping, regression tests and synthetic evidence. [Route inventory](task-22-route-inventory.md) records pre-edit behavior, guards, useful functions and dispositions. All useful secondary routes are retained.
 
+## Recovery assessment
+
+Resumed on 19 October 2026 on the existing `task22-focused-ui-qa` branch at `ab82dea01365223ceaec9ff8ed7028ba671173db`. Fetch confirmed that main and the merge base still equal `300cf87cfa7454597e59a1619bcedc4da9af3681`. No rebase/reset/clean or worktree replacement was performed. There was no existing Task 22 PR. All five Task 22 commits and the uncommitted screenshots were preserved. No build/test/browser process was still active; defunct browser children were left alone.
+
+| Area at resume | Assessment | Remaining work |
+| --- | --- | --- |
+| Route inventory, scope/compatibility documentation | Complete with source inspection evidence | Add final validation provenance and CI outcome |
+| Overview/Activity/Reports/Library/detail/shell/secondary fixes | Implemented; unit coverage completed for the prior source, final navigation/prefetch edits awaiting current browser verification | Verify current rendered behavior, retaining successful earlier evidence only for unchanged paths |
+| Shared status interpretation and operational boundaries | Complete with existing contract tests and diff inspection | Exercise final synthetic state matrix; no production operation |
+| Full application unit suite | 384 passed, 0 failed/cancelled/skipped in the completed pre-interruption log; compiled source `96cf5adae4d8951e889e9ea1d93cdbba49ae1774` | Current-source focused tests/browser plus exact final-head CI; do not use this run to certify subsequent navigation/prefetch changes |
+| Production build | Completed at current application source `ab82dea01365223ceaec9ff8ed7028ba671173db` | Current browser verification against that artifact |
+| Route types/typecheck/lint/audit | Earlier attempts/results present; last typecheck failed because a concurrent build replaced generated types | Run types/typecheck sequentially and capture fresh lint/audit exit results |
+| Browser screenshots and behavioral matrix | Partially verified; prior navigation timeout left an incomplete run without a completed manifest | Fresh full run in `evidence/task22/final/`, inspect actual renders; preserve earlier root screenshots as interrupted work, exclude them from final evidence |
+| Draft PR/final-head CI | Not started | Push preserved branch, open one draft PR, inspect its final checks |
+
+No partially implemented feature or unrelated user edit was identified. Runtime changes remain confined to presentation/input normalization; metrics, authentication, synchronization machinery, migrations, dependencies and CI enforcement are unchanged. Production synchronization/scheduling certification remains outside this task.
+
 ## Demonstrated defects and changes
 
 | Before | After |
@@ -22,7 +39,7 @@ Base: `300cf87cfa7454597e59a1619bcedc4da9af3681` (fetched main; no subsequent ch
 
 The runner uses installed Chromium/Playwright with an isolated production Next server and loopback fake Data API. It replaces application configuration/credentials through the repository's `sanitizedEnvironment`, blocks external browser requests and rejects non-allowlisted fixture mutations. Only synthetic login/logout storage is mutable. It never invokes sync/continuation/history/repair controls. No new app dependency or test framework is installed; pinned Prettier is a task-local formatting tool only.
 
-Screenshots and machine-readable assertions are in [evidence/task22](evidence/task22/); `ui-validation.json` records the exact tested source SHA. The final evidence commit changes documentation/images only; screenshot source and final PR head are distinguished in validation below. Browser timezone is America/New_York; APP_TIMEZONE is Europe/Athens. Dark styling is exercised with the existing root `.dark` class; the application has no theme-switch preference control, and this task adds none.
+Final screenshots and machine-readable assertions are in [evidence/task22/final](evidence/task22/final/); `ui-validation.json` records the exact tested source SHA. The final evidence commit changes documentation/images only; screenshot source and final PR head are distinguished in validation below. Browser timezone is America/New_York; APP_TIMEZONE is Europe/Athens. Dark styling is exercised with the existing root `.dark` class; the application has no theme-switch preference control, and this task adds none.
 
 | Route/control | Scenario | Viewport/input | Result / evidence |
 | --- | --- | --- | --- |
@@ -51,7 +68,7 @@ npm run test
 npm run build
 npm run audit:ci
 git diff --check
-TASK22_PLAYWRIGHT_MODULE=/opt/codex/runtimes/cua/lib/node_modules/playwright/index.mjs node scripts/task22-ui-verify.mjs
+TASK22_EVIDENCE_DIR=docs/evidence/task22/final TASK22_PLAYWRIGHT_MODULE=/opt/codex/runtimes/cua/lib/node_modules/playwright/index.mjs node scripts/task22-ui-verify.mjs
 ```
 
 Build/browser use synthetic server configuration; never substitute production values to reproduce screenshots. Existing tests cover canonical estimates, local periods/comparisons/CSV, complete inputs and bounded client payloads. New behavioral regression tests exercise actual presentation handlers/server pages and future Activity parameters; browser tests exercise actual forms, history, menu and pagination. No ingestion/security suite is duplicated or enforcement weakened.
