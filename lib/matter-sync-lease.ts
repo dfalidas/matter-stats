@@ -6,8 +6,9 @@ import { leaseRpcArgs, MatterSyncLeaseLostError, type MatterSyncLease } from "./
 // DB accepts only 30–300 seconds. Renew at every HTTP boundary and write batch.
 export const MATTER_SYNC_LEASE_TTL_SECONDS = 120;
 
-export async function acquireMatterSyncLease(): Promise<MatterSyncLease | null> {
-  const owner = randomUUID();
+export async function acquireMatterSyncLease(owner: string = randomUUID()): Promise<MatterSyncLease | null> {
+  // The invocation UUID also identifies its audit and fenced run. Ownership
+  // still requires the database-issued generation and a live lease.
   const { data, error } = await getSupabaseAdminClient().rpc("acquire_matter_sync_lease", {
     p_account_scope: "matter", p_owner: owner, p_ttl_seconds: MATTER_SYNC_LEASE_TTL_SECONDS,
   });

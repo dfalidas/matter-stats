@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { STATUS_TABLES, STATUS_FUNCTION_SIGNATURES } from "./matter-status-inventory.mjs";
 import assert from "node:assert/strict";
 import { readdir } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
@@ -17,7 +18,7 @@ import { GENERATION_TABLES, GENERATION_FUNCTION_SIGNATURES } from "./reading-gen
 export const INVENTORIED_TABLES = [
   "matter_items", "reading_sessions", "matter_tags", "item_tags", "annotations",
   "daily_stats", "sync_runs", "sync_state", "app_sessions", "app_login_attempts",
-  "matter_sync_streams", "matter_sync_leases", ...PAGE_TABLES, ...CONTINUATION_TABLES, ...REQUEST_TABLES, ...GENERATION_TABLES,
+  "matter_sync_streams", "matter_sync_leases", ...PAGE_TABLES, ...CONTINUATION_TABLES, ...REQUEST_TABLES, ...GENERATION_TABLES, ...STATUS_TABLES,
 ];
 
 export function catalogSql(tables = INVENTORIED_TABLES) {
@@ -70,7 +71,7 @@ BEGIN
   END IF;
   IF has_table_privilege('service_role','public.matter_sync_continuation','TRUNCATE') THEN RAISE EXCEPTION 'continuation can be truncated'; END IF;
   IF has_table_privilege('service_role','public.matter_quota','TRUNCATE') OR has_table_privilege('service_role','public.matter_request_work','TRUNCATE') THEN RAISE EXCEPTION 'request state can be truncated'; END IF;
-  FOREACH function_signature IN ARRAY ARRAY[${[...LEASE_FUNCTION_SIGNATURES, ...PAGE_FUNCTION_SIGNATURES, ...CONTINUATION_FUNCTION_SIGNATURES, ...REQUEST_FUNCTION_SIGNATURES, ...GENERATION_FUNCTION_SIGNATURES].map((signature) => `'public.${signature}'`).join(", ")}] LOOP
+  FOREACH function_signature IN ARRAY ARRAY[${[...LEASE_FUNCTION_SIGNATURES, ...PAGE_FUNCTION_SIGNATURES, ...CONTINUATION_FUNCTION_SIGNATURES, ...REQUEST_FUNCTION_SIGNATURES, ...GENERATION_FUNCTION_SIGNATURES, ...STATUS_FUNCTION_SIGNATURES].map((signature) => `'public.${signature}'`).join(", ")}] LOOP
     IF to_regprocedure(function_signature) IS NULL THEN
       RAISE EXCEPTION 'missing lease function %', function_signature;
     END IF;

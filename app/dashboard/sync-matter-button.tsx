@@ -14,7 +14,7 @@ import { getMatterSyncAvailabilityAction, syncMatterAction, type SyncMatterActio
 
 const initialState: SyncMatterActionState = null;
 
-export function SyncMatterButton({ showBackfill = false }: { showBackfill?: boolean } = {}) {
+export function SyncMatterButton({ showBackfill = false, timezone = "Europe/Athens" }: { showBackfill?: boolean; timezone?: string } = {}) {
   const [state, formAction, isPending] = useActionState(syncMatterAction, initialState);
   const [rateLimitedUntil, setRateLimitedUntil] = useState<string | null>(null);
   const [historyStatus, setHistoryStatus] = useState<string | null>(null);
@@ -36,7 +36,7 @@ export function SyncMatterButton({ showBackfill = false }: { showBackfill?: bool
       })
       .catch(() => {
         if (isMounted) {
-          setAvailabilityMessage(null);
+          setAvailabilityMessage("Sync availability unavailable. Retry the page before relying on cooldown status.");
         }
       });
 
@@ -49,9 +49,9 @@ export function SyncMatterButton({ showBackfill = false }: { showBackfill?: bool
     if (state?.historyStatus) setHistoryStatus(state.historyStatus);
     if (state?.rateLimitedUntil !== undefined) {
       setRateLimitedUntil(state.rateLimitedUntil);
-      setAvailabilityMessage(state.rateLimitedUntil ? buildMatterRateLimitMessage(state.rateLimitedUntil) : null);
+      setAvailabilityMessage(state.rateLimitedUntil ? buildMatterRateLimitMessage(state.rateLimitedUntil, timezone) : null);
     }
-  }, [state]);
+  }, [state, timezone]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -68,8 +68,8 @@ export function SyncMatterButton({ showBackfill = false }: { showBackfill?: bool
       return null;
     }
 
-    return `Matter sync is paused until ${formatMatterRetryTime(rateLimitedUntil)}.`;
-  }, [isPending, isRateLimited, rateLimitedUntil]);
+    return `Matter sync is paused until ${formatMatterRetryTime(rateLimitedUntil, timezone)}.`;
+  }, [isPending, isRateLimited, rateLimitedUntil, timezone]);
 
   return (
     <div className="flex flex-col items-start gap-2 md:items-end">
@@ -123,10 +123,10 @@ export function SyncMatterButton({ showBackfill = false }: { showBackfill?: bool
           />
         ) : null}
       </form>
-      {showBackfill ? <p className="text-sm text-dashboard-muted">Available session history continues daily at 06:00 UTC, even after closing this page.</p> : null}
+      {showBackfill ? <p className="text-sm text-dashboard-muted">Cron is configured for 06:00 UTC. Pending history can resume on eligible invocations; observed scheduled delivery remains an external verification gate.</p> : null}
       {showBackfill && historyStatus && historyStatus !== "none" ? <p className="text-sm text-dashboard-muted" role="status">Available session history: {historyStatus}.</p> : null}
       {rateLimitNotice ? <p className="text-sm text-warning">{rateLimitNotice}</p> : null}
-      {state || (availabilityMessage && isRateLimited) ? (
+      {state || availabilityMessage ? (
         <p className={state?.ok ? "text-sm text-emerald-400" : "text-sm text-destructive"} role="status" aria-live="polite">
           {state?.message ?? availabilityMessage}
         </p>

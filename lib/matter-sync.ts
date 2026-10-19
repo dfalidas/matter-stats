@@ -16,6 +16,7 @@ import {
   getMatterContinuation, requestMatterHistory, beginMatterHistory, turnMatterContinuation, cooldownMatterAccount,
   commitMatterPage,
   getMatterPageReceipt,
+  getSupabaseAdminClient,
   createSyncRun,
   getMatterSyncStream,
   getMatterSyncStreams,
@@ -94,6 +95,7 @@ type MatterSyncDiagnostics = {
 };
 
 export type MatterSyncRuntimeDeps = {
+  recordInvocation?: (id: string, trigger: string, outcome: string) => Promise<void>;
   prepareRequestWork?: typeof prepareMatterRequestWork;
   cooldownAccount: typeof cooldownMatterAccount;
   getContinuation: typeof getMatterContinuation;
@@ -122,6 +124,10 @@ export type MatterSyncRuntimeDeps = {
 };
 
 export const productionSyncDeps: MatterSyncRuntimeDeps = {
+  recordInvocation: async (id, trigger, outcome) => {
+    const { error } = await getSupabaseAdminClient().rpc("record_matter_invocation", { p_id: id, p_trigger: trigger, p_outcome: outcome }).abortSignal(AbortSignal.timeout(5_000));
+    if (error) throw new Error("Invocation evidence unavailable");
+  },
   prepareRequestWork: prepareMatterRequestWork,
   cooldownAccount: cooldownMatterAccount,
   getContinuation: getMatterContinuation, requestHistory: requestMatterHistory,
@@ -193,7 +199,7 @@ export async function getMatterSyncAvailability(
 
   return {
     rateLimitedUntil,
-    message: buildMatterRateLimitMessage(rateLimitedUntil),
+    message: buildMatterRateLimitMessage(rateLimitedUntil, getAppTimezone()),
   };
 }
 
@@ -203,11 +209,21 @@ export async function syncMatterData(
   deps: MatterSyncRuntimeDeps = productionSyncDeps
 ): Promise<MatterSyncResult> {
   const budget = new MatterInvocationBudget(options.budget, deps.budgetClock);
-  return withMatterInvocationBudget(budget, () => runMatterInvocation(mode, options, deps, budget));
+  const id = randomUUID();
+  const trigger = mode === "recent_activity_scheduled" ? "scheduled" : mode === "recent_activity" ? "unknown" : "manual";
+  const record = async (outcome: string) => {
+    try { await deps.recordInvocation?.(id, trigger, outcome); }
+    catch { console.error("Matter invocation evidence unavailable"); }
+  };
+  await record("attempted");
+  const result = await withMatterInvocationBudget(budget, () => runMatterInvocation(mode, options, deps, budget, id));
+  await record(result.skippedReason === "busy" ? "skipped_locked" : result.skippedReason === "rate_limited" ? "skipped_rate_limited"
+    : result.status === "partial" ? "partial" : result.ok ? "complete" : "error");
+  return result;
 }
 
 async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivityWindow?: MatterRecentActivityWindow },
-  deps: MatterSyncRuntimeDeps, budget: MatterInvocationBudget): Promise<MatterSyncResult> {
+  deps: MatterSyncRuntimeDeps, budget: MatterInvocationBudget, invocationId: string): Promise<MatterSyncResult> {
   let lease: MatterSyncLease | null = null;
   let syncRunId: string | null = null;
   let activeCycle: ActiveMatterCycle | null = null;
@@ -219,7 +235,7 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
     || ((mode === "recent_activity_manual" || mode === "recent_activity") && options.recentActivityWindow === "all");
   let stop: MatterBudgetStop | null = null;
   try {
-    lease = await deps.acquireLease();
+    lease = await deps.acquireLease(invocationId);
     if (!lease) return { ok: false, skippedReason: "busy", message: "Matter sync is already running for this account. Try again shortly." };
     leaseRpcArgs(lease);
     let intent = explicitHistory ? await deps.requestHistory(lease) : await deps.getContinuation();
@@ -227,7 +243,7 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
     await deps.recoverRollups(lease, budget.canRecover);
     const invocationNow = deps.now();
     const rateLimitedUntil = await loadActiveMatterCooldown(deps, invocationNow);
-    if (rateLimitedUntil) return { ok: false, skippedReason: "rate_limited", message: buildMatterRateLimitMessage(rateLimitedUntil), rateLimitedUntil, historyStatus: intent.history_status };
+    if (rateLimitedUntil) return { ok: false, skippedReason: "rate_limited", message: buildMatterRateLimitMessage(rateLimitedUntil, getAppTimezone()), rateLimitedUntil, historyStatus: intent.history_status };
     if (explicitHistory && intent.history_status === "complete") return {
       ok: true, status: "complete", historyStatus: "complete", pagesCommitted: 0, requestsAttempted: 0,
       message: "The requested enumeration of all sessions available from Matter is complete. This does not establish retention or universal historical completeness.",
@@ -340,7 +356,7 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
     return { ok: budgetPartial, status: budgetPartial ? "partial" : undefined, hasMore: true, pagesCommitted: budget.pages, requestsAttempted: budget.requests,
       itemsSynced: counts.items, sessionsSynced: counts.sessions, annotationsSynced: counts.annotations, tagsSynced: counts.tags,
       syncRunId: syncRunId ?? undefined, rateLimitedUntil,
-      message: rateLimitedUntil ? buildMatterRateLimitMessage(rateLimitedUntil)
+      message: rateLimitedUntil ? buildMatterRateLimitMessage(rateLimitedUntil, getAppTimezone())
         : `Matter sync stopped safely. ${sanitizedError} Earlier committed work remains; continuation uses the stored contract.`,
     };
   } finally {

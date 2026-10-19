@@ -411,3 +411,13 @@ Session/daily statement triggers coordinate the real fenced page and rollup path
 never rewrites their raw fields, receipts, dirty revisions or progress. Installing the additive
 migration is inactive; only an isolated explicit operator invocation starts work. No production
 repair/cutover, cron invocation, deployment or release readiness is implied.
+
+## Task 21 synchronization status
+
+Overview, Settings and authorized manual feedback use one bounded server status contract.
+[Task 21 definitions](task-21-status.md) distinguish invocation audit, independent sessions/metadata
+cycle completion, source boundaries, imported occurrence, pending ingestion/retry/lease/dirty work,
+raw-reader analytics and persisted generation readiness. Sessions freshness warns at elapsed time
+**greater than or equal to** `MATTER_SYNC_STALE_HOURS` (default 36). Unknown historical completion
+and readiness-transition times remain unknown. Coverage remains unverified. The additive migration
+records future terminal-page completion atomically with its receipt; it starts no synchronization or repair.

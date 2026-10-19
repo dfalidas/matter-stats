@@ -273,3 +273,12 @@ application ordering, old-reader/writer exclusion, tested restore prerequisites 
 rollback limits. Migration installation alone starts no historical work. This implementation
 and its operator executable authorize only disposable synthetic targets; production operations
 remain separately gated in Tasks 23–24.
+
+## Task 21 status compatibility
+
+After the complete Task 20 chain, Task 21 adds `20261015141435_truthful_sync_status.sql`.
+Apply it before compatible status code in a separately authorized rollout, with old instances drained.
+No historical event times are backfilled and no sync/repair starts. Optional server-only
+`MATTER_SYNC_STALE_HOURS` defaults to 36 elapsed hours, warning at `>=` the threshold.
+Keep the additive evidence on application rollback. See [status definitions, rollout and limits](task-21-status.md).
+Production migration, deployment, actual scheduled delivery and historical execution remain external gates.
