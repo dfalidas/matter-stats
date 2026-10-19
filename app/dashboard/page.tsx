@@ -4,7 +4,7 @@ import { PageShell } from "../_components/page-shell";
 import { DashboardOverview } from "./dashboard-overview";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { requireAccessSession } from "@/lib/require-auth";
-import { getDefaultMetricsTimezone, METRICS_PERIOD_PRESETS, type MetricsPeriodPreset } from "@/lib/metrics-service";
+import { formatDateInTimezone, getDefaultMetricsTimezone, METRICS_PERIOD_PRESETS, type MetricsPeriodPreset } from "@/lib/metrics-service";
 import { getOverviewReadingMetrics, toOverviewClientPayload, loadOverviewLibrary } from "@/lib/overview-service";
 import { validateCustomRange } from "@/lib/custom-range";
 
@@ -28,6 +28,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     return (
       <PageShell eyebrow="Overview" title="A quieter view of your reading" description="Choose a valid custom analytics period.">
         <form className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-5" action="/dashboard">
+          {Object.entries(params ?? {}).filter(([name]) => !["start", "end", "period"].includes(name)).flatMap(([name, values]) => (Array.isArray(values) ? values : values === undefined ? [] : [values]).map((value, index) => <input key={`${name}-${index}`} type="hidden" name={name} value={value} />))}
           <label className="grid gap-1 text-sm">From<input required name="start" type="date" defaultValue={start ?? ""} className="min-h-11 rounded-lg border px-3" /></label>
           <label className="grid gap-1 text-sm">Through<input required name="end" type="date" defaultValue={end ?? ""} className="min-h-11 rounded-lg border px-3" /></label>
           <button className="min-h-11 rounded-lg bg-foreground px-4 text-sm text-background">Apply dates</button>
@@ -51,7 +52,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       description="Reliable time-based insights from your synced Matter reading sessions."
     >
       <SyncStatusPanel view={status.view} />
-      <DashboardOverview period={start && end ? "custom" : period} metricsResult={metricsResult} />
+      <DashboardOverview fallbackDate={formatDateInTimezone(now, timezone)} period={start && end ? "custom" : period} metricsResult={metricsResult} />
     </PageShell>
   );
 }
@@ -78,10 +79,10 @@ async function getDashboardMetrics(period: MetricsPeriodPreset, start: string | 
         .catch(() => ({ ok: false as const })),
       loadOverviewLibrary(client),
     ]);
-    if (!overviewMetrics.ok) return { ok: false as const, message: "Reading metrics query unavailable. No zero totals have been substituted.", library };
+    if (!overviewMetrics.ok) return { ok: false as const, message: "Reading totals are unavailable. Reload this page to try again.", library };
     return { ok: true as const, ...toOverviewClientPayload(overviewMetrics.value), library };
   } catch {
-    return { ok: false as const, message: "Reading metrics query unavailable. Retry this page.", library: { state: "unavailable" as const } };
+    return { ok: false as const, message: "Reading totals are unavailable. Reload this page to try again.", library: { state: "unavailable" as const } };
   }
 }
 export const maxDuration = 180;

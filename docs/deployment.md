@@ -282,3 +282,14 @@ No historical event times are backfilled and no sync/repair starts. Optional ser
 `MATTER_SYNC_STALE_HOURS` defaults to 36 elapsed hours, warning at `>=` the threshold.
 Keep the additive evidence on application rollback. See [status definitions, rollout and limits](task-21-status.md).
 Production migration, deployment, actual scheduled delivery and historical execution remain external gates.
+
+## Task 22 application-only UI compatibility
+
+Task 22 requires no migration, dependency/configuration change or synchronization
+operation. It preserves Task 21's status evidence and invocation/run correlation,
+existing server authorization and logout, canonical metrics/CSV and bounded
+pagination. See [route dispositions and browser evidence](task-22-qa.md).
+An application-only rollback to its base restores the earlier UI; retain every
+installed migration, checkpoint, continuation intent, status record and generation.
+No reset, repair, manual deployment or merge is part of this QA task. Task 23
+release-runbook work and Task 24 staging/release certification remain separate.

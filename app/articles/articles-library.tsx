@@ -15,9 +15,10 @@ import { cn } from "@/lib/utils";
 
 type ArticlesLibraryProps = {
   result: ArticleListResult;
+  timezone: string;
 };
 
-export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
+export function ArticlesLibrary({ result, timezone }: ArticlesLibraryProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -74,11 +75,12 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
   }
 
   return (
-    <div className={cn("space-y-5", isPending && "opacity-75 transition-opacity")}>
+    <div aria-busy={isPending} className={cn("space-y-5", isPending && "opacity-75 transition-opacity")}>
+      <p className="sr-only" role="status">{isPending ? "Updating library…" : `${result.total} matching library items`}</p>
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Matching articles" value={formatInteger(result.total)} icon={FileText} />
-        <StatCard label="Page reading time" value={formatMinutes(summary.minutes)} icon={Clock} />
-        <StatCard label="Page words" value={formatInteger(summary.words)} icon={BookOpen} />
+        <StatCard label="Known page reading time" value={formatMinutes(summary.minutes)} icon={Clock} />
+        <StatCard label="Known page words" value={formatInteger(summary.words)} icon={BookOpen} />
         <StatCard label="Page highlights" value={formatInteger(summary.highlights)} icon={Highlighter} />
       </section>
 
@@ -110,11 +112,11 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
                   className="pl-9"
                 />
               </label>
-              <Button type="submit" disabled={isPending}>Search</Button>
+              <Button className="min-h-11" type="submit" disabled={isPending}>Search</Button>
             </form>
 
             <div className="grid gap-2 md:grid-cols-2">
-              <FilterSelect label="Status" value={result.filters.status} disabled={isPending} onChange={(v)=>updateParam("status",v)} options={[{value:"inbox",label:"Inbox"},{value:"queue",label:"Queue"},{value:"archive",label:"Archive"}]} />
+              <FilterSelect label="Status" value={result.filters.status === "all" ? "" : result.filters.status} disabled={isPending} onChange={(v)=>updateParam("status",v)} options={[{value:"inbox",label:"Inbox"},{value:"queue",label:"Queue"},{value:"archive",label:"Archive"}]} />
               <FilterSelect label="Article size" value={result.filters.size} disabled={isPending} onChange={(v)=>updateParam("size",v)} options={[{value:"short",label:"Short · <1,500 words"},{value:"medium",label:"Medium · 1,500–3,999"},{value:"long",label:"Long · 4,000+ words"}]} />
               <FilterSelect
                 label="Source"
@@ -135,13 +137,13 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
               />
               <label className="grid gap-1.5 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 Author
-                <Input value={author} placeholder="All authors" onChange={(event) => setAuthor(event.target.value)} onBlur={() => updateParam("author", author.trim())} />
+                <Input value={author} placeholder="All authors" onChange={(event) => setAuthor(event.target.value)} onBlur={() => { if (author.trim() !== result.filters.author) updateParam("author", author.trim()); }} />
               </label>
               <label className="grid gap-1.5 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 Content type
-                <Input value={contentType} placeholder="All types" onChange={(event) => setContentType(event.target.value)} onBlur={() => updateParam("type", contentType.trim())} />
+                <Input value={contentType} placeholder="All types" onChange={(event) => setContentType(event.target.value)} onBlur={() => { if (contentType.trim() !== result.filters.contentType) updateParam("type", contentType.trim()); }} />
               </label>
-              <Button type="button" variant="outline" onClick={() => { setQuery(""); setAuthor(""); setContentType(""); startTransition(() => router.push(pathname as Route)); }}>
+              <Button className="min-h-11" type="button" variant="outline" onClick={() => { setQuery(""); setAuthor(""); setContentType(""); startTransition(() => router.push(pathname as Route)); }}>
                 Clear all filters
               </Button>
             </div>
@@ -151,7 +153,7 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
         <CardContent>
           {result.articles.length === 0 ? (
             <EmptyArticles
-              hasFilters={Boolean(result.filters.query || result.filters.source || result.filters.tag || result.filters.period !== "all-time")}
+              hasFilters={Boolean(result.filters.query || result.filters.source || result.filters.tag || result.filters.author || result.filters.contentType || result.filters.size || result.filters.status !== "all" || result.filters.period !== "all-time")}
               onClear={() => {
                 setQuery("");
                 startTransition(() => router.push(pathname as Route));
@@ -182,7 +184,7 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
                     <TableHead className="min-w-[280px]">Title</TableHead>
                     <TableHead>Source</TableHead>
                     <TableHead>Author</TableHead>
-                    <TableHead className="min-w-[120px]">Date</TableHead>
+                    <TableHead className="min-w-[120px]">Date ({timezone})</TableHead>
                     <TableHead className="text-right">Reading time</TableHead>
                     <TableHead className="text-right">Words</TableHead>
                     <TableHead className="text-right">Highlights</TableHead>
@@ -228,7 +230,7 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
                       <TableCell>
                         <span className="inline-flex items-center gap-1.5 text-muted-foreground">
                           <CalendarDays className="h-3.5 w-3.5" aria-hidden />
-                          {formatDate(article.created_at_matter ?? article.updated_at_matter)}
+                          {formatDate(article.created_at_matter ?? article.updated_at_matter, timezone)}
                         </span>
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{article.estimated_reading_time_minutes == null ? "—" : formatMinutes(article.estimated_reading_time_minutes)}</TableCell>
@@ -247,11 +249,11 @@ export function ArticlesLibrary({ result }: ArticlesLibraryProps) {
                   Showing {formatInteger((result.page - 1) * result.pageSize + 1)}–{formatInteger((result.page - 1) * result.pageSize + result.articles.length)} of {formatInteger(result.total)} articles
                 </span>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" disabled={result.page <= 1 || isPending} onClick={() => updateParam("page", String(result.page - 1))}>
+                  <Button className="min-h-11" variant="outline" size="sm" disabled={result.page <= 1 || isPending} onClick={() => updateParam("page", String(result.page - 1))}>
                     Previous
                   </Button>
                   <span className="px-2 tabular-nums">Page {result.page} of {totalPages}</span>
-                  <Button variant="outline" size="sm" disabled={result.page >= totalPages || isPending} onClick={() => updateParam("page", String(result.page + 1))}>
+                  <Button className="min-h-11" variant="outline" size="sm" disabled={result.page >= totalPages || isPending} onClick={() => updateParam("page", String(result.page + 1))}>
                     Next
                   </Button>
                 </div>
@@ -272,9 +274,9 @@ function FilterSelect({ label, value, options, disabled, onChange }: { label: st
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 rounded-xl border border-input bg-background px-3 py-2 text-sm normal-case tracking-normal text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        className="min-h-11 min-w-0 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm normal-case tracking-normal text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <option value="">All {label.toLowerCase()}s</option>
+        <option value="">All {label === "Status" ? "statuses" : `${label.toLowerCase()}s`}</option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
         ))}
@@ -308,7 +310,7 @@ function EmptyArticles({ hasFilters, onClear }: { hasFilters: boolean; onClear: 
       <h3 className="mt-5 text-xl font-semibold tracking-tight text-foreground">No articles found</h3>
       <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
         {hasFilters
-          ? "Try clearing a search term or broadening the period, source, or tag filters."
+          ? "Try clearing or broadening your filters."
           : "Sync your Matter account to fill this library with article metadata, tags, and highlights."}
       </p>
       {hasFilters ? (
@@ -336,10 +338,11 @@ function formatMinutes(minutes: number): string {
   return remaining > 0 ? `${hours}h ${remaining}m` : `${hours}h`;
 }
 
-function formatDate(value: string | null): string {
+function formatDate(value: string | null, timezone: string): string {
   if (!value) {
     return "—";
   }
 
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-US", { timeZone: timezone,
+    month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
 }

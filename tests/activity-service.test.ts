@@ -60,3 +60,14 @@ test("sums one-second estimates before pagination for calendar and selected-day 
   assert.equal(result.sessions.length, 1);
   assert.equal(result.sessions[0]?.estimatedWords, 4);
 });
+
+test("future month/day URLs fall back to the current local selection; today is valid", async () => {
+  const now = new Date("2026-09-14T22:30:00Z"); // September 15 in Athens, still 14 in New York.
+  const futureMonth = await getActivityMonth(client([]), "2026-10", "2026-10-01", 1, now);
+  assert.equal(futureMonth.month, "2026-09");
+  assert.equal(futureMonth.selectedDay, "2026-09-15");
+  const futureDay = await getActivityMonth(client([]), "2026-09", "2026-09-16", 1, now);
+  assert.equal(futureDay.selectedDay, "2026-09-15");
+  const today = await getActivityMonth(client([]), "2026-09", "2026-09-15", 1, now);
+  assert.equal(today.selectedDay, "2026-09-15");
+});

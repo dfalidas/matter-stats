@@ -59,7 +59,7 @@ test('real server pages construct bounded client props; calendar CSV and totals 
         assert.equal(report.sessionLengthHistogram[0].count,count);
         reportSizes.push(Buffer.byteLength(JSON.stringify(props)));
       }
-      const recap=(await YearPage()).props.children.props.recapResult;
+      const recap=(await YearPage({})).props.children.find(child=>child?.props?.recapResult).props.recapResult;
       assert.equal(recap.ok,true);
       assert.equal(recap.report.metrics.totals.sessionsCount,count);
       assert.equal('timeline' in recap.report,false);

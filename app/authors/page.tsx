@@ -20,7 +20,7 @@ export default async function AuthorsPage({ searchParams }: AuthorsPageProps) {
   return (
     <PageShell
       eyebrow="Authors"
-      title="Author insights"
+      title="Author reading attribution"
       description="Rank authors by reading time, article count, estimated words, and the publications where you spend the most time with their work. Estimated from reading time at 225 words/min."
     >
       {rankingResult.ok ? (

@@ -1,5 +1,7 @@
 "use client";
 
+import { ReadingAttributionNotice } from "@/components/reading-attribution";
+
 import { useMemo, useState, useTransition } from "react";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -81,12 +83,13 @@ export function AuthorsRanking({ period, ranking }: AuthorsRankingProps) {
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <ReadingAttributionNotice />
+      {ranking.totals.articlesRead > 0 && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Reading time" value={formatDuration(ranking.totals.readingTimeSeconds)} icon={Clock} />
         <StatCard label="Authors" value={formatInteger(ranking.totals.authors)} icon={Users} />
         <StatCard label="Articles" value={formatInteger(ranking.totals.articlesRead)} icon={Newspaper} />
         <StatCard label="Estimated words" value={formatInteger(ranking.totals.wordsRead)} icon={BookOpen} />
-      </section>
+      </section>}
 
       <Card className="border-white/10 bg-background/55 shadow-soft">
         <CardHeader className="gap-4 pb-4">
@@ -99,7 +102,7 @@ export function AuthorsRanking({ period, ranking }: AuthorsRankingProps) {
                 </Badge>
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
-                Rank the writers behind your reading sessions, including articles with missing author metadata.
+                Rank reading by writer where stored item links support attribution. An unknown byline does not establish an article link.
               </p>
             </div>
 
@@ -109,8 +112,9 @@ export function AuthorsRanking({ period, ranking }: AuthorsRankingProps) {
                   key={preset}
                   type="button"
                   variant={preset === period ? "default" : "outline"}
-                  size="sm"
+                  size="sm" className="min-h-11"
                   disabled={isPending}
+                  aria-pressed={preset === period}
                   onClick={() => updatePeriod(preset)}
                 >
                   {periodLabels[preset]}
@@ -140,8 +144,9 @@ export function AuthorsRanking({ period, ranking }: AuthorsRankingProps) {
                     type="button"
                     variant={key === sortKey ? "secondary" : "ghost"}
                     size="sm"
+                    aria-pressed={key === sortKey}
                     onClick={() => setSortKey(key)}
-                    className="rounded-full"
+                    className="min-h-11 rounded-full"
                   >
                     <Icon className="h-4 w-4" aria-hidden />
                     {sortLabels[key]}
@@ -154,8 +159,8 @@ export function AuthorsRanking({ period, ranking }: AuthorsRankingProps) {
         </CardHeader>
 
         <CardContent>
-          {ranking.authors.length === 0 ? (
-            <EmptyRanking message="No author reading data was found for this period." />
+          {ranking.totals.articlesRead === 0 || ranking.authors.length === 0 ? (
+            <EmptyRanking message="No attributed author results in this period. This does not establish no reading; session-to-item attribution may be unsupported." />
           ) : filteredAuthors.length === 0 ? (
             <EmptyRanking message={`No authors or sources match “${query.trim()}”.`} />
           ) : (

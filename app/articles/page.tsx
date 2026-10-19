@@ -1,3 +1,5 @@
+import { getDefaultMetricsTimezone } from "@/lib/metrics-service";
+import Link from "next/link";
 import { PageShell } from "../_components/page-shell";
 import { ArticlesLibrary } from "./articles-library";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
@@ -32,8 +34,9 @@ export default async function ArticlesPage({ searchParams }: ArticlesPageProps) 
       title="Your library"
       description="Browse current Matter items. Library metadata and progress are independent of the analytics period."
     >
+      <nav aria-label="Library insights" className="mb-5 flex flex-wrap gap-4 text-sm text-primary"><Link className="inline-flex min-h-11 items-center" href="/authors">Author reading attribution</Link><Link className="inline-flex min-h-11 items-center" href="/sources">Source reading attribution</Link><Link className="inline-flex min-h-11 items-center" href="/tags">Tag reading attribution</Link></nav>
       {result.ok ? (
-        <ArticlesLibrary result={result.result} />
+        <ArticlesLibrary result={result.result} timezone={getDefaultMetricsTimezone()} />
       ) : (
         <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
           {result.message}
@@ -48,7 +51,8 @@ async function getArticlesPageData(client: ReturnType<typeof getSupabaseAdminCli
     const result = await getArticleList(client, filters);
     return { ok: true as const, result };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to load articles.";
+    void error;
+    const message = "Library data is unavailable. Reload this page to try again.";
     return { ok: false as const, message };
   }
 }
