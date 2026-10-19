@@ -576,6 +576,7 @@ try {
   assert.equal(new URL(page.url()).pathname, "/dashboard");
   assert.equal(new URL(page.url()).searchParams.get("end"), "2025-01-02");
   assert.match(await page.locator("main").innerText(), /1 Jan – 2 Jan 2025/);
+  assert.match(await page.locator("main").innerText(), /≈2,250/);
   await page.getByLabel("Through", { exact: true }).fill("2025-01-03");
   await page.getByRole("button", { name: "Apply dates" }).click();
   await page.waitForURL("**/dashboard?**end=2025-01-03**");
@@ -1032,7 +1033,6 @@ try {
   } finally {
     releaseLogin();
   }
-  await page.unroute(`${origin}/login`);
   await page
     .locator("main")
     .getByRole("alert")
@@ -1043,7 +1043,11 @@ try {
     /temporarily unavailable/,
   );
   assert.equal(new URL(page.url()).pathname, "/login");
+  // The response has settled before removing the held-request handler.
+  await page.unroute(`${origin}/login`);
   await scenario("normal");
+  // React resets an uncontrolled action form after the returned error state.
+  await page.getByLabel("Access password").fill("synthetic-password");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/dashboard");
   check(
