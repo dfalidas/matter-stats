@@ -17,6 +17,30 @@ const { chromium } = await import(
 const testedSourceSha = execFileSync("git", ["rev-parse", "HEAD"], {
   encoding: "utf8",
 }).trim();
+const phase =
+  process.env.TASK22_PHASE ??
+  (process.env.TASK22_BEHAVIORS_ONLY ? "flows" : "all");
+assert.ok(["all", "layout", "flows", "states"].includes(phase));
+const layoutWidth = process.env.TASK22_WIDTH;
+assert.ok(
+  !layoutWidth ||
+    (phase === "layout" && ["390", "768", "1440"].includes(layoutWidth)),
+);
+const layoutWidths = layoutWidth ? [Number(layoutWidth)] : [390, 768, 1440];
+const buildSourceSha = process.env.TASK22_BUILD_SOURCE_SHA ?? testedSourceSha;
+execFileSync("git", [
+  "diff",
+  "--exit-code",
+  buildSourceSha,
+  "HEAD",
+  "--",
+  "app",
+  "components",
+  "lib",
+  "package.json",
+  "package-lock.json",
+  "tailwind.config.ts",
+]);
 const output = process.env.TASK22_EVIDENCE_DIR ?? "docs/evidence/task22";
 if (output.startsWith("docs/")) {
   assert.equal(
@@ -277,12 +301,13 @@ try {
     "/year-in-reading?year=2025",
     "/login",
   ];
-  if (!process.env.TASK22_BEHAVIORS_ONLY)
-    for (const width of [390, 768, 1440])
+  if (phase === "all" || phase === "layout")
+    for (const width of layoutWidths)
       for (const theme of ["light", "dark"]) {
         const ui = await attach(width, theme);
         for (const route of routes) {
           if (route === "/login") await ui.context.clearCookies();
+          console.log(`RENDER ${width} ${theme} ${route}`);
           await ui.goto(route);
           assert.equal(new URL(ui.page.url()).pathname, route.split("?")[0]);
           if (route === "/settings") {
@@ -569,490 +594,531 @@ try {
         });
         await ui.context.close();
       }
-  // Behavioral URL, forms, history, session pagination and downloaded CSV.
-  const ui = await attach(390, "light"),
-    { page } = ui;
-  await ui.goto("/?start=2025-01-01&end=2025-01-02&context=keep");
-  assert.equal(new URL(page.url()).pathname, "/dashboard");
-  assert.equal(new URL(page.url()).searchParams.get("end"), "2025-01-02");
-  assert.match(await page.locator("main").innerText(), /1 Jan – 2 Jan 2025/);
-  assert.match(await page.locator("main").innerText(), /≈2,250/);
-  await page.getByLabel("Through", { exact: true }).fill("2025-01-03");
-  await page.getByRole("button", { name: "Apply dates" }).click();
-  await page.waitForURL("**/dashboard?**end=2025-01-03**");
-  assert.equal(new URL(page.url()).searchParams.get("context"), "keep");
-  await page.getByRole("button", { name: "Month", exact: true }).click();
-  await page.waitForURL("**period=month");
-  assert.equal(
-    await page
-      .getByRole("button", { name: "Month", exact: true })
-      .getAttribute("aria-pressed"),
-    "true",
-  );
-  await page.goBack();
-  await page.waitForURL("**end=2025-01-03**");
-  assert.equal(
-    await page.getByLabel("Through", { exact: true }).inputValue(),
-    "2025-01-03",
-  );
-  await page.goForward();
-  await page.waitForURL("**period=month");
-  await page.reload();
-  assert.equal(
-    await page
-      .getByRole("button", { name: "Month", exact: true })
-      .getAttribute("aria-pressed"),
-    "true",
-  );
-  const primary = page.locator('nav[aria-label="Primary navigation"]:visible');
-  await primary.getByRole("link", { name: "Activity", exact: true }).click();
-  await page.waitForURL("**/activity?period=month");
-  await primary.getByRole("link", { name: "Overview", exact: true }).click();
-  await page.waitForURL("**/dashboard?period=month");
-  assert.equal(
-    await page
-      .getByRole("button", { name: "Month", exact: true })
-      .getAttribute("aria-pressed"),
-    "true",
-  );
-  await ui.goto("/dashboard?start=2025-02-02&end=2025-01-01&context=keep");
-  assert.match(
-    await page.locator("main").getByRole("alert").innerText(),
-    /end|Through|after|before/i,
-  );
-  await page.getByLabel("Through", { exact: true }).fill("2025-02-03");
-  await page.getByRole("button", { name: "Apply dates" }).click();
-  await page.waitForURL("**end=2025-02-03**");
-  assert.equal(new URL(page.url()).searchParams.get("context"), "keep");
-  for (const preset of ["today", "week", "month", "year", "all-time"]) {
-    await ui.goto(`/dashboard?period=${preset}`);
-    assert.match(await page.locator("main").innerText(), /Reading time/);
-  }
-  await page
-    .getByRole("heading", { name: "Your reading", exact: true })
-    .scrollIntoViewIfNeeded();
-  await capture(ui, "/dashboard", "presets", true);
-  check(
-    "Overview inclusive range, query preservation, invalid recovery, presets, back/forward/reload",
-  );
-  await ui.goto(
-    "/activity?month=2099-12&day=2099-12-31&page=bogus&context=keep",
-  );
-  assert.equal(
-    await page.getByLabel("Month", { exact: true }).inputValue(),
-    month,
-  );
-  const dayButton = page.getByRole("button", {
-    name: new RegExp(`^${today},`),
-  });
-  assert.equal(await dayButton.isEnabled(), true);
-  await dayButton.tap();
-  assert.equal(await dayButton.getAttribute("aria-pressed"), "true");
-  assert.match(
-    await page.getByRole("region", { name: "Selected day" }).innerText(),
-    /100 estimated words · 25 sessions/,
-  );
-  assert.match(await page.locator("main").innerText(), /00:30/);
-  for (const button of await page.locator("button[aria-label]").all()) {
-    const label = await button.getAttribute("aria-label");
-    if (/^\d{4}-\d{2}-\d{2},/.test(label) && label.slice(0, 10) > today)
-      assert.equal(await button.isDisabled(), true);
-  }
-  await page.getByRole("link", { name: "Next", exact: true }).click();
-  await page.waitForURL("**page=2");
-  assert.equal(new URL(page.url()).searchParams.get("context"), "keep");
-  assert.equal(await page.locator("main article").count(), 5);
-  assert.match(
-    await page.getByRole("region", { name: "Selected day" }).innerText(),
-    /100 estimated words · 25 sessions/,
-  );
-  await page
-    .getByRole("region", { name: "Selected day" })
-    .scrollIntoViewIfNeeded();
-  await capture(ui, "/activity", "selected-day", true);
-  await page.reload();
-  assert.equal(await dayButton.getAttribute("aria-pressed"), "true");
-  await page.getByLabel("Month", { exact: true }).fill("2025-01");
-  await page.waitForURL("**month=2025-01**");
-  assert.equal(new URL(page.url()).searchParams.has("page"), false);
-  assert.equal(new URL(page.url()).searchParams.has("day"), false);
-  await ui.goto(`/activity?month=${month}&day=2025-01-01`);
-  assert.equal(await dayButton.getAttribute("aria-pressed"), "true");
-  check(
-    "Activity future/invalid/out-of-month, today, touch selection, page-independent totals and Athens timestamps",
-  );
-  await ui.goto("/reports?period=yearly&date=2025&context=keep");
-  assert.match(
-    await page.locator("main").innerText(),
-    /Previous year: 2024-01-01 – 2024-12-31/,
-  );
-  const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export CSV" }).click();
-  const download = await downloadPromise;
-  const csv = await readFile(await download.path(), "utf8");
-  assert.equal(download.suggestedFilename(), "matter-stats-yearly-2025.csv");
-  assert.equal(csv.split("\n").length, 366);
-  assert.equal(
-    csv.split("\n")[0],
-    "date,reading_time_seconds,estimated_words,sessions",
-  );
-  assert.match(csv, /2025-01-02,600,2250,1/);
-  assert.equal(csv.split("\n").at(-1), "2025-12-31,0,0,0");
-  await page.getByRole("button", { name: "Month", exact: true }).click();
-  await page.waitForURL("**period=monthly**");
-  assert.equal(new URL(page.url()).searchParams.get("date"), "2025-01");
-  assert.equal(new URL(page.url()).searchParams.get("context"), "keep");
-  await page.goBack();
-  await page.waitForURL("**period=yearly**");
-  await page.reload();
-  assert.equal(
-    await page.getByLabel("Specific report period").inputValue(),
-    "2025",
-  );
-  await page.getByLabel("Specific report period").fill("20");
-  await page.getByRole("button", { name: "Apply period" }).click();
-  assert.equal(
-    await page
-      .getByLabel("Specific report period")
-      .evaluate((el) => el.validity.patternMismatch),
-    true,
-  );
-  assert.equal(new URL(page.url()).searchParams.get("date"), "2025");
-  await page.getByLabel("Specific report period").fill("2024");
-  await page.getByRole("button", { name: "Apply period" }).click();
-  await page.waitForURL("**date=2024**");
-  await page
-    .getByRole("link", { name: "Explore your 2024 annual recap →" })
-    .click();
-  await page.waitForURL("**year-in-reading?year=2024");
-  assert.match(await page.locator("h1").innerText(), /2024/);
-  await page.reload();
-  await page.getByRole("link", { name: "View 2024 report and CSV →" }).click();
-  await page.waitForURL("**period=yearly&date=2024");
-  await ui.goto("/reports?period=weekly&weekStart=2025-01-02");
-  assert.equal(
-    await page.getByLabel("Specific report period").inputValue(),
-    "2024-12-30",
-  );
-  await ui.goto("/reports?period=daily&date=2025-01-02");
-  assert.equal(
-    await page
-      .getByRole("button", { name: "Day", exact: true })
-      .getAttribute("aria-pressed"),
-    "true",
-  );
-  check(
-    "Reports selected year, editable input, comparison labels, legacy deep links, history, recap round trip and canonical CSV",
-  );
-  await ui.goto("/articles?page=99&context=keep");
-  assert.match(
-    await page.locator("main").innerText(),
-    /Matching library items are available/,
-  );
-  await page.getByRole("button", { name: "Return to first page" }).click();
-  await page.waitForURL("**page=1**");
-  assert.equal(new URL(page.url()).searchParams.get("context"), "keep");
-  await ui.goto("/articles");
-  assert.equal(
-    await page.locator("main button h3").first().innerText(),
-    "Untitled article",
-  );
-  assert.equal(
-    await page
-      .locator("main")
-      .getByRole("button", { name: /Untitled article/ })
-      .count(),
-    1,
-  );
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await page.waitForURL("**page=2");
-  assert.equal(
-    await page
-      .locator("main button")
-      .filter({ has: page.locator("h3") })
-      .count(),
-    5,
-  );
-  await page.getByRole("button", { name: "Previous", exact: true }).click();
-  await page.waitForURL("**page=1");
-  const searchDraft = page.getByRole("textbox", {
-    name: "Search articles by title, source, or author",
-  });
-  await searchDraft.fill("Synthetic");
-  await page.getByLabel("Author", { exact: true }).fill("Sample author");
-  await page.getByLabel("Content type", { exact: true }).focus();
-  await page.waitForURL("**author=Sample+author**");
-  assert.equal(await searchDraft.inputValue(), "Synthetic");
-  await page.getByLabel("Content type", { exact: true }).fill("article");
-  await page.getByRole("button", { name: "Search", exact: true }).tap();
-  await page.waitForURL(
-    (url) =>
-      url.searchParams.get("q") === "Synthetic" &&
-      url.searchParams.get("type") === "article",
-  );
-  assert.equal(new URL(page.url()).searchParams.get("author"), "Sample author");
-  await ui.goto(
-    "/articles?q=Synthetic&source=Example+journal&tag=synthetic-tag&status=queue&author=Sample+author&type=article&size=short",
-  );
-  assert.match(await page.locator("main").innerText(), /Synthetic article 001/);
-  assert.match(await page.locator("main").innerText(), /Matching articles\s+1/);
-  await page.getByRole("button", { name: /Synthetic article 001/ }).tap();
-  await page.waitForURL("**/articles/synthetic-item-001");
-  await page
-    .getByText(/Reading sessions are not attributed to this item/)
-    .waitFor();
-  assert.match(
-    await page.locator("main").innerText(),
-    /Reading sessions are not attributed/,
-  );
-  await page.goBack();
-  assert.equal(new URL(page.url()).searchParams.get("tag"), "synthetic-tag");
-  for (const filter of [
-    "status=inbox",
-    "author=Missing",
-    "type=missing",
-    "size=long",
-  ]) {
-    await ui.goto(`/articles?${filter}`);
-    assert.match(
-      await page.locator("main").innerText(),
-      /Try clearing or broadening/,
-    );
-    assert.equal(
+  if (phase !== "layout") {
+    // Behavioral URL, forms, history, session pagination and downloaded CSV.
+    const ui = await attach(390, "light"),
+      { page } = ui;
+    if (phase === "all" || phase === "flows") {
+      await ui.goto("/?start=2025-01-01&end=2025-01-02&context=keep");
+      assert.equal(new URL(page.url()).pathname, "/dashboard");
+      assert.equal(new URL(page.url()).searchParams.get("end"), "2025-01-02");
+      assert.match(
+        await page.locator("main").innerText(),
+        /1 Jan – 2 Jan 2025/,
+      );
+      assert.match(await page.locator("main").innerText(), /≈2,250/);
+      await page.getByLabel("Through", { exact: true }).fill("2025-01-03");
+      await page.getByRole("button", { name: "Apply dates" }).click();
+      await page.waitForURL("**/dashboard?**end=2025-01-03**");
+      assert.equal(new URL(page.url()).searchParams.get("context"), "keep");
+      await page.getByRole("button", { name: "Month", exact: true }).click();
+      await page.waitForURL("**period=month");
+      assert.equal(
+        await page
+          .getByRole("button", { name: "Month", exact: true })
+          .getAttribute("aria-pressed"),
+        "true",
+      );
+      await page.goBack();
+      await page.waitForURL("**end=2025-01-03**");
+      assert.equal(
+        await page.getByLabel("Through", { exact: true }).inputValue(),
+        "2025-01-03",
+      );
+      await page.goForward();
+      await page.waitForURL("**period=month");
+      await page.reload();
+      assert.equal(
+        await page
+          .getByRole("button", { name: "Month", exact: true })
+          .getAttribute("aria-pressed"),
+        "true",
+      );
+      const primary = page.locator(
+        'nav[aria-label="Primary navigation"]:visible',
+      );
+      await primary
+        .getByRole("link", { name: "Activity", exact: true })
+        .click();
+      await page.waitForURL("**/activity?period=month");
+      await primary
+        .getByRole("link", { name: "Overview", exact: true })
+        .click();
+      await page.waitForURL("**/dashboard?period=month");
+      assert.equal(
+        await page
+          .getByRole("button", { name: "Month", exact: true })
+          .getAttribute("aria-pressed"),
+        "true",
+      );
+      await ui.goto("/dashboard?start=2025-02-02&end=2025-01-01&context=keep");
+      assert.match(
+        await page.locator("main").getByRole("alert").innerText(),
+        /end|Through|after|before/i,
+      );
+      await page.getByLabel("Through", { exact: true }).fill("2025-02-03");
+      await page.getByRole("button", { name: "Apply dates" }).click();
+      await page.waitForURL("**end=2025-02-03**");
+      assert.equal(new URL(page.url()).searchParams.get("context"), "keep");
+      for (const preset of ["today", "week", "month", "year", "all-time"]) {
+        await ui.goto(`/dashboard?period=${preset}`);
+        assert.match(await page.locator("main").innerText(), /Reading time/);
+      }
+      await page
+        .getByRole("heading", { name: "Your reading", exact: true })
+        .scrollIntoViewIfNeeded();
+      await capture(ui, "/dashboard", "presets", true);
+      check(
+        "Overview inclusive range, query preservation, invalid recovery, presets, back/forward/reload",
+      );
+      await ui.goto(
+        "/activity?month=2099-12&day=2099-12-31&page=bogus&context=keep",
+      );
+      assert.equal(
+        await page.getByLabel("Month", { exact: true }).inputValue(),
+        month,
+      );
+      const dayButton = page.getByRole("button", {
+        name: new RegExp(`^${today},`),
+      });
+      assert.equal(await dayButton.isEnabled(), true);
+      await dayButton.tap();
+      assert.equal(await dayButton.getAttribute("aria-pressed"), "true");
+      assert.match(
+        await page.getByRole("region", { name: "Selected day" }).innerText(),
+        /100 estimated words · 25 sessions/,
+      );
+      assert.match(await page.locator("main").innerText(), /00:30/);
+      for (const button of await page.locator("button[aria-label]").all()) {
+        const label = await button.getAttribute("aria-label");
+        if (/^\d{4}-\d{2}-\d{2},/.test(label) && label.slice(0, 10) > today)
+          assert.equal(await button.isDisabled(), true);
+      }
+      await page.getByRole("link", { name: "Next", exact: true }).click();
+      await page.waitForURL("**page=2");
+      assert.equal(new URL(page.url()).searchParams.get("context"), "keep");
+      assert.equal(await page.locator("main article").count(), 5);
+      assert.match(
+        await page.getByRole("region", { name: "Selected day" }).innerText(),
+        /100 estimated words · 25 sessions/,
+      );
+      await page
+        .getByRole("region", { name: "Selected day" })
+        .scrollIntoViewIfNeeded();
+      await capture(ui, "/activity", "selected-day", true);
+      await page.reload();
+      assert.equal(await dayButton.getAttribute("aria-pressed"), "true");
+      await page.getByLabel("Month", { exact: true }).fill("2025-01");
+      await page.waitForURL("**month=2025-01**");
+      assert.equal(new URL(page.url()).searchParams.has("page"), false);
+      assert.equal(new URL(page.url()).searchParams.has("day"), false);
+      await ui.goto(`/activity?month=${month}&day=2025-01-01`);
+      assert.equal(await dayButton.getAttribute("aria-pressed"), "true");
+      check(
+        "Activity future/invalid/out-of-month, today, touch selection, page-independent totals and Athens timestamps",
+      );
+      await ui.goto("/reports?period=yearly&date=2025&context=keep");
+      assert.match(
+        await page.locator("main").innerText(),
+        /Previous year: 2024-01-01 – 2024-12-31/,
+      );
+      const downloadPromise = page.waitForEvent("download");
+      await page.getByRole("button", { name: "Export CSV" }).click();
+      const download = await downloadPromise;
+      const csv = await readFile(await download.path(), "utf8");
+      assert.equal(
+        download.suggestedFilename(),
+        "matter-stats-yearly-2025.csv",
+      );
+      assert.equal(csv.split("\n").length, 366);
+      assert.equal(
+        csv.split("\n")[0],
+        "date,reading_time_seconds,estimated_words,sessions",
+      );
+      assert.match(csv, /2025-01-02,600,2250,1/);
+      assert.equal(csv.split("\n").at(-1), "2025-12-31,0,0,0");
+      await page.getByRole("button", { name: "Month", exact: true }).click();
+      await page.waitForURL("**period=monthly**");
+      assert.equal(new URL(page.url()).searchParams.get("date"), "2025-01");
+      assert.equal(new URL(page.url()).searchParams.get("context"), "keep");
+      await page.goBack();
+      await page.waitForURL("**period=yearly**");
+      await page.reload();
+      assert.equal(
+        await page.getByLabel("Specific report period").inputValue(),
+        "2025",
+      );
+      await page.getByLabel("Specific report period").fill("20");
+      await page.getByRole("button", { name: "Apply period" }).click();
+      assert.equal(
+        await page
+          .getByLabel("Specific report period")
+          .evaluate((el) => el.validity.patternMismatch),
+        true,
+      );
+      assert.equal(new URL(page.url()).searchParams.get("date"), "2025");
+      await page.getByLabel("Specific report period").fill("2024");
+      await page.getByRole("button", { name: "Apply period" }).click();
+      await page.waitForURL("**date=2024**");
+      await page
+        .getByRole("link", { name: "Explore your 2024 annual recap →" })
+        .click();
+      await page.waitForURL("**year-in-reading?year=2024");
+      assert.match(await page.locator("h1").innerText(), /2024/);
+      await page.reload();
+      await page
+        .getByRole("link", { name: "View 2024 report and CSV →" })
+        .click();
+      await page.waitForURL("**period=yearly&date=2024");
+      await ui.goto("/reports?period=weekly&weekStart=2025-01-02");
+      assert.equal(
+        await page.getByLabel("Specific report period").inputValue(),
+        "2024-12-30",
+      );
+      await ui.goto("/reports?period=daily&date=2025-01-02");
+      assert.equal(
+        await page
+          .getByRole("button", { name: "Day", exact: true })
+          .getAttribute("aria-pressed"),
+        "true",
+      );
+      check(
+        "Reports selected year, editable input, comparison labels, legacy deep links, history, recap round trip and canonical CSV",
+      );
+      await ui.goto("/articles?page=99&context=keep");
+      assert.match(
+        await page.locator("main").innerText(),
+        /Matching library items are available/,
+      );
+      await page.getByRole("button", { name: "Return to first page" }).click();
+      await page.waitForURL("**page=1**");
+      assert.equal(new URL(page.url()).searchParams.get("context"), "keep");
+      await ui.goto("/articles");
+      assert.equal(
+        await page.locator("main button h3").first().innerText(),
+        "Untitled article",
+      );
+      assert.equal(
+        await page
+          .locator("main")
+          .getByRole("button", { name: /Untitled article/ })
+          .count(),
+        1,
+      );
+      await page.getByRole("button", { name: "Next", exact: true }).click();
+      await page.waitForURL("**page=2");
+      assert.equal(
+        await page
+          .locator("main button")
+          .filter({ has: page.locator("h3") })
+          .count(),
+        5,
+      );
+      await page.getByRole("button", { name: "Previous", exact: true }).click();
+      await page.waitForURL("**page=1");
+      const searchDraft = page.getByRole("textbox", {
+        name: "Search articles by title, source, or author",
+      });
+      await searchDraft.fill("Synthetic");
+      await page.getByLabel("Author", { exact: true }).fill("Sample author");
+      await page.getByLabel("Content type", { exact: true }).focus();
+      await page.waitForURL("**author=Sample+author**");
+      assert.equal(await searchDraft.inputValue(), "Synthetic");
+      await page.getByLabel("Content type", { exact: true }).fill("article");
+      await page.getByRole("button", { name: "Search", exact: true }).tap();
+      await page.waitForURL(
+        (url) =>
+          url.searchParams.get("q") === "Synthetic" &&
+          url.searchParams.get("type") === "article",
+      );
+      assert.equal(
+        new URL(page.url()).searchParams.get("author"),
+        "Sample author",
+      );
+      await ui.goto(
+        "/articles?q=Synthetic&source=Example+journal&tag=synthetic-tag&status=queue&author=Sample+author&type=article&size=short",
+      );
+      assert.match(
+        await page.locator("main").innerText(),
+        /Synthetic article 001/,
+      );
+      assert.match(
+        await page.locator("main").innerText(),
+        /Matching articles\s+1/,
+      );
+      await page.getByRole("button", { name: /Synthetic article 001/ }).tap();
+      await page.waitForURL("**/articles/synthetic-item-001");
+      await page
+        .getByText(/Reading sessions are not attributed to this item/)
+        .waitFor();
+      assert.match(
+        await page.locator("main").innerText(),
+        /Reading sessions are not attributed/,
+      );
+      await page.goBack();
+      assert.equal(
+        new URL(page.url()).searchParams.get("tag"),
+        "synthetic-tag",
+      );
+      for (const filter of [
+        "status=inbox",
+        "author=Missing",
+        "type=missing",
+        "size=long",
+      ]) {
+        await ui.goto(`/articles?${filter}`);
+        assert.match(
+          await page.locator("main").innerText(),
+          /Try clearing or broadening/,
+        );
+        assert.equal(
+          await page
+            .getByRole("button", { name: "Clear filters", exact: true })
+            .isVisible(),
+          true,
+        );
+      }
       await page
         .getByRole("button", { name: "Clear filters", exact: true })
-        .isVisible(),
-      true,
-    );
-  }
-  await page
-    .getByRole("button", { name: "Clear filters", exact: true })
-    .click();
-  await page.waitForURL(`${origin}/articles`);
-  for (const route of ["/authors", "/sources", "/tags"]) {
-    await ui.goto(route);
-    assert.match(
-      await page.locator("main").innerText(),
-      /attribution is unavailable/,
-    );
-    assert.doesNotMatch(
-      await page.locator("main").innerText(),
-      /Sync Matter items with tags|No .* reading data was found/,
-    );
-  }
-  await ui.goto("/year-in-reading");
-  assert.doesNotMatch(
-    await page.locator("main").innerText(),
-    /No .*reading sessions have synced/,
-  );
-  assert.match(await page.locator("main").innerText(), /25 sessions/);
-  check(
-    "Library stable pagination, combined filters, empty recovery, nullable details and unsupported attribution",
-  );
-  // Stored legacy links are synthetic; they do not establish upstream capability.
-  await scenario("linked");
-  for (const width of [390, 768, 1440]) {
-    await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
-    for (const route of ["/authors", "/sources", "/tags"]) {
-      await ui.goto(route);
-      assert.ok((await page.getByRole("row").count()) > 1);
-      const search = page.getByRole("textbox");
-      await search.fill("no-match-fixture");
-      await page.getByText(/No .* match/).waitFor();
-      await search.fill("");
-      const sort = page.getByRole("button", {
-        name: "Estimated words",
-        exact: true,
-      });
-      await sort.click();
-      assert.equal(await sort.getAttribute("aria-pressed"), "true");
-      await capture(
-        { ...ui, width },
-        route,
-        "linked",
-        width === 768 && route === "/sources",
+        .click();
+      await page.waitForURL(`${origin}/articles`);
+      for (const route of ["/authors", "/sources", "/tags"]) {
+        await ui.goto(route);
+        assert.match(
+          await page.locator("main").innerText(),
+          /attribution is unavailable/,
+        );
+        assert.doesNotMatch(
+          await page.locator("main").innerText(),
+          /Sync Matter items with tags|No .* reading data was found/,
+        );
+      }
+      await ui.goto("/year-in-reading");
+      assert.doesNotMatch(
+        await page.locator("main").innerText(),
+        /No .*reading sessions have synced/,
       );
-    }
-    await ui.goto(`/year-in-reading?year=${today.slice(0, 4)}`);
-    assert.match(
-      await page.locator("main").innerText(),
-      /Attributed articles\s+2/,
-    );
-    await capture(
-      { ...ui, width },
-      "/year-in-reading",
-      "linked",
-      width === 390,
-    );
-  }
-  check(
-    "retained legacy linked rankings, search/sort and distinct annual recap",
-    { widths: [390, 768, 1440] },
-  );
-  await scenario("normal");
-  // Independent status/data scenarios, all widths; Task 21 owns every interpretation.
-  const expected = {
-    normal: /Sessions completion is recent/,
-    partial: /Partial ingestion; pending continuation/,
-    stale: /Sessions completion is stale/,
-    never: /No completed sessions synchronization yet/,
-    unknown: /Sessions completion time unknown/,
-    "metadata-incomplete": /Sessions completion is recent/,
-    "derived-pending": /Updates pending|pending dirty rollups/,
-    candidate: /not applied/,
-    "status-error": /Sessions status unavailable/,
-    "library-error": /Library query unavailable/,
-    "metrics-error": /Reading data unavailable/,
-    empty: /No imported reading sessions in this period/,
-  };
-  if (!process.env.TASK22_BEHAVIORS_ONLY)
-    for (const [name, pattern] of Object.entries(expected)) {
-      await scenario(name);
+      assert.match(await page.locator("main").innerText(), /25 sessions/);
+      check(
+        "Library stable pagination, combined filters, empty recovery, nullable details and unsupported attribution",
+      );
+      // Stored legacy links are synthetic; they do not establish upstream capability.
+      await scenario("linked");
       for (const width of [390, 768, 1440]) {
         await page.setViewportSize({
           width,
           height: width === 390 ? 844 : 1000,
         });
-        await ui.goto("/dashboard");
-        assert.match(await page.locator("main").innerText(), pattern);
+        for (const route of ["/authors", "/sources", "/tags"]) {
+          await ui.goto(route);
+          assert.ok((await page.getByRole("row").count()) > 1);
+          const search = page.getByRole("textbox");
+          await search.fill("no-match-fixture");
+          await page.getByText(/No .* match/).waitFor();
+          await search.fill("");
+          const sort = page.getByRole("button", {
+            name: "Estimated words",
+            exact: true,
+          });
+          await sort.click();
+          assert.equal(await sort.getAttribute("aria-pressed"), "true");
+          await capture(
+            { ...ui, width },
+            route,
+            "linked",
+            width === 768 && route === "/sources",
+          );
+        }
+        await ui.goto(`/year-in-reading?year=${today.slice(0, 4)}`);
         assert.match(
           await page.locator("main").innerText(),
-          /Coverage unverified/,
+          /Attributed articles\s+2/,
         );
-        if (["metrics-error", "library-error", "status-error"].includes(name))
-          assert.equal(
-            await page
-              .getByRole("button", { name: "Month", exact: true })
-              .isEnabled(),
-            true,
-          );
-        if (name === "metrics-error")
-          assert.match(
-            await page.locator("main").innerText(),
-            /Synthetic article/,
-          );
-        else
-          assert.match(
-            await page.locator("main").innerText(),
-            /Estimated words/,
-          );
         await capture(
           { ...ui, width },
-          "/dashboard",
-          name,
-          width === 390 &&
-            ["partial", "candidate", "metrics-error"].includes(name),
-        );
-        await ui.goto("/settings");
-        assert.match(await page.locator("main").innerText(), /Europe\/Athens/);
-        if (name === "derived-pending")
-          assert.match(
-            await page.locator("main").innerText(),
-            /pending dirty rollups/,
-          );
-        if (name === "candidate")
-          assert.match(await page.locator("main").innerText(), /not applied/);
-        if (name === "candidate" && width === 768)
-          await page
-            .getByText("Historical repair", { exact: true })
-            .scrollIntoViewIfNeeded();
-        await capture(
-          { ...ui, width },
-          "/settings",
-          name,
-          width === 768 && name === "candidate",
+          "/year-in-reading",
+          "linked",
+          width === 390,
         );
       }
+      check(
+        "retained legacy linked rankings, search/sort and distinct annual recap",
+        { widths: [390, 768, 1440] },
+      );
+      await scenario("normal");
     }
-  await scenario("library-error");
-  await ui.goto("/articles");
-  assert.doesNotMatch(
-    await page.locator("main").innerText(),
-    /No articles found/,
-  );
-  await ui.goto("/articles/synthetic-item-000");
-  assert.match(await page.locator("main").innerText(), /Item unavailable/);
-  await scenario("metrics-error");
-  for (const route of ["/activity", "/reports", "/year-in-reading"]) {
-    await ui.goto(route);
-    assert.doesNotMatch(
-      await page.locator("main").innerText(),
-      /No reading activity|You spent 0|No imported sessions/,
-    );
+    if (phase === "all" || phase === "states") {
+      // Independent status/data scenarios, all widths; Task 21 owns every interpretation.
+      const expected = {
+        normal: /Sessions completion is recent/,
+        partial: /Partial ingestion; pending continuation/,
+        stale: /Sessions completion is stale/,
+        never: /No completed sessions synchronization yet/,
+        unknown: /Sessions completion time unknown/,
+        "metadata-incomplete": /Sessions completion is recent/,
+        "derived-pending": /Updates pending|pending dirty rollups/,
+        candidate: /not applied/,
+        "status-error": /Sessions status unavailable/,
+        "library-error": /Library query unavailable/,
+        "metrics-error": /Reading data unavailable/,
+        empty: /No imported reading sessions in this period/,
+      };
+      for (const [name, pattern] of Object.entries(expected)) {
+        await scenario(name);
+        for (const width of [390, 768, 1440]) {
+          await page.setViewportSize({
+            width,
+            height: width === 390 ? 844 : 1000,
+          });
+          await ui.goto("/dashboard");
+          assert.match(await page.locator("main").innerText(), pattern);
+          assert.match(
+            await page.locator("main").innerText(),
+            /Coverage unverified/,
+          );
+          if (["metrics-error", "library-error", "status-error"].includes(name))
+            assert.equal(
+              await page
+                .getByRole("button", { name: "Month", exact: true })
+                .isEnabled(),
+              true,
+            );
+          if (name === "metrics-error")
+            assert.match(
+              await page.locator("main").innerText(),
+              /Synthetic article/,
+            );
+          else
+            assert.match(
+              await page.locator("main").innerText(),
+              /Estimated words/,
+            );
+          await capture(
+            { ...ui, width },
+            "/dashboard",
+            name,
+            width === 390 &&
+              ["partial", "candidate", "metrics-error"].includes(name),
+          );
+          await ui.goto("/settings");
+          assert.match(
+            await page.locator("main").innerText(),
+            /Europe\/Athens/,
+          );
+          if (name === "derived-pending")
+            assert.match(
+              await page.locator("main").innerText(),
+              /pending dirty rollups/,
+            );
+          if (name === "candidate")
+            assert.match(await page.locator("main").innerText(), /not applied/);
+          if (name === "candidate" && width === 768)
+            await page
+              .getByText("Historical repair", { exact: true })
+              .scrollIntoViewIfNeeded();
+          await capture(
+            { ...ui, width },
+            "/settings",
+            name,
+            width === 768 && name === "candidate",
+          );
+        }
+      }
+      await scenario("library-error");
+      await ui.goto("/articles");
+      assert.doesNotMatch(
+        await page.locator("main").innerText(),
+        /No articles found/,
+      );
+      await ui.goto("/articles/synthetic-item-000");
+      assert.match(await page.locator("main").innerText(), /Item unavailable/);
+      await scenario("metrics-error");
+      for (const route of ["/activity", "/reports", "/year-in-reading"]) {
+        await ui.goto(route);
+        assert.doesNotMatch(
+          await page.locator("main").innerText(),
+          /No reading activity|You spent 0|No imported sessions/,
+        );
+      }
+      check(
+        "independent failures and never/unknown/empty/partial/stale/metadata/derived/candidate status matrix",
+      );
+    }
+    if (phase === "all" || phase === "flows") {
+      await scenario("normal");
+      await page.setViewportSize({ width: 390, height: 844 });
+      await ui.goto("/dashboard");
+      await page.locator("summary").click();
+      await page
+        .locator("details")
+        .getByRole("button", { name: "Log out" })
+        .click();
+      await page.waitForURL("**/login");
+      assert.equal(
+        (await ui.context.cookies()).some(
+          (c) => c.name === "matter_stats_session",
+        ),
+        false,
+      );
+      await ui.context.addCookies([
+        {
+          name: "matter_stats_session",
+          value: "task21-synthetic-session-cookie-only",
+          url: origin,
+        },
+      ]);
+      await ui.goto("/dashboard");
+      assert.equal(new URL(page.url()).pathname, "/login");
+      await ui.context.clearCookies();
+      await page.getByLabel("Access password").fill("wrong-synthetic-password");
+      await page.getByRole("button", { name: "Sign in" }).click();
+      assert.match(
+        await page.locator("main").getByRole("alert").innerText(),
+        /Invalid password/,
+      );
+      await scenario("login-error");
+      await page.getByLabel("Access password").fill("synthetic-password");
+      let releaseLogin;
+      const loginGate = new Promise((resolve) => {
+        releaseLogin = resolve;
+      });
+      await page.route(`${origin}/login`, async (route) => {
+        if (route.request().method() === "POST") await loginGate;
+        await route.continue();
+      });
+      try {
+        await page.getByRole("button", { name: "Sign in" }).click();
+        const pending = page.getByRole("button", {
+          name: "Checking...",
+          exact: true,
+        });
+        await pending.waitFor();
+        assert.equal(await pending.isDisabled(), true);
+      } finally {
+        releaseLogin();
+      }
+      await page
+        .locator("main")
+        .getByRole("alert")
+        .filter({ hasText: /temporarily unavailable/ })
+        .waitFor();
+      assert.match(
+        await page.locator("main").getByRole("alert").innerText(),
+        /temporarily unavailable/,
+      );
+      assert.equal(new URL(page.url()).pathname, "/login");
+      // The response has settled before removing the held-request handler.
+      await page.unroute(`${origin}/login`);
+      await scenario("normal");
+      // React resets an uncontrolled action form after the returned error state.
+      await page.getByLabel("Access password").fill("synthetic-password");
+      await page.getByRole("button", { name: "Sign in" }).click();
+      await page.waitForURL("**/dashboard");
+      check(
+        "synthetic login errors, logout revocation, cookie removal and replay denial",
+      );
+    }
   }
-  check(
-    "independent failures and never/unknown/empty/partial/stale/metadata/derived/candidate status matrix",
-  );
-  await scenario("normal");
-  await page.setViewportSize({ width: 390, height: 844 });
-  await ui.goto("/dashboard");
-  await page.locator("summary").click();
-  await page
-    .locator("details")
-    .getByRole("button", { name: "Log out" })
-    .click();
-  await page.waitForURL("**/login");
-  assert.equal(
-    (await ui.context.cookies()).some((c) => c.name === "matter_stats_session"),
-    false,
-  );
-  await ui.context.addCookies([
-    {
-      name: "matter_stats_session",
-      value: "task21-synthetic-session-cookie-only",
-      url: origin,
-    },
-  ]);
-  await ui.goto("/dashboard");
-  assert.equal(new URL(page.url()).pathname, "/login");
-  await ui.context.clearCookies();
-  await page.getByLabel("Access password").fill("wrong-synthetic-password");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  assert.match(
-    await page.locator("main").getByRole("alert").innerText(),
-    /Invalid password/,
-  );
-  await scenario("login-error");
-  await page.getByLabel("Access password").fill("synthetic-password");
-  let releaseLogin;
-  const loginGate = new Promise((resolve) => {
-    releaseLogin = resolve;
-  });
-  await page.route(`${origin}/login`, async (route) => {
-    if (route.request().method() === "POST") await loginGate;
-    await route.continue();
-  });
-  try {
-    await page.getByRole("button", { name: "Sign in" }).click();
-    const pending = page.getByRole("button", {
-      name: "Checking...",
-      exact: true,
-    });
-    await pending.waitFor();
-    assert.equal(await pending.isDisabled(), true);
-  } finally {
-    releaseLogin();
-  }
-  await page
-    .locator("main")
-    .getByRole("alert")
-    .filter({ hasText: /temporarily unavailable/ })
-    .waitFor();
-  assert.match(
-    await page.locator("main").getByRole("alert").innerText(),
-    /temporarily unavailable/,
-  );
-  assert.equal(new URL(page.url()).pathname, "/login");
-  // The response has settled before removing the held-request handler.
-  await page.unroute(`${origin}/login`);
-  await scenario("normal");
-  // React resets an uncontrolled action form after the returned error state.
-  await page.getByLabel("Access password").fill("synthetic-password");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL("**/dashboard");
-  check(
-    "synthetic login errors, logout revocation, cookie removal and replay denial",
-  );
   const requests = await (await fetch(`${api}/observations`)).json();
   const mutations = requests.filter(
     (r) =>
@@ -1090,6 +1156,9 @@ try {
     JSON.stringify(
       {
         testedSourceSha,
+        buildSourceSha,
+        phase,
+        layoutWidths: phase === "layout" ? layoutWidths : undefined,
         syntheticOnly: true,
         productionData: false,
         appTimezone: "Europe/Athens",
@@ -1112,7 +1181,53 @@ try {
   console.log(
     `Verified ${evidence.length} rendered route/state/viewport/theme combinations and ${checks.length} behavioral groups at ${testedSourceSha}.`,
   );
+} catch (error) {
+  const diagnostic = {
+    testedSourceSha,
+    buildSourceSha,
+    phase,
+    layoutWidths,
+    message: error.message,
+    lastCompletedPages: evidence.slice(-3),
+    activePages: [],
+  };
+  if (browser?.isConnected())
+    for (const context of browser.contexts())
+      for (const page of context.pages()) {
+        const state = { url: page.url() };
+        try {
+          state.mainText = await page
+            .locator("main")
+            .innerText({ timeout: 5000 });
+          await page.screenshot({
+            path: "work/task22-ui-failure.png",
+            timeout: 5000,
+          });
+        } catch (captureError) {
+          state.captureError = captureError.message;
+        }
+        diagnostic.activePages.push(state);
+      }
+  await writeFile(
+    "work/task22-ui-failure.json",
+    JSON.stringify(diagnostic, null, 2) + "\n",
+  );
+  throw error;
 } finally {
   if (browser) await browser.close();
-  for (const child of children) child.kill("SIGTERM");
+  await Promise.all(
+    children.map(
+      (child) =>
+        new Promise((resolve) => {
+          if (child.exitCode !== null || child.signalCode !== null)
+            return resolve();
+          const timer = setTimeout(() => child.kill("SIGKILL"), 5000);
+          child.once("exit", () => {
+            clearTimeout(timer);
+            resolve();
+          });
+          child.kill("SIGTERM");
+        }),
+    ),
+  );
 }
