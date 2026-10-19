@@ -217,6 +217,19 @@ try {
               ].includes(route)) ||
               (theme === "dark" && route === "/articles/synthetic-item-000"),
           );
+          if (route === "/articles" && width === 768 && theme === "light") {
+            assert.equal(await ui.page.getByRole("row").count(), 101);
+            const title = ui.page.getByRole("link", {
+              name: "Open Untitled article",
+              exact: true,
+            });
+            await title.focus();
+            await capture(ui, route, "table-keyboard", true);
+            await ui.page.keyboard.press("Enter");
+            await ui.page.waitForURL("**/articles/synthetic-item-000");
+            await ui.page.goBack();
+            await ui.page.waitForURL(`${origin}/articles`);
+          }
           const main = ui.page.locator("main");
           const controls = main.locator(
             "a:visible,button:visible,input:visible,select:visible",
@@ -384,7 +397,7 @@ try {
   );
   await ui.goto("/dashboard?start=2025-02-02&end=2025-01-01&context=keep");
   assert.match(
-    await page.getByRole("alert").innerText(),
+    await page.locator("main").getByRole("alert").innerText(),
     /end|Through|after|before/i,
   );
   await page.getByLabel("Through", { exact: true }).fill("2025-02-03");
@@ -420,7 +433,11 @@ try {
     /100 estimated words · 25 sessions/,
   );
   assert.match(await page.locator("main").innerText(), /00:30/);
-  assert.equal((await page.locator("button[disabled]").count()) > 0, true);
+  for (const button of await page.locator("button[aria-label]").all()) {
+    const label = await button.getAttribute("aria-label");
+    if (/^\d{4}-\d{2}-\d{2},/.test(label) && label.slice(0, 10) > today)
+      assert.equal(await button.isDisabled(), true);
+  }
   await page.getByRole("link", { name: "Next", exact: true }).click();
   await page.waitForURL("**page=2");
   assert.equal(new URL(page.url()).searchParams.get("context"), "keep");
@@ -507,7 +524,19 @@ try {
   check(
     "Reports selected year, editable input, comparison labels, legacy deep links, history, recap round trip and canonical CSV",
   );
+  await ui.goto("/articles?page=99&context=keep");
+  assert.match(
+    await page.locator("main").innerText(),
+    /Matching library items are available/,
+  );
+  await page.getByRole("button", { name: "Return to first page" }).click();
+  await page.waitForURL("**page=1**");
+  assert.equal(new URL(page.url()).searchParams.get("context"), "keep");
   await ui.goto("/articles");
+  assert.equal(
+    await page.locator("main button h3").first().innerText(),
+    "Untitled article",
+  );
   assert.equal(
     await page
       .locator("main")
@@ -596,58 +625,65 @@ try {
     "metrics-error": /Reading data unavailable/,
     empty: /No imported reading sessions in this period/,
   };
-  for (const [name, pattern] of Object.entries(expected)) {
-    await scenario(name);
-    for (const width of [390, 768, 1440]) {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
-      await ui.goto("/dashboard");
-      assert.match(await page.locator("main").innerText(), pattern);
-      assert.match(
-        await page.locator("main").innerText(),
-        /Coverage unverified/,
-      );
-      if (["metrics-error", "library-error", "status-error"].includes(name))
-        assert.equal(
+  if (!process.env.TASK22_BEHAVIORS_ONLY)
+    for (const [name, pattern] of Object.entries(expected)) {
+      await scenario(name);
+      for (const width of [390, 768, 1440]) {
+        await page.setViewportSize({
+          width,
+          height: width === 390 ? 844 : 1000,
+        });
+        await ui.goto("/dashboard");
+        assert.match(await page.locator("main").innerText(), pattern);
+        assert.match(
+          await page.locator("main").innerText(),
+          /Coverage unverified/,
+        );
+        if (["metrics-error", "library-error", "status-error"].includes(name))
+          assert.equal(
+            await page
+              .getByRole("button", { name: "Month", exact: true })
+              .isEnabled(),
+            true,
+          );
+        if (name === "metrics-error")
+          assert.match(
+            await page.locator("main").innerText(),
+            /Synthetic article/,
+          );
+        else
+          assert.match(
+            await page.locator("main").innerText(),
+            /Estimated words/,
+          );
+        await capture(
+          { ...ui, width },
+          "/dashboard",
+          name,
+          width === 390 &&
+            ["partial", "candidate", "metrics-error"].includes(name),
+        );
+        await ui.goto("/settings");
+        assert.match(await page.locator("main").innerText(), /Europe\/Athens/);
+        if (name === "derived-pending")
+          assert.match(
+            await page.locator("main").innerText(),
+            /pending dirty rollups/,
+          );
+        if (name === "candidate")
+          assert.match(await page.locator("main").innerText(), /not applied/);
+        if (name === "candidate" && width === 768)
           await page
-            .getByRole("button", { name: "Month", exact: true })
-            .isEnabled(),
-          true,
+            .getByText("Historical repair", { exact: true })
+            .scrollIntoViewIfNeeded();
+        await capture(
+          { ...ui, width },
+          "/settings",
+          name,
+          width === 768 && name === "candidate",
         );
-      if (name === "metrics-error")
-        assert.match(
-          await page.locator("main").innerText(),
-          /Synthetic article/,
-        );
-      else
-        assert.match(await page.locator("main").innerText(), /Estimated words/);
-      await capture(
-        { ...ui, width },
-        "/dashboard",
-        name,
-        width === 390 &&
-          ["partial", "candidate", "metrics-error"].includes(name),
-      );
-      await ui.goto("/settings");
-      assert.match(await page.locator("main").innerText(), /Europe\/Athens/);
-      if (name === "derived-pending")
-        assert.match(
-          await page.locator("main").innerText(),
-          /pending dirty rollups/,
-        );
-      if (name === "candidate")
-        assert.match(await page.locator("main").innerText(), /not applied/);
-      if (name === "candidate" && width === 768)
-        await page
-          .getByText("Historical repair", { exact: true })
-          .scrollIntoViewIfNeeded();
-      await capture(
-        { ...ui, width },
-        "/settings",
-        name,
-        width === 768 && name === "candidate",
-      );
+      }
     }
-  }
   await scenario("library-error");
   await ui.goto("/articles");
   assert.doesNotMatch(
@@ -692,12 +728,15 @@ try {
   await ui.context.clearCookies();
   await page.getByLabel("Access password").fill("wrong-synthetic-password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  assert.match(await page.getByRole("alert").innerText(), /Invalid password/);
+  assert.match(
+    await page.locator("main").getByRole("alert").innerText(),
+    /Invalid password/,
+  );
   await scenario("login-error");
   await page.getByLabel("Access password").fill("synthetic-password");
   await page.getByRole("button", { name: "Sign in" }).click();
   assert.match(
-    await page.getByRole("alert").innerText(),
+    await page.locator("main").getByRole("alert").innerText(),
     /temporarily unavailable/,
   );
   assert.equal(new URL(page.url()).pathname, "/login");

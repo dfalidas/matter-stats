@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -151,7 +152,12 @@ export function ArticlesLibrary({ result, timezone }: ArticlesLibraryProps) {
         </CardHeader>
 
         <CardContent>
-          {result.articles.length === 0 ? (
+          {result.articles.length === 0 ? result.total > 0 && result.page > 1 ? (
+            <div className="rounded-xl border p-6">
+              <p role="status" className="text-sm text-muted-foreground">No items on this page. Matching library items are available on earlier pages.</p>
+              <Button className="mt-4 min-h-11" variant="outline" onClick={() => updateParam("page", "1")}>Return to first page</Button>
+            </div>
+          ) : (
             <EmptyArticles
               hasFilters={Boolean(result.filters.query || result.filters.source || result.filters.tag || result.filters.author || result.filters.contentType || result.filters.size || result.filters.status !== "all" || result.filters.period !== "all-time")}
               onClear={() => {
@@ -195,21 +201,12 @@ export function ArticlesLibrary({ result, timezone }: ArticlesLibraryProps) {
                   {result.articles.map((article) => (
                     <TableRow
                       key={article.id}
-                      tabIndex={0}
-                      role="link"
-                      aria-label={`Open ${article.title ?? "Untitled article"}`}
                       onClick={() => openArticle(article.id)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          openArticle(article.id);
-                        }
-                      }}
-                      className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                      className="cursor-pointer"
                     >
                       <TableCell>
                         <div className="space-y-2">
-                          <div className="font-medium leading-6 text-foreground">{article.title ?? "Untitled article"}</div>
+                          <Link href={`/articles/${encodeURIComponent(article.id)}`} aria-label={`Open ${article.title ?? "Untitled article"}`} onClick={event => event.stopPropagation()} className="rounded font-medium leading-6 text-foreground">{article.title ?? "Untitled article"}</Link>
                           {article.tags.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                               {article.tags.slice(0, 3).map((tag) => (

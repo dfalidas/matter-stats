@@ -31,6 +31,16 @@ const requests = [];
 const now = new Date(),
   iso = (ms) => new Date(ms).toISOString(),
   ago = (h) => iso(now.getTime() - h * 3600000);
+const todaySessionTime = localDateTimeToUtc(
+  {
+    ...getLocalDateParts(now, "Europe/Athens"),
+    hour: 0,
+    minute: 30,
+    second: 0,
+    millisecond: 0,
+  },
+  "Europe/Athens",
+).toISOString();
 const tables = () => {
   const partial = scenario === "partial",
     stale = scenario === "stale";
@@ -146,14 +156,7 @@ const tables = () => {
         : [
             ...Array.from({ length: 25 }, (_, index) => ({
               id: `synthetic-session-${String(index).padStart(2, "0")}`,
-              started_at: new Date(
-                new Intl.DateTimeFormat("en-CA", {
-                  timeZone: "Europe/Athens",
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
-                }).format(now) + "T00:30:00+03:00",
-              ).toISOString(),
+              started_at: todaySessionTime,
               duration_seconds: 1,
               item_id: null,
             })),

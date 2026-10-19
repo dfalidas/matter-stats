@@ -54,6 +54,9 @@ Module._load = function (request, parent, ...rest) {
     return { requireAccessSession: async () => {} };
   return originalLoad.call(this, request, parent, ...rest);
 };
+const { ArticlesLibrary } = require(
+  path.join(root, "app/articles/articles-library.js"),
+);
 const { DashboardOverview } = require(
   path.join(root, "app/dashboard/dashboard-overview.js"),
 );
@@ -214,4 +217,76 @@ test("root Overview alias preserves range and repeated URL parameters", async ()
     }),
     /redirect:\/dashboard\?start=2025-01-01&end=2025-01-02&context=a&context=b/,
   );
+});
+
+const libraryResult = {
+  articles: [],
+  total: 105,
+  page: 99,
+  pageSize: 100,
+  filters: {
+    period: "all-time",
+    query: "",
+    source: "Science",
+    tag: "",
+    status: "all",
+    author: "",
+    contentType: "",
+    size: "",
+    page: 99,
+  },
+  sources: [{ value: "Science", label: "Science" }],
+  tags: [],
+};
+test("out-of-range Library pages offer a first-page recovery while retaining filters", () => {
+  pathname = "/articles";
+  params = new URLSearchParams("source=Science&page=99&context=keep");
+  const view = ArticlesLibrary({
+    result: libraryResult,
+    timezone: "Europe/Athens",
+  });
+  const recovery = all(
+    view,
+    (node) => node.props?.children === "Return to first page",
+  )[0];
+  recovery.props.onClick();
+  assert.equal(pushed, "/articles?source=Science&page=1&context=keep");
+});
+test("Library keeps native table rows and actual title links for keyboard navigation", () => {
+  const result = {
+    ...libraryResult,
+    page: 1,
+    articles: [
+      {
+        id: "synthetic-item",
+        title: "An example",
+        source: null,
+        author: null,
+        status: null,
+        word_count: null,
+        estimated_reading_time_minutes: null,
+        progress: null,
+        created_at_matter: null,
+        updated_at_matter: null,
+        highlights: 0,
+        tags: [],
+      },
+    ],
+  };
+  const view = ArticlesLibrary({ result, timezone: "Europe/Athens" });
+  const rows = all(view, (node) => node.type?.displayName === "TableRow");
+  assert.equal(rows.length, 2);
+  assert.ok(rows.every((row) => row.props.role === undefined));
+  const link = all(
+    view,
+    (node) => node.props?.href === "/articles/synthetic-item",
+  )[0];
+  assert.equal(link.props["aria-label"], "Open An example");
+  let stopped = false;
+  link.props.onClick({
+    stopPropagation: () => {
+      stopped = true;
+    },
+  });
+  assert.equal(stopped, true);
 });

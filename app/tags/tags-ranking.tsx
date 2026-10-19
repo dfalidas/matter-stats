@@ -89,7 +89,7 @@ export function TagsRanking({ period, ranking }: TagsRankingProps) {
                   {periodLabels[period]}
                 </Badge>
                 <Badge variant="outline" className="rounded-full">
-                  {formatInteger(ranking.totals.tags)} tags
+                  {ranking.totals.articlesRead > 0 ? `${formatInteger(ranking.totals.tags)} attributed tags` : "Attribution unavailable"}
                 </Badge>
               </div>
               <p className="mt-2 text-sm text-muted-foreground">

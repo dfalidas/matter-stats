@@ -75,7 +75,7 @@ export function YearInReadingOverview({ year, recapResult }: YearInReadingOvervi
     return (
       <ErrorState
         title="Unable to load your annual recap"
-        description="Matter Stats could not read the selected year's Supabase metrics."
+        description="Reading data is currently unavailable. Reload this page to try again."
         message={recapResult.message}
       />
     );
