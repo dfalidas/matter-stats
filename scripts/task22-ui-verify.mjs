@@ -95,6 +95,7 @@ const evidence = [],
   scrollChecks = [],
   resourceFailures = [],
   externalRequests = [],
+  libraryDetailPrefetches = [],
   checks = [];
 const check = (name, details = {}) => {
   checks.push({ name, result: "passed", ...details });
@@ -189,6 +190,15 @@ try {
         });
     });
     page.on("pageerror", (e) => pageErrors.push(e.message));
+    page.on("request", (request) => {
+      if (
+        new URL(page.url()).pathname === "/articles" &&
+        new URL(request.url()).pathname.startsWith("/articles/") &&
+        request.headers()["next-router-prefetch"] === "1"
+      ) {
+        libraryDetailPrefetches.push(new URL(request.url()).pathname);
+      }
+    });
     page.on("response", (r) => {
       if (r.status() >= 400)
         resourceFailures.push({
@@ -530,6 +540,17 @@ try {
   await page.goForward();
   await page.waitForURL("**period=month");
   await page.reload();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Month", exact: true })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
+  const primary = page.locator('nav[aria-label="Primary navigation"]:visible');
+  await primary.getByRole("link", { name: "Activity", exact: true }).click();
+  await page.waitForURL("**/activity?period=month");
+  await primary.getByRole("link", { name: "Overview", exact: true }).click();
+  await page.waitForURL("**/dashboard?period=month");
   assert.equal(
     await page
       .getByRole("button", { name: "Month", exact: true })
@@ -984,6 +1005,7 @@ try {
   assert.deepEqual(mutations, []);
   assert.deepEqual(pageErrors, []);
   assert.deepEqual(externalRequests, []);
+  assert.deepEqual(libraryDetailPrefetches, []);
   assert.ok(
     consoleErrors.every(
       (error) =>
@@ -1016,6 +1038,7 @@ try {
         pageErrors,
         resourceFailures,
         externalRequests,
+        libraryDetailPrefetches,
         unexpectedMutations: mutations,
       },
       null,

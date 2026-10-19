@@ -407,6 +407,7 @@ export function ArticlesLibrary({ result, timezone }: ArticlesLibraryProps) {
                           <div className="space-y-2">
                             <Link
                               href={`/articles/${encodeURIComponent(article.id)}`}
+                              prefetch={false}
                               aria-label={`Open ${article.title ?? "Untitled article"}`}
                               onClick={(event) => event.stopPropagation()}
                               className="rounded font-medium leading-6 text-foreground"

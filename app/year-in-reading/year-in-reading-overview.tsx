@@ -244,7 +244,7 @@ function YearInReadingContent({ year, report }: { year: number; report: YearInRe
         <ChartCard title="Milestones" description="Your biggest selected-year reading moments." action={<Medal className="h-5 w-5 text-dashboard-muted" aria-hidden />}>
           <div className="space-y-3">
             <MilestoneRow label="Most Active Month" value={mostActiveMonth ? mostActiveMonth.label : "Not yet"} helper={mostActiveMonth ? `${formatInteger(mostActiveMonth.words)} estimated words` : "Read in more months to unlock this."} icon={CalendarDays} />
-            <MilestoneRow label="Best Streak" value={`${formatInteger(metrics.bestStreakDays)} ${pluralize("day", metrics.bestStreakDays)}`} helper={metrics.bestStreakDays > 0 ? "Longest reading streak the selected year" : "Start a streak with your next read."} icon={Flame} />
+            <MilestoneRow label="Best Streak" value={`${formatInteger(metrics.bestStreakDays)} ${pluralize("day", metrics.bestStreakDays)}`} helper={metrics.bestStreakDays > 0 ? "Longest reading streak in the selected year" : "Start a streak with your next read."} icon={Flame} />
             <MilestoneRow label="Most Productive Day" value={mostProductiveDay ? formatDateLabel(mostProductiveDay.date) : "Not yet"} helper={mostProductiveDay ? `${formatInteger(mostProductiveDay.wordsRead)} estimated words` : "Daily highs appear after reading sessions sync."} icon={Award} />
           </div>
         </ChartCard>
