@@ -3,12 +3,93 @@
 @tailwind utilities;
 
 @layer base {
-  :root { color-scheme: light; --background: 60 18% 97%; --foreground: 150 5% 13%; --card: 0 0% 100%; --card-foreground: 150 5% 13%; --popover: 0 0% 100%; --popover-foreground: 150 5% 13%; --primary: 212 32% 42%; --primary-foreground: 0 0% 100%; --secondary: 60 10% 93%; --secondary-foreground: 150 5% 13%; --muted: 60 10% 93%; --muted-foreground: 150 4% 39%; --accent: 212 24% 91%; --accent-foreground: 212 40% 30%; --destructive: 0 65% 45%; --destructive-foreground: 0 0% 100%; --border: 60 7% 85%; --input: 60 7% 80%; --ring: 212 32% 42%; --radius: .75rem; --dashboard-background: 60 18% 97%; --dashboard-card: 0 0% 100%; --dashboard-border: 60 7% 85%; --dashboard-text: 150 5% 13%; --dashboard-muted: 150 4% 39%; --accent-red: 212 32% 42%; --accent-violet: 212 32% 42%; --accent-blue: 212 32% 42%; --success: 150 35% 35%; --warning: 35 70% 40%; }
-  .dark { color-scheme: dark; --background: 150 7% 9%; --foreground: 60 13% 92%; --card: 150 6% 12%; --card-foreground: 60 13% 92%; --popover: 150 6% 12%; --popover-foreground: 60 13% 92%; --primary: 211 39% 65%; --primary-foreground: 150 8% 10%; --secondary: 150 5% 17%; --secondary-foreground: 60 13% 92%; --muted: 150 5% 17%; --muted-foreground: 60 5% 65%; --accent: 211 20% 22%; --accent-foreground: 211 45% 78%; --border: 150 4% 22%; --input: 150 4% 25%; --ring: 211 39% 65%; --dashboard-background: 150 7% 9%; --dashboard-card: 150 6% 12%; --dashboard-border: 150 4% 22%; --dashboard-text: 60 13% 92%; --dashboard-muted: 60 5% 65%; }
-  * { @apply border-border; box-sizing: border-box; }
-  html { scroll-padding-bottom: 7rem; }
-  html, body { min-height: 100%; background: hsl(var(--background)); }
-  body { margin: 0; color: hsl(var(--foreground)); }
-  a { color: inherit; text-decoration: none; }
-  button, a, input, select, summary { @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2; }
+  :root {
+    color-scheme: light;
+    --background: 60 18% 97%;
+    --foreground: 150 5% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 150 5% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 5% 13%;
+    --primary: 212 32% 42%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 60 10% 93%;
+    --secondary-foreground: 150 5% 13%;
+    --muted: 60 10% 93%;
+    --muted-foreground: 150 4% 39%;
+    --accent: 212 24% 91%;
+    --accent-foreground: 212 40% 30%;
+    --destructive: 0 65% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 60 7% 85%;
+    --input: 60 7% 80%;
+    --ring: 212 32% 42%;
+    --radius: 0.75rem;
+    --dashboard-background: 60 18% 97%;
+    --dashboard-card: 0 0% 100%;
+    --dashboard-border: 60 7% 85%;
+    --dashboard-text: 150 5% 13%;
+    --dashboard-muted: 150 4% 39%;
+    --accent-red: 212 32% 42%;
+    --accent-violet: 212 32% 42%;
+    --accent-blue: 212 32% 42%;
+    --success: 150 35% 30%;
+    --warning: 35 70% 30%;
+  }
+  .dark {
+    color-scheme: dark;
+    --destructive: 0 65% 70%;
+    --destructive-foreground: 150 8% 10%;
+    --success: 150 35% 65%;
+    --warning: 35 70% 65%;
+    --background: 150 7% 9%;
+    --foreground: 60 13% 92%;
+    --card: 150 6% 12%;
+    --card-foreground: 60 13% 92%;
+    --popover: 150 6% 12%;
+    --popover-foreground: 60 13% 92%;
+    --primary: 211 39% 65%;
+    --primary-foreground: 150 8% 10%;
+    --secondary: 150 5% 17%;
+    --secondary-foreground: 60 13% 92%;
+    --muted: 150 5% 17%;
+    --muted-foreground: 60 5% 65%;
+    --accent: 211 20% 22%;
+    --accent-foreground: 211 45% 78%;
+    --border: 150 4% 22%;
+    --input: 150 4% 25%;
+    --ring: 211 39% 65%;
+    --dashboard-background: 150 7% 9%;
+    --dashboard-card: 150 6% 12%;
+    --dashboard-border: 150 4% 22%;
+    --dashboard-text: 60 13% 92%;
+    --dashboard-muted: 60 5% 65%;
+  }
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+  html {
+    scroll-padding-bottom: 7rem;
+  }
+  html,
+  body {
+    min-height: 100%;
+    background: hsl(var(--background));
+  }
+  body {
+    margin: 0;
+    color: hsl(var(--foreground));
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+  button,
+  a,
+  input,
+  select,
+  summary {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
 }

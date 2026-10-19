@@ -1,4 +1,5 @@
 "use client";
+import { chartTooltipStyle } from "@/components/chart-style";
 import type { Evidence } from "@/lib/sync-status";
 import type { Route } from "next";
 import { useTransition } from "react";
@@ -217,9 +218,20 @@ export function DashboardOverview({
               }))}
             >
               <CartesianGrid vertical={false} stroke="hsl(var(--border))" />
-              <XAxis dataKey="date" tickLine={false} />
-              <YAxis unit="m" tickLine={false} />
-              <Tooltip formatter={(v) => [`${v} min`, "Reading time"]} />
+              <XAxis
+                stroke="hsl(var(--muted-foreground))"
+                dataKey="date"
+                tickLine={false}
+              />
+              <YAxis
+                stroke="hsl(var(--muted-foreground))"
+                unit="m"
+                tickLine={false}
+              />
+              <Tooltip
+                contentStyle={chartTooltipStyle}
+                formatter={(v) => [`${v} min`, "Reading time"]}
+              />
               <Bar
                 dataKey="minutes"
                 fill="hsl(var(--primary))"

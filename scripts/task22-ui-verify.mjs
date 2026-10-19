@@ -74,7 +74,7 @@ for (const [name, args] of [
   child.stderr.pipe(log);
   children.push(child);
 }
-const origin = "http://127.0.0.1:3091",
+const origin = "http://localhost:3091",
   api = "http://127.0.0.1:54391";
 async function ready(url) {
   for (let i = 0; i < 150; i++) {
@@ -97,8 +97,51 @@ const check = (name, details = {}) => {
   checks.push({ name, result: "passed", ...details });
   console.log(`PASS ${name}`);
 };
+const contrastChecks = [];
+async function assertContrast(locator, property = "color") {
+  const paint = await locator.evaluate((el, property) => {
+    const read = (value) => value.match(/[\d.]+/g).map(Number);
+    let background = [255, 255, 255];
+    const ancestors = [];
+    for (let node = el; node; node = node.parentElement)
+      ancestors.unshift(node);
+    for (const node of ancestors) {
+      const value = read(getComputedStyle(node).backgroundColor);
+      const alpha = value[3] ?? 1;
+      background = value
+        .slice(0, 3)
+        .map((value, index) => value * alpha + background[index] * (1 - alpha));
+    }
+    return {
+      foreground: read(getComputedStyle(el)[property]).slice(0, 3),
+      background,
+      text: el.textContent.trim().slice(0, 80),
+    };
+  }, property);
+  const luminance = (rgb) =>
+    rgb
+      .map((value) => value / 255)
+      .map((value) =>
+        value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4,
+      )
+      .reduce(
+        (sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index],
+        0,
+      );
+  const a = luminance(paint.foreground),
+    b = luminance(paint.background);
+  const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  assert.ok(
+    ratio >= 4.5,
+    `${paint.text}: text contrast ${ratio.toFixed(2)}:1 is below 4.5:1`,
+  );
+  contrastChecks.push({ ...paint, ratio: Number(ratio.toFixed(2)) });
+}
 try {
-  await Promise.all([ready(`${origin}/login`), ready(`${api}/info`)]);
+  await Promise.all([
+    ready("http://127.0.0.1:3091/login"),
+    ready(`${api}/info`),
+  ]);
   const info = await (await fetch(`${api}/info`)).json();
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Athens",
@@ -148,6 +191,18 @@ try {
       await page.evaluate(
         (dark) => document.documentElement.classList.toggle("dark", dark),
         theme === "dark",
+      );
+      assert.equal(
+        await page.evaluate(
+          () => getComputedStyle(document.documentElement).colorScheme,
+        ),
+        theme,
+      );
+      assert.equal(
+        await page.evaluate(
+          () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+        ),
+        "America/New_York",
       );
     };
     return { page, goto, context, width, theme };
@@ -204,6 +259,44 @@ try {
           if (route === "/login") await ui.context.clearCookies();
           await ui.goto(route);
           assert.equal(new URL(ui.page.url()).pathname, route.split("?")[0]);
+          if (route === "/settings") {
+            for (const badge of await ui.page
+              .locator(".text-success,.text-warning,.text-primary")
+              .all()) {
+              if (await badge.evaluate((el) => el.textContent.trim()))
+                await assertContrast(badge);
+            }
+          }
+          if (route === "/login" && theme === "dark") {
+            await ui.page
+              .getByLabel("Access password")
+              .fill("wrong-synthetic-password");
+            await ui.page.getByRole("button", { name: "Sign in" }).click();
+            const error = ui.page.locator("main").getByRole("alert");
+            await error.waitFor();
+            await assertContrast(error);
+            if (width === 390)
+              await capture(ui, route, "invalid-password", true);
+          }
+          if (
+            route.startsWith("/reports") &&
+            theme === "dark" &&
+            width === 1440
+          ) {
+            await ui.page.locator(".recharts-rectangle").first().hover();
+            const tooltip = ui.page
+              .locator(".recharts-default-tooltip")
+              .first();
+            await tooltip.waitFor();
+            await assertContrast(tooltip);
+            await assertContrast(tooltip.locator("li").first());
+            await assertContrast(
+              ui.page.locator(".recharts-cartesian-axis-tick-value").first(),
+              "fill",
+            );
+            await capture(ui, route, "chart-hover", true);
+            check("rendered chart tooltip and axis contrast", { width, theme });
+          }
           await capture(
             ui,
             route,
@@ -224,6 +317,16 @@ try {
               exact: true,
             });
             await title.focus();
+            await ui.page.keyboard.press("Tab");
+            await ui.page.keyboard.press("Shift+Tab");
+            assert.equal(
+              await title.evaluate((el) => el === document.activeElement),
+              true,
+            );
+            assert.notEqual(
+              await title.evaluate((el) => getComputedStyle(el).boxShadow),
+              "none",
+            );
             await capture(ui, route, "table-keyboard", true);
             await ui.page.keyboard.press("Enter");
             await ui.page.waitForURL("**/articles/synthetic-item-000");
@@ -610,6 +713,47 @@ try {
   check(
     "Library stable pagination, combined filters, empty recovery, nullable details and unsupported attribution",
   );
+  // Stored legacy links are synthetic; they do not establish upstream capability.
+  await scenario("linked");
+  for (const width of [390, 768, 1440]) {
+    await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+    for (const route of ["/authors", "/sources", "/tags"]) {
+      await ui.goto(route);
+      assert.ok((await page.getByRole("row").count()) > 1);
+      const search = page.getByRole("textbox");
+      await search.fill("no-match-fixture");
+      await page.getByText(/No .* match/).waitFor();
+      await search.fill("");
+      const sort = page.getByRole("button", {
+        name: "Estimated words",
+        exact: true,
+      });
+      await sort.click();
+      assert.equal(await sort.getAttribute("aria-pressed"), "true");
+      await capture(
+        { ...ui, width },
+        route,
+        "linked",
+        width === 768 && route === "/sources",
+      );
+    }
+    await ui.goto(`/year-in-reading?year=${today.slice(0, 4)}`);
+    assert.match(
+      await page.locator("main").innerText(),
+      /Attributed articles\s+2/,
+    );
+    await capture(
+      { ...ui, width },
+      "/year-in-reading",
+      "linked",
+      width === 390,
+    );
+  }
+  check(
+    "retained legacy linked rankings, search/sort and distinct annual recap",
+    { widths: [390, 768, 1440] },
+  );
+  await scenario("normal");
   // Independent status/data scenarios, all widths; Task 21 owns every interpretation.
   const expected = {
     normal: /Sessions completion is recent/,
@@ -779,6 +923,7 @@ try {
         browserTimezone: "America/New_York",
         pages: evidence,
         checks,
+        contrastChecks,
         pageErrors,
         resourceFailures,
         externalRequests,

@@ -1,4 +1,5 @@
 "use client";
+import { chartTooltipStyle } from "@/components/chart-style";
 import Link from "next/link";
 import type { Route } from "next";
 import { useTransition } from "react";
@@ -243,10 +244,10 @@ export function ReportsOverview({
         >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={timeline}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="date" />
-              <YAxis unit="m" />
-              <Tooltip />
+              <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+              <XAxis stroke="hsl(var(--muted-foreground))" dataKey="date" />
+              <YAxis stroke="hsl(var(--muted-foreground))" unit="m" />
+              <Tooltip contentStyle={chartTooltipStyle} />
               <Bar dataKey="minutes" fill="hsl(var(--primary))" />
             </BarChart>
           </ResponsiveContainer>
@@ -273,10 +274,10 @@ export function ReportsOverview({
         >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={weekdays}>
-              <CartesianGrid vertical={false} />
-              <XAxis dataKey="label" />
-              <YAxis unit="m" />
-              <Tooltip />
+              <CartesianGrid stroke="hsl(var(--border))" vertical={false} />
+              <XAxis stroke="hsl(var(--muted-foreground))" dataKey="label" />
+              <YAxis stroke="hsl(var(--muted-foreground))" unit="m" />
+              <Tooltip contentStyle={chartTooltipStyle} />
               <Bar dataKey="minutes" fill="hsl(var(--primary))" />
             </BarChart>
           </ResponsiveContainer>

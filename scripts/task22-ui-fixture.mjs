@@ -5,6 +5,10 @@ import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 const require = createRequire(import.meta.url);
 const {
+  getLocalDateParts,
+  localDateTimeToUtc,
+} = require("../.test-build/lib/calendar.js");
+const {
   cappedPostgrest,
 } = require("../.test-build/tests/fixtures/capped-postgrest.js");
 export const token = "task21-synthetic-session-cookie-only";
@@ -24,6 +28,7 @@ const scenarios = [
   "derived-pending",
   "candidate",
   "login-error",
+  "linked",
 ];
 const authRows = [],
   revoked = new Set();
@@ -149,7 +154,12 @@ const tables = () => {
             updated_at_matter: ago(1),
             updated_at: ago(1),
           })),
-    matter_tags: [{ id: "synthetic-tag", name: "Science" }],
+    matter_tags: [
+      { id: "synthetic-tag", name: "Science" },
+      ...(scenario === "linked"
+        ? [{ id: "linked-tag", name: "Engineering" }]
+        : []),
+    ],
     reading_sessions:
       scenario === "empty"
         ? []
@@ -158,7 +168,12 @@ const tables = () => {
               id: `synthetic-session-${String(index).padStart(2, "0")}`,
               started_at: todaySessionTime,
               duration_seconds: 1,
-              item_id: null,
+              item_id:
+                scenario === "linked"
+                  ? index < 24
+                    ? "synthetic-item-001"
+                    : "synthetic-item-002"
+                  : null,
             })),
             {
               id: "historical-session",
@@ -169,7 +184,12 @@ const tables = () => {
           ],
     daily_stats: [],
     annotations: [],
-    item_tags: [{ item_id: "synthetic-item-001", tag_id: "synthetic-tag" }],
+    item_tags: [
+      { item_id: "synthetic-item-001", tag_id: "synthetic-tag" },
+      ...(scenario === "linked"
+        ? [{ item_id: "synthetic-item-002", tag_id: "linked-tag" }]
+        : []),
+    ],
     matter_dirty_rollups:
       partial || scenario === "derived-pending"
         ? [{ date: now.toISOString().slice(0, 10) }]
