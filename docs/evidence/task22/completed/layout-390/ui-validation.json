@@ -1,0 +1,587 @@
+{
+  "testedSourceSha": "9097b2298f3a4641b97a2d81bcae3e644e76fc64",
+  "buildSourceSha": "877fae00126141b60fc7a60f6690c8f02a9cab22",
+  "phase": "layout",
+  "layoutWidths": [
+    390
+  ],
+  "syntheticOnly": true,
+  "productionData": false,
+  "appTimezone": "Europe/Athens",
+  "browserTimezone": "America/New_York",
+  "pages": [
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-dashboard-390-light.png"
+    },
+    {
+      "route": "/activity",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-activity-390-light.png"
+    },
+    {
+      "route": "/activity",
+      "scenario": "scroll-end",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "scroll-end-activity-390-light.png"
+    },
+    {
+      "route": "/articles",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-articles-390-light.png"
+    },
+    {
+      "route": "/articles/synthetic-item-000",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/reports?period=yearly&date=2025",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-reports-390-light.png"
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/authors",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/sources",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/tags",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/year-in-reading?year=2025",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/login",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "account",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "account-settings-390-light.png"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/activity",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/articles",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/articles/synthetic-item-000",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-articlessynthetic-item-000-390-dark.png"
+    },
+    {
+      "route": "/reports?period=yearly&date=2025",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/authors",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/sources",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/tags",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/year-in-reading?year=2025",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/login",
+      "scenario": "invalid-password",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "browser forms / pointer / keyboard",
+      "horizontalOverflow": false,
+      "screenshot": "invalid-password-login-390-dark.png"
+    },
+    {
+      "route": "/login",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    }
+  ],
+  "checks": [
+    {
+      "name": "route/theme/scroll matrix",
+      "result": "passed",
+      "width": 390,
+      "theme": "light",
+      "routes": 11
+    },
+    {
+      "name": "navigation/account keyboard and pointer operation",
+      "result": "passed",
+      "width": 390,
+      "theme": "light"
+    },
+    {
+      "name": "route/theme/scroll matrix",
+      "result": "passed",
+      "width": 390,
+      "theme": "dark",
+      "routes": 11
+    },
+    {
+      "name": "navigation/account keyboard and pointer operation",
+      "result": "passed",
+      "width": 390,
+      "theme": "dark"
+    }
+  ],
+  "contrastChecks": [
+    {
+      "foreground": [
+        73,
+        105,
+        141
+      ],
+      "background": [
+        249,
+        249,
+        246
+      ],
+      "text": "Settings",
+      "ratio": 5.4
+    },
+    {
+      "foreground": [
+        130,
+        85,
+        23
+      ],
+      "background": [
+        241.42,
+        236.92,
+        230.18
+      ],
+      "text": "Configured",
+      "ratio": 5.52
+    },
+    {
+      "foreground": [
+        50,
+        103,
+        77
+      ],
+      "background": [
+        233.42,
+        238.72,
+        235.57999999999998
+      ],
+      "text": "Reads available",
+      "ratio": 5.65
+    },
+    {
+      "foreground": [
+        50,
+        103,
+        77
+      ],
+      "background": [
+        233.42,
+        238.72,
+        235.57999999999998
+      ],
+      "text": "Invocation success",
+      "ratio": 5.65
+    },
+    {
+      "foreground": [
+        131,
+        165,
+        201
+      ],
+      "background": [
+        21,
+        25,
+        23
+      ],
+      "text": "Settings",
+      "ratio": 6.92
+    },
+    {
+      "foreground": [
+        228,
+        176,
+        103
+      ],
+      "background": [
+        47.46000000000001,
+        45.14,
+        36.760000000000005
+      ],
+      "text": "Configured",
+      "ratio": 7.01
+    },
+    {
+      "foreground": [
+        135,
+        197,
+        166
+      ],
+      "background": [
+        38.160000000000004,
+        47.24000000000001,
+        43.06
+      ],
+      "text": "Reads available",
+      "ratio": 6.91
+    },
+    {
+      "foreground": [
+        135,
+        197,
+        166
+      ],
+      "background": [
+        38.160000000000004,
+        47.24000000000001,
+        43.06
+      ],
+      "text": "Invocation success",
+      "ratio": 6.91
+    },
+    {
+      "foreground": [
+        228,
+        129,
+        129
+      ],
+      "background": [
+        41.7,
+        35.4,
+        33.6
+      ],
+      "text": "Invalid password. Please try again.",
+      "ratio": 5.68
+    }
+  ],
+  "scrollChecks": [
+    {
+      "route": "/dashboard",
+      "width": 390,
+      "theme": "light",
+      "controlBottom": 731,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/activity",
+      "width": 390,
+      "theme": "light",
+      "controlBottom": 731.890625,
+      "contentBottom": 731.890625,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/articles",
+      "width": 390,
+      "theme": "light",
+      "controlBottom": 707,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/articles/synthetic-item-000",
+      "width": 390,
+      "theme": "light",
+      "controlBottom": 305,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/reports?period=yearly&date=2025",
+      "width": 390,
+      "theme": "light",
+      "controlBottom": 388,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/settings",
+      "width": 390,
+      "theme": "light",
+      "controlBottom": 707,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/authors",
+      "width": 390,
+      "theme": "light",
+      "controlBottom": 499,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/sources",
+      "width": 390,
+      "theme": "light",
+      "controlBottom": 499,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/tags",
+      "width": 390,
+      "theme": "light",
+      "controlBottom": 499,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/year-in-reading?year=2025",
+      "width": 390,
+      "theme": "light",
+      "controlBottom": 373,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/login",
+      "width": 390,
+      "theme": "light",
+      "controlBottom": 439.09375,
+      "contentBottom": 560.1875,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/dashboard",
+      "width": 390,
+      "theme": "dark",
+      "controlBottom": 731,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/activity",
+      "width": 390,
+      "theme": "dark",
+      "controlBottom": 731.890625,
+      "contentBottom": 731.890625,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/articles",
+      "width": 390,
+      "theme": "dark",
+      "controlBottom": 707,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/articles/synthetic-item-000",
+      "width": 390,
+      "theme": "dark",
+      "controlBottom": 305,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/reports?period=yearly&date=2025",
+      "width": 390,
+      "theme": "dark",
+      "controlBottom": 388,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/settings",
+      "width": 390,
+      "theme": "dark",
+      "controlBottom": 707,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/authors",
+      "width": 390,
+      "theme": "dark",
+      "controlBottom": 499,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/sources",
+      "width": 390,
+      "theme": "dark",
+      "controlBottom": 499,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/tags",
+      "width": 390,
+      "theme": "dark",
+      "controlBottom": 499,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/year-in-reading?year=2025",
+      "width": 390,
+      "theme": "dark",
+      "controlBottom": 373,
+      "contentBottom": 732,
+      "availableBottom": 786.5
+    },
+    {
+      "route": "/login",
+      "width": 390,
+      "theme": "dark",
+      "controlBottom": 466.09375,
+      "contentBottom": 560.1875,
+      "availableBottom": 786.5
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "resourceFailures": [],
+  "externalRequests": [],
+  "libraryDetailPrefetches": [],
+  "unexpectedMutations": []
+}

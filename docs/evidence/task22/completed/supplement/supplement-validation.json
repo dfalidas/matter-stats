@@ -1,0 +1,21 @@
+{
+  "testedApplicationSourceSha": "9097b2298f3a4641b97a2d81bcae3e644e76fc64",
+  "buildSourceSha": "877fae00126141b60fc7a60f6690c8f02a9cab22",
+  "syntheticOnly": true,
+  "appTimezone": "Europe/Athens",
+  "browserTimezone": "America/New_York",
+  "checks": [
+    {
+      "name": "Unavailable metrics visible with period controls and independent Library data",
+      "width": 390,
+      "theme": "light",
+      "result": "passed"
+    },
+    {
+      "name": "Imported sessions remain visible while annual item attribution is unavailable",
+      "width": 390,
+      "theme": "light",
+      "result": "passed"
+    }
+  ]
+}

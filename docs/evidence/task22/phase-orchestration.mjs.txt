@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import {spawnSync,execFileSync} from 'node:child_process';
+import {mkdir,readFile,writeFile} from 'node:fs/promises';
+import {openSync,closeSync} from 'node:fs';
+const root='docs/evidence/task22/completed';
+const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+const build='877fae00126141b60fc7a60f6690c8f02a9cab22';
+const specs=[...['390','768','1440'].map(width=>({name:`layout-${width}`,phase:'layout',width})),{name:'flows',phase:'flows'},{name:'states',phase:'states'}];
+await mkdir(root,{recursive:true});
+const phases=[];
+for(const spec of specs){
+ const startedAt=new Date().toISOString();console.log(`START ${spec.name}`);
+ const fd=openSync(`work/task22-phase-${spec.name}.log`,'w');
+ const result=spawnSync(process.execPath,['scripts/task22-ui-verify.mjs'],{env:{...process.env,TASK22_PHASE:spec.phase,TASK22_WIDTH:spec.width??'',TASK22_BEHAVIORS_ONLY:'',TASK22_BUILD_SOURCE_SHA:build,TASK22_EVIDENCE_DIR:`${root}/${spec.name}`,TASK22_PLAYWRIGHT_MODULE:'/opt/codex/runtimes/cua/lib/node_modules/playwright/index.mjs'},stdio:['ignore',fd,fd]});closeSync(fd);
+ phases.push({...spec,startedAt,finishedAt:new Date().toISOString(),exitCode:result.status,status:result.status===0?'passed':'failed'});
+ await writeFile(`${root}/phase-commands.json`,JSON.stringify({testedSourceSha:sha,buildSourceSha:build,phases},null,2)+'\n');
+ console.log(`${result.status===0?'PASS':'FAIL'} ${spec.name}`);
+ if(result.status!==0)process.exit(result.status??1);
+}
+const manifests=await Promise.all(specs.map(async spec=>({...JSON.parse(await readFile(`${root}/${spec.name}/ui-validation.json`,'utf8')),directory:spec.name})));
+for(const manifest of manifests){assert.equal(manifest.testedSourceSha,sha);assert.equal(manifest.buildSourceSha,build);assert.equal(manifest.syntheticOnly,true);for(const key of ['pageErrors','externalRequests','unexpectedMutations','libraryDetailPrefetches'])assert.deepEqual(manifest[key],[]);}
+const layouts=manifests.filter(m=>m.phase==='layout');
+assert.equal(layouts.length,3);
+assert.equal(layouts.flatMap(m=>m.pages.filter(p=>p.scenario==='normal')).length,66);
+for(const width of [390,768,1440])for(const theme of ['light','dark'])assert.ok(layouts.some(m=>m.checks.some(c=>c.name==='route/theme/scroll matrix'&&c.width===width&&c.theme===theme&&c.routes===11)));
+const flows=manifests.find(m=>m.phase==='flows');assert.equal(flows.checks.length,6);
+const states=manifests.find(m=>m.phase==='states');assert.equal(states.pages.length,72);
+for(const scenario of ['normal','partial','stale','never','unknown','metadata-incomplete','derived-pending','candidate','status-error','library-error','metrics-error','empty'])for(const width of [390,768,1440])for(const route of ['/dashboard','/settings'])assert.ok(states.pages.some(p=>p.scenario===scenario&&p.width===width&&p.route===route));
+const pages=manifests.flatMap(m=>m.pages.map(page=>({...page,evidenceDirectory:m.directory})));
+const checks=manifests.flatMap(m=>m.checks);
+const contrastChecks=manifests.flatMap(m=>m.contrastChecks);
+const summary={testedSourceSha:sha,buildSourceSha:build,syntheticOnly:true,productionSynchronizationVerified:false,appTimezone:'Europe/Athens',browserTimezone:'America/New_York',normalLayoutPages:66,statePages:72,renderedPageChecks:pages.length,distinctRecordedCombinations:new Set(pages.map(p=>JSON.stringify([p.route,p.scenario,p.width,p.theme]))).size,screenshots:pages.filter(p=>p.screenshot).length,behavioralGroups:checks.length,contrastChecks:contrastChecks.length,minimumMeasuredContrast:Math.min(...contrastChecks.map(c=>c.ratio)),scrollChecks:manifests.flatMap(m=>m.scrollChecks).length,pageErrors:[],externalRequests:[],unexpectedMutations:[],libraryDetailPrefetches:[],phases,checks,pages};
+await writeFile(`${root}/ui-validation.json`,JSON.stringify(summary,null,2)+'\n');console.log(JSON.stringify({renderedPageChecks:summary.renderedPageChecks,screenshots:summary.screenshots,behavioralGroups:summary.behavioralGroups,source:sha}));

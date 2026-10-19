@@ -1,0 +1,595 @@
+{
+  "testedSourceSha": "9097b2298f3a4641b97a2d81bcae3e644e76fc64",
+  "buildSourceSha": "877fae00126141b60fc7a60f6690c8f02a9cab22",
+  "phase": "layout",
+  "layoutWidths": [
+    768
+  ],
+  "syntheticOnly": true,
+  "productionData": false,
+  "appTimezone": "Europe/Athens",
+  "browserTimezone": "America/New_York",
+  "pages": [
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-dashboard-768-light.png"
+    },
+    {
+      "route": "/activity",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-activity-768-light.png"
+    },
+    {
+      "route": "/articles",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-articles-768-light.png"
+    },
+    {
+      "route": "/articles",
+      "scenario": "table-keyboard",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "keyboard",
+      "horizontalOverflow": false,
+      "screenshot": "table-keyboard-articles-768-light.png"
+    },
+    {
+      "route": "/articles",
+      "scenario": "table-horizontal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "table-horizontal-articles-768-light.png"
+    },
+    {
+      "route": "/articles/synthetic-item-000",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/reports?period=yearly&date=2025",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-reports-768-light.png"
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/authors",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/sources",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/tags",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/year-in-reading?year=2025",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/login",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/activity",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/articles",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/articles/synthetic-item-000",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-articlessynthetic-item-000-768-dark.png"
+    },
+    {
+      "route": "/reports?period=yearly&date=2025",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/authors",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/sources",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/tags",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/year-in-reading?year=2025",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/login",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "account",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "account-settings-768-dark.png"
+    }
+  ],
+  "checks": [
+    {
+      "name": "Library table horizontal keyboard and trackpad scrolling",
+      "result": "passed",
+      "width": 768,
+      "theme": "light",
+      "keyboardScroll": 180,
+      "trackpadScroll": 180
+    },
+    {
+      "name": "route/theme/scroll matrix",
+      "result": "passed",
+      "width": 768,
+      "theme": "light",
+      "routes": 11
+    },
+    {
+      "name": "navigation/account keyboard and pointer operation",
+      "result": "passed",
+      "width": 768,
+      "theme": "light"
+    },
+    {
+      "name": "route/theme/scroll matrix",
+      "result": "passed",
+      "width": 768,
+      "theme": "dark",
+      "routes": 11
+    },
+    {
+      "name": "navigation/account keyboard and pointer operation",
+      "result": "passed",
+      "width": 768,
+      "theme": "dark"
+    }
+  ],
+  "contrastChecks": [
+    {
+      "foreground": [
+        73,
+        105,
+        141
+      ],
+      "background": [
+        249,
+        249,
+        246
+      ],
+      "text": "Settings",
+      "ratio": 5.4
+    },
+    {
+      "foreground": [
+        130,
+        85,
+        23
+      ],
+      "background": [
+        241.42,
+        236.92,
+        230.18
+      ],
+      "text": "Configured",
+      "ratio": 5.52
+    },
+    {
+      "foreground": [
+        50,
+        103,
+        77
+      ],
+      "background": [
+        233.42,
+        238.72,
+        235.57999999999998
+      ],
+      "text": "Reads available",
+      "ratio": 5.65
+    },
+    {
+      "foreground": [
+        50,
+        103,
+        77
+      ],
+      "background": [
+        233.42,
+        238.72,
+        235.57999999999998
+      ],
+      "text": "Invocation success",
+      "ratio": 5.65
+    },
+    {
+      "foreground": [
+        131,
+        165,
+        201
+      ],
+      "background": [
+        21,
+        25,
+        23
+      ],
+      "text": "Settings",
+      "ratio": 6.92
+    },
+    {
+      "foreground": [
+        228,
+        176,
+        103
+      ],
+      "background": [
+        47.46000000000001,
+        45.14,
+        36.760000000000005
+      ],
+      "text": "Configured",
+      "ratio": 7.01
+    },
+    {
+      "foreground": [
+        135,
+        197,
+        166
+      ],
+      "background": [
+        38.160000000000004,
+        47.24000000000001,
+        43.06
+      ],
+      "text": "Reads available",
+      "ratio": 6.91
+    },
+    {
+      "foreground": [
+        135,
+        197,
+        166
+      ],
+      "background": [
+        38.160000000000004,
+        47.24000000000001,
+        43.06
+      ],
+      "text": "Invocation success",
+      "ratio": 6.91
+    },
+    {
+      "foreground": [
+        228,
+        129,
+        129
+      ],
+      "background": [
+        41.7,
+        35.4,
+        33.6
+      ],
+      "text": "Invalid password. Please try again.",
+      "ratio": 5.68
+    }
+  ],
+  "scrollChecks": [
+    {
+      "route": "/dashboard",
+      "width": 768,
+      "theme": "light",
+      "controlBottom": 887,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/activity",
+      "width": 768,
+      "theme": "light",
+      "controlBottom": 887.765625,
+      "contentBottom": 887.765625,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/articles",
+      "width": 768,
+      "theme": "light",
+      "controlBottom": 863,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/articles/synthetic-item-000",
+      "width": 768,
+      "theme": "light",
+      "controlBottom": 313,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/reports?period=yearly&date=2025",
+      "width": 768,
+      "theme": "light",
+      "controlBottom": 466,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/settings",
+      "width": 768,
+      "theme": "light",
+      "controlBottom": 863,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/authors",
+      "width": 768,
+      "theme": "light",
+      "controlBottom": 655,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/sources",
+      "width": 768,
+      "theme": "light",
+      "controlBottom": 655,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/tags",
+      "width": 768,
+      "theme": "light",
+      "controlBottom": 655,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/year-in-reading?year=2025",
+      "width": 768,
+      "theme": "light",
+      "controlBottom": 451,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/login",
+      "width": 768,
+      "theme": "light",
+      "controlBottom": 482,
+      "contentBottom": 646,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/dashboard",
+      "width": 768,
+      "theme": "dark",
+      "controlBottom": 887,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/activity",
+      "width": 768,
+      "theme": "dark",
+      "controlBottom": 887.765625,
+      "contentBottom": 887.765625,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/articles",
+      "width": 768,
+      "theme": "dark",
+      "controlBottom": 863,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/articles/synthetic-item-000",
+      "width": 768,
+      "theme": "dark",
+      "controlBottom": 313,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/reports?period=yearly&date=2025",
+      "width": 768,
+      "theme": "dark",
+      "controlBottom": 466,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/settings",
+      "width": 768,
+      "theme": "dark",
+      "controlBottom": 863,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/authors",
+      "width": 768,
+      "theme": "dark",
+      "controlBottom": 655,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/sources",
+      "width": 768,
+      "theme": "dark",
+      "controlBottom": 655,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/tags",
+      "width": 768,
+      "theme": "dark",
+      "controlBottom": 655,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/year-in-reading?year=2025",
+      "width": 768,
+      "theme": "dark",
+      "controlBottom": 451,
+      "contentBottom": 888,
+      "availableBottom": 942.5
+    },
+    {
+      "route": "/login",
+      "width": 768,
+      "theme": "dark",
+      "controlBottom": 509,
+      "contentBottom": 646,
+      "availableBottom": 942.5
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "resourceFailures": [],
+  "externalRequests": [],
+  "libraryDetailPrefetches": [],
+  "unexpectedMutations": []
+}

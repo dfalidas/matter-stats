@@ -1,0 +1,30 @@
+import {spawn,execFileSync} from 'node:child_process';
+import {createWriteStream} from 'node:fs';
+import {writeFile} from 'node:fs/promises';
+import {sanitizedEnvironment} from '../scripts/stabilization-db-orchestrator.mjs';
+const sourceSha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+const env=sanitizedEnvironment({APP_ACCESS_PASSWORD:'synthetic-password',APP_CREDENTIAL_VERSION:'1',MATTER_API_TOKEN:'synthetic-unused-token',SUPABASE_URL:'http://127.0.0.1:54391',SUPABASE_SERVICE_ROLE_KEY:'synthetic-server-only',CRON_SECRET:'synthetic-unused-cron',APP_TIMEZONE:'Europe/Athens',NEXT_TELEMETRY_DISABLED:'1',npm_config_cache:'work/npm-cache'});
+const commands=[
+ ['install','npm',['ci','--cache','work/npm-cache']],
+ ['route-types','npx',['--no-install','next','typegen']],
+ ['typecheck','npm',['run','typecheck']],
+ ['lint','npm',['run','lint']],
+ ['test-compile','npx',['--no-install','tsc','-p','tests/tsconfig.json']],
+ ['focused-tests','node',['--test','.test-build/tests/activity-service.test.js','tests/ui-presentation.test.mjs','tests/dependency-css-compatibility.test.mjs']],
+ ['production-build','npm',['run','build']],
+ ['audit','npm',['run','audit:ci']],
+ ['diff-check','git',['diff','--check']],
+ ['boundary-check','git',['diff','--exit-code','origin/main','--','supabase','.github','vercel.json','package.json','package-lock.json','lib/auth-actions.ts','lib/auth-cookie.ts','lib/require-auth.ts','lib/sync-status.ts','lib/calendar.ts','lib/report-csv.ts','lib/reading-estimates.ts','lib/reports-service.ts']],
+];
+const results=[];
+for(const [name,command,args] of commands){
+ console.log(`RUN ${name} at ${sourceSha}`);
+ const startedAt=new Date().toISOString();
+ const log=createWriteStream(`work/task22-final-${name}.log`);
+ const code=await new Promise((resolve,reject)=>{const child=spawn(command,args,{env,stdio:['ignore','pipe','pipe']});child.stdout.pipe(log,{end:false});child.stderr.pipe(log,{end:false});child.once('error',reject);child.once('close',resolve);});
+ await new Promise(resolve=>log.end(resolve));
+ results.push({name,command:[command,...args].join(' '),startedAt,finishedAt:new Date().toISOString(),exitCode:code,status:code===0?'passed':'failed'});
+ await writeFile('work/task22-final-command-results.json',JSON.stringify({testedSourceSha:sourceSha,node:process.version,syntheticConfiguration:true,results},null,2)+'\n');
+ console.log(`${code===0?'PASS':'FAIL'} ${name}`);
+ if(code!==0)process.exit(code??1);
+}

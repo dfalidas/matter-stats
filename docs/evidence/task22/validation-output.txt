@@ -1,0 +1,147 @@
+Task 22 local validation at 877fae00126141b60fc7a60f6690c8f02a9cab22. Synthetic configuration only.
+
+install: passed, exit 0
+npm ci --cache work/npm-cache
+
+added 456 packages, and audited 457 packages in 1m
+
+148 packages are looking for funding
+  run `npm fund` for details
+
+8 high severity vulnerabilities
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+route-types: passed, exit 0
+npx --no-install next typegen
+Generating route types...
+✓ Route types generated successfully
+
+typecheck: passed, exit 0
+npm run typecheck
+
+> matter-stats@0.1.0 typecheck
+> tsc --noEmit
+
+
+lint: passed, exit 0
+npm run lint
+
+> matter-stats@0.1.0 lint
+> eslint .
+
+
+/workspace/matter-stats/.agents/skills/visual-explainer/extension.ts
+  435:1  warning  Unexpected default export of anonymous function  import/no-anonymous-default-export
+
+/workspace/matter-stats/.agents/skills/visual-explainer/plan/plan.js
+  11:79  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+
+/workspace/matter-stats/.agents/skills/visual-explainer/plan/render.mjs
+  322:22  warning  'i' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 3 problems (0 errors, 3 warnings)
+
+
+test-compile: passed, exit 0
+npx --no-install tsc -p tests/tsconfig.json
+
+focused-tests: passed, exit 0
+node --test .test-build/tests/activity-service.test.js tests/ui-presentation.test.mjs tests/dependency-css-compatibility.test.mjs
+✔ validates real calendar values and positive integer pages (6.610867ms)
+✔ uses one Athens today reference, includes local midnight, and excludes adjacent month (260.806455ms)
+✔ resets an out-of-month day and returns complete totals across database pages (2444.977012ms)
+✔ Athens month boundaries follow DST offsets (47.385641ms)
+✔ sums one-second estimates before pagination for calendar and selected-day totals (40.012427ms)
+✔ future month/day URLs fall back to the current local selection; today is valid (41.354072ms)
+✔ postcss-nested preserves ampersands, selector lists, pseudo nesting and media transforms with parser 7 (56.89624ms)
+✔ Tailwind preserves apply, group/peer, arbitrary and escaped Unicode selectors with parser 7 (1123.841336ms)
+✔ Tailwind prefix/important scoping and multi-selector variants retain their CSS (489.316905ms)
+✔ PostCSS maps and valid indexed SourceNode roundtrips work with source-map-js 1.2.2 (32.73502ms)
+✔ production CSS retains the declared dark palette without a literal JSX dark class (3772.036796ms)
+✔ Overview period controls remain operable during independent metrics failure and preserve URL context (19.302336ms)
+✔ report frequency conversions retain the selected calendar year and unrelated parameters (8.427176ms)
+✔ primary navigation preserves its own deep link without sharing incompatible report periods (53.741919ms)
+✔ article detail distinguishes query failure from a missing item and does not decode a valid percent ID twice (383.892861ms)
+✔ annual recap keeps selected year through an empty successful query and independent query failure (2243.608108ms)
+✔ root Overview alias preserves range and repeated URL parameters (2.287741ms)
+✔ out-of-range Library pages offer a first-page recovery while retaining filters (520.154608ms)
+✔ Library keeps native table rows and actual title links for keyboard navigation (86.398032ms)
+✔ Library search submits draft text, author and content type together without losing other filters (12.261547ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 21444.891115
+
+production-build: passed, exit 0
+npm run build
+
+> matter-stats@0.1.0 build
+> next build
+
+   ▲ Next.js 15.5.27
+
+   Creating an optimized production build ...
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (101kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+<w> [webpack.cache.PackFileCacheStrategy] Serializing big strings (231kiB) impacts deserialization performance (consider using Buffer instead and decode when needed)
+ ✓ Compiled successfully in 85s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/5) ...
+   Generating static pages (1/5) 
+   Generating static pages (2/5) 
+   Generating static pages (3/5) 
+ ✓ Generating static pages (5/5)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ƒ /                                      132 B         102 kB
+├ ○ /_not-found                            996 B         103 kB
+├ ƒ /activity                            2.42 kB         108 kB
+├ ƒ /api/cron/sync-recent-activity         132 B         102 kB
+├ ƒ /articles                            4.82 kB         121 kB
+├ ƒ /articles/[id]                         163 B         106 kB
+├ ƒ /authors                             2.52 kB         120 kB
+├ ƒ /dashboard                           4.86 kB         219 kB
+├ ƒ /login                               2.51 kB         112 kB
+├ ƒ /reports                             3.85 kB         218 kB
+├ ƒ /settings                            2.16 kB         142 kB
+├ ƒ /sources                             2.64 kB         120 kB
+├ ƒ /tags                                3.11 kB         121 kB
+└ ƒ /year-in-reading                     47.9 kB         296 kB
++ First Load JS shared by all             102 kB
+  ├ chunks/255-3f216dfa517cdf3a.js       46.2 kB
+  ├ chunks/4bd1b696-409494caf8c83275.js  54.2 kB
+  └ other shared chunks (total)          1.94 kB
+
+
+ƒ Middleware                             85.2 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+audit: failed, exit 1
+npm run audit:ci
+
+> matter-stats@0.1.0 audit:ci
+> node scripts/audit-policy.mjs
+
+Audit policy failed: A compatible remediation is available for tailwindcss-animate; update the reviewed dependency baseline and remove the GHSA-vfj7-8cjw-p6xm exception
+
+diff-check: passed, exit 0
+git diff --check
+
+boundary-check: passed, exit 0
+git diff --exit-code origin/main -- supabase .github vercel.json package.json package-lock.json lib/auth-actions.ts lib/auth-cookie.ts lib/require-auth.ts lib/sync-status.ts lib/calendar.ts lib/report-csv.ts lib/reading-estimates.ts lib/reports-service.ts
