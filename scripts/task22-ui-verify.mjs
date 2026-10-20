@@ -782,7 +782,7 @@ try {
         await ui.goto(`/reports?${query}`);
         await expectReference(today);
       }
-      await scenario("unavailable");
+      await scenario("metrics-error");
       await ui.goto(
         "/reports?period=yearly&date=2025&context=keep&context=again",
       );
