@@ -1,0 +1,49 @@
+{
+  "testedSourceSha": "9097b2298f3a4641b97a2d81bcae3e644e76fc64",
+  "buildSourceSha": "877fae00126141b60fc7a60f6690c8f02a9cab22",
+  "phases": [
+    {
+      "name": "layout-390",
+      "phase": "layout",
+      "width": "390",
+      "startedAt": "2026-10-19T17:31:48.138Z",
+      "finishedAt": "2026-10-19T17:34:36.801Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "layout-768",
+      "phase": "layout",
+      "width": "768",
+      "startedAt": "2026-10-19T17:34:36.810Z",
+      "finishedAt": "2026-10-19T17:35:55.565Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "layout-1440",
+      "phase": "layout",
+      "width": "1440",
+      "startedAt": "2026-10-19T17:35:55.569Z",
+      "finishedAt": "2026-10-19T17:37:10.088Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "flows",
+      "phase": "flows",
+      "startedAt": "2026-10-19T17:37:10.098Z",
+      "finishedAt": "2026-10-19T17:39:46.218Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "states",
+      "phase": "states",
+      "startedAt": "2026-10-19T17:39:46.225Z",
+      "finishedAt": "2026-10-19T17:42:57.866Z",
+      "exitCode": 0,
+      "status": "passed"
+    }
+  ]
+}

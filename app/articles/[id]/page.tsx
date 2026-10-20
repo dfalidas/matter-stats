@@ -7,6 +7,164 @@ import { getArticleDetail } from "@/lib/articles-service";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { requireAccessSession } from "@/lib/require-auth";
 
-export const dynamic="force-dynamic";
-export default async function ArticleDetailPage({params}:{params:Promise<{id:string}>}){await requireAccessSession();const{id}=await params;const article=await getArticleDetail(getSupabaseAdminClient(),decodeURIComponent(id));if(!article)notFound();const progress=article.progress==null?null:Math.max(0,Math.min(100,article.progress<=1?article.progress*100:article.progress));return <PageShell eyebrow="Library detail" title={article.title??"Untitled item"} description={[article.source,article.author].filter(Boolean).join(" · ")||"Metadata unavailable"}><div className="space-y-8"><div className="flex flex-wrap gap-3"><Link href="/articles" className="inline-flex min-h-11 items-center gap-2 rounded-lg border bg-card px-4 text-sm"><ArrowLeft className="h-4 w-4"/>Back to Library</Link>{article.url&&<a href={article.url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-foreground px-4 text-sm text-background">Open original<ExternalLink className="h-4 w-4"/></a>}</div><dl className="grid border-y sm:grid-cols-2 lg:grid-cols-4"><Meta label="Author" value={article.author}/><Meta label="Source" value={article.source}/><Meta label="Status" value={article.status}/><Meta label="Content type" value={article.content_type}/><Meta label="Article size" value={article.word_count==null?null:`≈${article.word_count.toLocaleString()} words`}/><Meta label="Current progress" value={progress==null?null:`${Math.round(progress)}%`}/><Meta label="Favorite" value="Unavailable in local data"/></dl>{progress!=null&&<div><div className="mb-2 flex justify-between text-sm"><span>Current progress</span><span>{Math.round(progress)}%</span></div><div className="h-2 rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{width:`${progress}%`}}/></div></div>}<section><h2 className="text-xl font-semibold">Tags</h2><div className="mt-3 flex flex-wrap gap-2">{article.tags.length?article.tags.map(t=><Badge key={t.id} variant="outline"><Tags className="mr-1 h-3 w-3"/>{t.name}</Badge>):<p className="text-sm text-muted-foreground">No tags synced.</p>}</div></section><section><h2 className="text-xl font-semibold">Highlights</h2><div className="mt-4 grid gap-3 md:grid-cols-2">{article.annotations.length?article.annotations.map(a=><blockquote key={a.id} className="rounded-xl border bg-card p-5 text-sm leading-7">{a.text??"Highlight text unavailable"}{a.note&&<footer className="mt-3 text-muted-foreground">Note: {a.note}</footer>}</blockquote>):<p className="text-sm text-muted-foreground">No excerpt or highlights are available for this item.</p>}</div></section><p className="rounded-xl border p-4 text-xs leading-5 text-muted-foreground">Reading sessions are not attributed to this item because Matter’s documented session contract does not provide an item identifier.</p></div></PageShell>}
-function Meta({label,value}:{label:string;value:string|null}){return <div className="border-b p-5 sm:border-r"><dt className="text-xs uppercase tracking-wider text-muted-foreground">{label}</dt><dd className="mt-2 capitalize">{value||"Not available"}</dd></div>}
+export const dynamic = "force-dynamic";
+export default async function ArticleDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  await requireAccessSession();
+  const { id } = await params;
+  let article;
+  try {
+    article = await getArticleDetail(getSupabaseAdminClient(), id);
+  } catch {
+    return (
+      <PageShell
+        eyebrow="Library detail"
+        title="Item unavailable"
+        description="This item could not be loaded. Reload this page to try again."
+      >
+        <p role="status" className="mb-5 rounded-xl border p-5 text-sm">
+          Item details are currently unavailable.
+        </p>
+        <Link
+          href="/articles"
+          className="inline-flex min-h-11 items-center rounded-lg border px-4 text-sm"
+        >
+          Back to Library
+        </Link>
+      </PageShell>
+    );
+  }
+  if (!article) notFound();
+  const progress =
+    article.progress == null
+      ? null
+      : Math.max(
+          0,
+          Math.min(
+            100,
+            article.progress <= 1 ? article.progress * 100 : article.progress,
+          ),
+        );
+  return (
+    <PageShell
+      eyebrow="Library detail"
+      title={article.title ?? "Untitled item"}
+      description={
+        [article.source, article.author].filter(Boolean).join(" · ") ||
+        "Metadata unavailable"
+      }
+    >
+      <div className="space-y-8">
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/articles"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border bg-card px-4 text-sm"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Library
+          </Link>
+          {article.url && (
+            <a
+              href={article.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-foreground px-4 text-sm text-background"
+            >
+              Open original
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          )}
+        </div>
+        <dl className="grid border-y sm:grid-cols-2 lg:grid-cols-4">
+          <Meta label="Author" value={article.author} />
+          <Meta label="Source" value={article.source} />
+          <Meta label="Status" value={article.status} />
+          <Meta label="Content type" value={article.content_type} />
+          <Meta
+            label="Article size"
+            value={
+              article.word_count == null
+                ? null
+                : `≈${article.word_count.toLocaleString()} words`
+            }
+          />
+          <Meta
+            label="Current progress"
+            value={progress == null ? null : `${Math.round(progress)}%`}
+          />
+          <Meta label="Favorite" value="Unavailable in local data" />
+        </dl>
+        {progress != null && (
+          <div>
+            <div className="mb-2 flex justify-between text-sm">
+              <span>Current progress</span>
+              <span>{Math.round(progress)}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        )}
+        <section>
+          <h2 className="text-xl font-semibold">Tags</h2>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {article.tags.length ? (
+              article.tags.map((t) => (
+                <Badge key={t.id} variant="outline">
+                  <Tags className="mr-1 h-3 w-3" />
+                  {t.name}
+                </Badge>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">No tags synced.</p>
+            )}
+          </div>
+        </section>
+        <section>
+          <h2 className="text-xl font-semibold">Highlights</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {article.annotations.length ? (
+              article.annotations.map((a) => (
+                <blockquote
+                  key={a.id}
+                  className="rounded-xl border bg-card p-5 text-sm leading-7"
+                >
+                  {a.text ?? "Highlight text unavailable"}
+                  {a.note && (
+                    <footer className="mt-3 text-muted-foreground">
+                      Note: {a.note}
+                    </footer>
+                  )}
+                </blockquote>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No excerpt or highlights are available for this item.
+              </p>
+            )}
+          </div>
+        </section>
+        <p className="rounded-xl border p-4 text-xs leading-5 text-muted-foreground">
+          Reading sessions are not attributed to this item because Matter’s
+          documented session contract does not provide an item identifier.
+        </p>
+      </div>
+    </PageShell>
+  );
+}
+function Meta({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div className="border-b p-5 sm:border-r">
+      <dt className="text-xs uppercase tracking-wider text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="mt-2 capitalize">{value || "Not available"}</dd>
+    </div>
+  );
+}

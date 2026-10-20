@@ -50,7 +50,7 @@ export async function getActivityMonth(
 ) {
   const timezone = getDefaultMetricsTimezone();
   const today = formatDateInTimezone(now, timezone);
-  const month = isCalendarMonth(requestedMonth) ? requestedMonth : today.slice(0, 7);
+  const month = isCalendarMonth(requestedMonth) && requestedMonth <= today.slice(0, 7) ? requestedMonth : today.slice(0, 7);
   const [year, monthNumber] = month.split("-").map(Number);
   const start = localDateToUtc(year, monthNumber, 1, timezone);
   const end = localDateToUtc(year, monthNumber + 1, 1, timezone);
@@ -67,7 +67,7 @@ export async function getActivityMonth(
     days.set(date, value);
   }
 
-  const selectedDay = isCalendarDate(requestedDay) && requestedDay.startsWith(`${month}-`)
+  const selectedDay = isCalendarDate(requestedDay) && requestedDay.startsWith(`${month}-`) && requestedDay <= today
     ? requestedDay
     : today.startsWith(`${month}-`)
       ? today

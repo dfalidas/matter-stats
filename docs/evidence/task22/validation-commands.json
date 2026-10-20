@@ -1,0 +1,87 @@
+{
+  "testedSourceSha": "877fae00126141b60fc7a60f6690c8f02a9cab22",
+  "node": "v24.19.0",
+  "syntheticConfiguration": true,
+  "results": [
+    {
+      "name": "install",
+      "command": "npm ci --cache work/npm-cache",
+      "startedAt": "2026-10-19T17:11:35.533Z",
+      "finishedAt": "2026-10-19T17:13:02.210Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "route-types",
+      "command": "npx --no-install next typegen",
+      "startedAt": "2026-10-19T17:13:02.216Z",
+      "finishedAt": "2026-10-19T17:13:07.412Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "typecheck",
+      "command": "npm run typecheck",
+      "startedAt": "2026-10-19T17:13:07.416Z",
+      "finishedAt": "2026-10-19T17:13:21.015Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "lint",
+      "command": "npm run lint",
+      "startedAt": "2026-10-19T17:13:21.022Z",
+      "finishedAt": "2026-10-19T17:14:08.672Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "test-compile",
+      "command": "npx --no-install tsc -p tests/tsconfig.json",
+      "startedAt": "2026-10-19T17:14:08.678Z",
+      "finishedAt": "2026-10-19T17:14:57.194Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "focused-tests",
+      "command": "node --test .test-build/tests/activity-service.test.js tests/ui-presentation.test.mjs tests/dependency-css-compatibility.test.mjs",
+      "startedAt": "2026-10-19T17:14:57.205Z",
+      "finishedAt": "2026-10-19T17:15:18.859Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "production-build",
+      "command": "npm run build",
+      "startedAt": "2026-10-19T17:15:18.866Z",
+      "finishedAt": "2026-10-19T17:19:05.965Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "audit",
+      "command": "npm run audit:ci",
+      "startedAt": "2026-10-19T17:19:05.968Z",
+      "finishedAt": "2026-10-19T17:19:15.549Z",
+      "exitCode": 1,
+      "status": "failed"
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "startedAt": "2026-10-19T17:20:30.582Z",
+      "finishedAt": "2026-10-19T17:20:30.787Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "boundary-check",
+      "command": "git diff --exit-code origin/main -- supabase .github vercel.json package.json package-lock.json lib/auth-actions.ts lib/auth-cookie.ts lib/require-auth.ts lib/sync-status.ts lib/calendar.ts lib/report-csv.ts lib/reading-estimates.ts lib/reports-service.ts",
+      "startedAt": "2026-10-19T17:20:30.792Z",
+      "finishedAt": "2026-10-19T17:20:30.815Z",
+      "exitCode": 0,
+      "status": "passed"
+    }
+  ]
+}

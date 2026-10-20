@@ -1,5 +1,7 @@
 "use client";
 
+import { ReadingAttributionNotice } from "@/components/reading-attribution";
+
 import { useMemo, useState, useTransition } from "react";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -72,12 +74,13 @@ export function SourcesRanking({ period, ranking }: SourcesRankingProps) {
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <ReadingAttributionNotice />
+      {ranking.totals.articlesRead > 0 && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Reading time" value={formatDuration(ranking.totals.readingTimeSeconds)} icon={Clock} />
         <StatCard label="Estimated words" value={formatInteger(ranking.totals.wordsRead)} icon={BookOpen} />
         <StatCard label="Articles" value={formatInteger(ranking.totals.articlesRead)} icon={Newspaper} />
         <StatCard label="Highlights" value={formatInteger(ranking.totals.highlights)} icon={Highlighter} />
-      </section>
+      </section>}
 
       <Card className="border-white/10 bg-background/55 shadow-soft">
         <CardHeader className="gap-4 pb-4">
@@ -90,7 +93,7 @@ export function SourcesRanking({ period, ranking }: SourcesRankingProps) {
                 </Badge>
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
-                Ranked from real Matter reading sessions and annotations stored in Supabase.
+                Reading attributed to stored item sources. Incomplete item links limit this ranking.
               </p>
             </div>
 
@@ -100,8 +103,9 @@ export function SourcesRanking({ period, ranking }: SourcesRankingProps) {
                   key={preset}
                   type="button"
                   variant={preset === period ? "default" : "outline"}
-                  size="sm"
+                  size="sm" className="min-h-11"
                   disabled={isPending}
+                  aria-pressed={preset === period}
                   onClick={() => updatePeriod(preset)}
                 >
                   {periodLabels[preset]}
@@ -131,8 +135,9 @@ export function SourcesRanking({ period, ranking }: SourcesRankingProps) {
                     type="button"
                     variant={key === sortKey ? "secondary" : "ghost"}
                     size="sm"
+                    aria-pressed={key === sortKey}
                     onClick={() => setSortKey(key)}
-                    className="rounded-full"
+                    className="min-h-11 rounded-full"
                   >
                     <Icon className="h-4 w-4" aria-hidden />
                     {sortLabels[key]}
@@ -145,8 +150,8 @@ export function SourcesRanking({ period, ranking }: SourcesRankingProps) {
         </CardHeader>
 
         <CardContent>
-          {ranking.sources.length === 0 ? (
-            <EmptyRanking message="No source reading data was found for this period." />
+          {ranking.totals.articlesRead === 0 || ranking.sources.length === 0 ? (
+            <EmptyRanking message="No attributed source results in this period. This does not establish no reading; session-to-item attribution may be unsupported." />
           ) : filteredSources.length === 0 ? (
             <EmptyRanking message={`No sources match “${query.trim()}”.`} />
           ) : (

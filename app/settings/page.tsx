@@ -253,9 +253,9 @@ async function getSettingsSyncData(now: Date, timezone: string): Promise<Setting
 function getStatusBadgeClass(state: ConnectionState): string {
   switch (state) {
     case "connected":
-      return "border-emerald-400/25 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/15";
+      return "border-success/25 bg-success/10 text-success hover:bg-success/15";
     case "warning":
-      return "border-amber-400/25 bg-amber-400/10 text-amber-300 hover:bg-amber-400/15";
+      return "border-warning/25 bg-warning/10 text-warning hover:bg-warning/15";
     case "error":
       return "border-destructive/25 bg-destructive/10 text-destructive hover:bg-destructive/15";
     case "not-configured":
@@ -266,9 +266,9 @@ function getStatusBadgeClass(state: ConnectionState): string {
 function getSyncRunStatusBadgeClass(status: string): string {
   switch (status) {
     case "success":
-      return "border-emerald-400/25 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/15";
+      return "border-success/25 bg-success/10 text-success hover:bg-success/15";
     case "running":
-      return "border-sky-400/25 bg-sky-400/10 text-sky-300 hover:bg-sky-400/15";
+      return "border-primary/25 bg-primary/10 text-primary hover:bg-primary/15";
     case "error":
       return "border-destructive/25 bg-destructive/10 text-destructive hover:bg-destructive/15";
     default:

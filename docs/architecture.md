@@ -421,3 +421,15 @@ raw-reader analytics and persisted generation readiness. Sessions freshness warn
 **greater than or equal to** `MATTER_SYNC_STALE_HOURS` (default 36). Unknown historical completion
 and readiness-transition times remain unknown. Coverage remains unverified. The additive migration
 records future terminal-page completion atomically with its receipt; it starts no synchronization or repair.
+
+## Task 22 focused UI compatibility
+
+[Task 22 QA](task-22-qa.md) and the [route inventory](task-22-route-inventory.md)
+record focused browser verification, state/error presentation and preserved
+secondary functions. Overview forms/root alias retain URL context; Reports
+retain historical period identity and link to the distinct selected-year recap.
+Library links expose retained reading-attribution rankings, whose unsupported
+session linkage is separate from current item metadata. Task 21 remains the
+single synchronization interpretation. No metric, database, auth, ingestion or
+deployment contract changes. Production synchronization and scheduled execution
+are not certified by synthetic UI screenshots.

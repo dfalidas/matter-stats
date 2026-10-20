@@ -1,0 +1,44 @@
+import assert from 'node:assert/strict';
+import {spawn,execFileSync} from 'node:child_process';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {createWriteStream} from 'node:fs';
+import {sanitizedEnvironment} from '../scripts/stabilization-db-orchestrator.mjs';
+import {chromium} from '/opt/codex/runtimes/cua/lib/node_modules/playwright/index.mjs';
+const sha=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+execFileSync('git',['diff','--exit-code','HEAD','--','app','components','lib','tailwind.config.ts']);
+const env=sanitizedEnvironment({APP_ACCESS_PASSWORD:'synthetic-password',APP_CREDENTIAL_VERSION:'1',MATTER_API_TOKEN:'synthetic-unused-token',SUPABASE_URL:'http://127.0.0.1:54391',SUPABASE_SERVICE_ROLE_KEY:'synthetic-server-only',CRON_SECRET:'synthetic-unused-cron',APP_TIMEZONE:'Europe/Athens',NEXT_TELEMETRY_DISABLED:'1'});
+const children=[];
+for (const [name,args] of [['fixture',['scripts/task22-ui-fixture.mjs']],['app',['node_modules/next/dist/bin/next','start','--hostname','127.0.0.1','--port','3091']]]) {
+ const child=spawn(process.execPath,args,{env,stdio:['ignore','pipe','pipe']});const log=createWriteStream(`work/task22-supplement-${name}.log`);child.stdout.pipe(log);child.stderr.pipe(log);children.push(child);
+}
+let browser;
+const output='docs/evidence/task22/completed/supplement';
+await mkdir(output,{recursive:true});
+const checks=[];
+try {
+ for(const url of ['http://127.0.0.1:54391/info','http://localhost:3091/login']) {
+  let ready=false;for(let attempt=0;attempt<150;attempt++){try{await fetch(url);ready=true;break;}catch{await new Promise(r=>setTimeout(r,100));}}assert.ok(ready);
+ }
+ browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+ const context=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,timezoneId:'America/New_York'});
+ await context.route('**/*',r=>r.request().url().startsWith('http://localhost:3091')?r.continue():r.abort());
+ await context.addCookies([{name:'matter_stats_session',value:'task21-synthetic-session-cookie-only',url:'http://localhost:3091'}]);
+ const page=await context.newPage();
+ await fetch('http://127.0.0.1:54391/scenario?name=metrics-error');
+ await page.goto('http://localhost:3091/dashboard',{waitUntil:'networkidle'});
+ const unavailable=page.getByText(/Reading data unavailable/);
+ await unavailable.waitFor();await unavailable.scrollIntoViewIfNeeded();
+ assert.match(await page.locator('main').innerText(), /Synthetic article/);
+ assert.equal(await page.getByRole('button',{name:'Month',exact:true}).isEnabled(),true);
+ await page.screenshot({path:`${output}/metrics-unavailable-dashboard-390-light.png`});
+ checks.push({name:'Unavailable metrics visible with period controls and independent Library data',width:390,theme:'light',result:'passed'});
+ await fetch('http://127.0.0.1:54391/scenario?name=normal');
+ await page.goto('http://localhost:3091/year-in-reading',{waitUntil:'networkidle'});
+ assert.match(await page.locator('main').innerText(), /25 sessions/);
+ assert.doesNotMatch(await page.locator('main').innerText(), /No .*reading sessions have synced/);
+ await page.getByText('Attributed articles',{exact:true}).scrollIntoViewIfNeeded();
+ await page.screenshot({path:`${output}/unsupported-year-in-reading-390-light.png`});
+ checks.push({name:'Imported sessions remain visible while annual item attribution is unavailable',width:390,theme:'light',result:'passed'});
+ await writeFile(`${output}/supplement-validation.json`,JSON.stringify({testedApplicationSourceSha:sha,buildSourceSha:'877fae00126141b60fc7a60f6690c8f02a9cab22',syntheticOnly:true,appTimezone:'Europe/Athens',browserTimezone:'America/New_York',checks},null,2)+'\n');
+ console.log(JSON.stringify(checks));
+} finally {if(browser)await browser.close();for(const child of children)child.kill('SIGTERM');}

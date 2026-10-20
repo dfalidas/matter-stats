@@ -1,0 +1,35 @@
+import { spawn, execFileSync } from 'node:child_process';
+import { createWriteStream } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
+import { sanitizedEnvironment } from '../../scripts/stabilization-db-orchestrator.mjs';
+const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+const env = sanitizedEnvironment({APP_ACCESS_PASSWORD:'synthetic-password', APP_CREDENTIAL_VERSION:'1', MATTER_API_TOKEN:'synthetic-unused-token', SUPABASE_URL:'http://127.0.0.1:54391', SUPABASE_SERVICE_ROLE_KEY:'synthetic-server-only', CRON_SECRET:'synthetic-unused-cron', APP_TIMEZONE:'Europe/Athens', NEXT_TELEMETRY_DISABLED:'1', npm_config_cache:'work/npm-cache'});
+const commands = [
+ ['install','npm',['ci','--cache','work/npm-cache']],
+ ['route-types','npx',['--no-install','next','typegen']],
+ ['typecheck','npm',['run','typecheck']],
+ ['lint','npm',['run','lint']],
+ ['test-compile','npx',['--no-install','tsc','-p','tests/tsconfig.json']],
+ ['focused-tests','node',['--test','.test-build/tests/reports-service.test.js','.test-build/tests/report-csv.test.js','tests/ui-presentation.test.mjs','tests/analytics-client-payload.test.mjs']],
+ ['full-tests','npm',['run','test']],
+ ['production-build','npm',['run','build']],
+ ['audit','npm',['run','audit:ci']],
+ ['diff-check','git',['diff','--check']],
+ ['boundary-check','git',['diff','--exit-code','880fafb4db67b0a08c0f8ff2e717f1d88786c8ba','--','supabase','.github','vercel.json','package.json','package-lock.json','lib','app/_components','app/dashboard','app/activity','app/articles','app/settings','app/year-in-reading','components','tailwind.config.ts']],
+];
+const results = [];
+for (const [name, command, args] of commands) {
+ console.log(`RUN ${name} at ${sourceSha}`);
+ const startedAt = new Date().toISOString();
+ const log = createWriteStream(`work/reports-reference/${name}.txt`);
+ const exitCode = await new Promise((resolve,reject) => {
+  const child = spawn(command,args,{env,stdio:['ignore','pipe','pipe']});
+  child.stdout.pipe(log,{end:false}); child.stderr.pipe(log,{end:false});
+  child.once('error',reject); child.once('close',resolve);
+ });
+ await new Promise(resolve => log.end(resolve));
+ results.push({name,command:[command,...args].join(' '),startedAt,finishedAt:new Date().toISOString(),exitCode,status:exitCode===0?'passed':'failed'});
+ await writeFile('work/reports-reference/validation-commands.json', JSON.stringify({testedSourceSha:sourceSha,node:process.version,syntheticConfiguration:true,results},null,2)+'\n');
+ console.log(`${exitCode === 0 ? 'PASS' : 'FAIL'} ${name}`);
+ if (exitCode !== 0 && !['audit'].includes(name)) break;
+}

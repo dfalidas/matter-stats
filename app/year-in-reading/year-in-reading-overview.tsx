@@ -1,5 +1,7 @@
 "use client";
 
+import { ReadingAttributionNotice } from "@/components/reading-attribution";
+
 import { motion } from "framer-motion";
 import {
   Award,
@@ -73,7 +75,7 @@ export function YearInReadingOverview({ year, recapResult }: YearInReadingOvervi
     return (
       <ErrorState
         title="Unable to load your annual recap"
-        description="Matter Stats could not read this year's Supabase metrics."
+        description="Reading data is currently unavailable. Reload this page to try again."
         message={recapResult.message}
       />
     );
@@ -88,12 +90,13 @@ function YearInReadingContent({ year, report }: { year: number; report: YearInRe
   const activeMonths = monthData.filter((month) => month.words > 0 || month.minutes > 0 || month.articles > 0);
   const mostActiveMonth = getMostActiveMonth(monthData);
   const mostProductiveDay = getMostProductiveDay(metrics.heatmap);
-  const longestRead = report.longformReads[0];
+  const attributedReads = report.longformReads.filter(read => read.itemId !== null);
+  const longestRead = attributedReads[0];
   const topPublication = metrics.topSources[0];
   const topAuthor = metrics.topAuthors[0];
   const booksEquivalent = metrics.totals.wordsRead / WORDS_PER_BOOK;
   const personality = getReadingPersonality(metrics);
-  const isLowData = metrics.totals.articlesRead < 3 && metrics.totals.wordsRead < WORDS_PER_BOOK / 2;
+  const isLowData = metrics.totals.sessionsCount < 3 && metrics.totals.wordsRead < WORDS_PER_BOOK / 2;
 
   return (
     <motion.div
@@ -126,6 +129,7 @@ function YearInReadingContent({ year, report }: { year: number; report: YearInRe
         </div>
       </section>
 
+      <ReadingAttributionNotice />
       {isLowData ? (
         <div className="rounded-3xl border border-warning/20 bg-warning/10 p-4 text-sm text-dashboard-muted">
           This recap is ready, but {year} has limited synced reading data so far. As more Matter sessions sync, these cards will fill in automatically.
@@ -142,12 +146,12 @@ function YearInReadingContent({ year, report }: { year: number; report: YearInRe
           tooltip={`Estimated from ${formatDuration(metrics.totals.totalReadingTimeSeconds)} of synced reading time.`}
         />
         <MetricCard
-          label="Articles Read"
-          value={formatInteger(metrics.totals.articlesRead)}
+          label="Attributed articles"
+          value={metrics.totals.articlesRead > 0 ? formatInteger(metrics.totals.articlesRead) : "Unavailable"}
           helper={`${formatInteger(metrics.totals.sessionsCount)} reading sessions`}
           icon={Newspaper}
           accent="blue"
-          tooltip="Unique Matter items with reading activity during the current year."
+          tooltip="Unique Matter items with reading activity during the selected year."
         />
         <MetricCard
           label="Estimated book equivalent"
@@ -162,20 +166,20 @@ function YearInReadingContent({ year, report }: { year: number; report: YearInRe
       <div className="grid gap-4 lg:grid-cols-3">
         <SpotlightCard
           title="Top Publication"
-          value={topPublication?.name ?? "Not enough data yet"}
-          helper={topPublication ? `${formatInteger(topPublication.wordsRead)} estimated words • ${formatInteger(topPublication.articlesRead)} articles` : "Publications appear after reads sync with source metadata."}
+          value={topPublication?.name ?? "Attribution unavailable"}
+          helper={topPublication ? `${formatInteger(topPublication.wordsRead)} estimated words • ${formatInteger(topPublication.articlesRead)} articles` : "Source reading requires a session-to-item link."}
           icon={Newspaper}
         />
         <SpotlightCard
           title="Top Author"
-          value={topAuthor?.name ?? "Not enough data yet"}
-          helper={topAuthor ? `${formatInteger(topAuthor.wordsRead)} estimated words • ${formatInteger(topAuthor.articlesRead)} articles` : "Authors appear after synced items include bylines."}
+          value={topAuthor?.name ?? "Attribution unavailable"}
+          helper={topAuthor ? `${formatInteger(topAuthor.wordsRead)} estimated words • ${formatInteger(topAuthor.articlesRead)} articles` : "Author reading requires a session-to-item link."}
           icon={PenLine}
         />
         <SpotlightCard
           title="Longest Read"
-          value={longestRead?.title ?? "Not enough data yet"}
-          helper={longestRead ? `${formatInteger(longestRead.wordsRead)} estimated words • ${formatDuration(longestRead.readingTimeSeconds)}` : "Longform reads appear once sessions are synced."}
+          value={longestRead?.title ?? "Attribution unavailable"}
+          helper={longestRead ? `${formatInteger(longestRead.wordsRead)} estimated words • ${formatDuration(longestRead.readingTimeSeconds)}` : "Item reading requires a session-to-item link."}
           icon={Trophy}
         />
       </div>
@@ -183,7 +187,7 @@ function YearInReadingContent({ year, report }: { year: number; report: YearInRe
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.9fr)]">
         <ChartCard
           title="Reading Journey"
-          description="Estimated words by month across the current year."
+          description="Estimated words by month across the selected year."
           badge={year}
           action={<BarChart3 className="h-5 w-5 text-dashboard-muted" aria-hidden />}
           contentClassName="h-80"
@@ -204,11 +208,11 @@ function YearInReadingContent({ year, report }: { year: number; report: YearInRe
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <EmptyState title="No monthly journey yet" description="Your month-by-month recap will appear after reading sessions sync for this year." icon={BarChart3} className="h-full" />
+            <EmptyState title="No monthly journey yet" description="Your month-by-month recap will appear after reading sessions sync for the selected year." icon={BarChart3} className="h-full" />
           )}
         </ChartCard>
 
-        <ChartCard title="Reading Personality" description="A playful summary based on your current-year habits." action={<Sparkles className="h-5 w-5 text-dashboard-muted" aria-hidden />}>
+        <ChartCard title="Reading Personality" description="A playful summary based on your selected-year habits." action={<Sparkles className="h-5 w-5 text-dashboard-muted" aria-hidden />}>
           <div className="rounded-3xl border border-primary/20 bg-primary/10 p-5">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
               <personality.icon className="h-6 w-6" aria-hidden />
@@ -233,14 +237,14 @@ function YearInReadingContent({ year, report }: { year: number; report: YearInRe
               maxValue={Math.max(...metrics.topTags.slice(0, 5).map((tag) => Math.max(1, Math.round(tag.wordsRead / 1000))), 1)}
             />
           ) : (
-            <EmptyState title="No topics yet" description="Tags from synced Matter items power your topic recap." icon={Hash} />
+            <EmptyState title="Topic attribution unavailable" description="Reading topics require linked sessions and item tags." icon={Hash} />
           )}
         </ChartCard>
 
-        <ChartCard title="Milestones" description="Your biggest current-year reading moments." action={<Medal className="h-5 w-5 text-dashboard-muted" aria-hidden />}>
+        <ChartCard title="Milestones" description="Your biggest selected-year reading moments." action={<Medal className="h-5 w-5 text-dashboard-muted" aria-hidden />}>
           <div className="space-y-3">
             <MilestoneRow label="Most Active Month" value={mostActiveMonth ? mostActiveMonth.label : "Not yet"} helper={mostActiveMonth ? `${formatInteger(mostActiveMonth.words)} estimated words` : "Read in more months to unlock this."} icon={CalendarDays} />
-            <MilestoneRow label="Best Streak" value={`${formatInteger(metrics.bestStreakDays)} ${pluralize("day", metrics.bestStreakDays)}`} helper={metrics.bestStreakDays > 0 ? "Longest reading streak this year" : "Start a streak with your next read."} icon={Flame} />
+            <MilestoneRow label="Best Streak" value={`${formatInteger(metrics.bestStreakDays)} ${pluralize("day", metrics.bestStreakDays)}`} helper={metrics.bestStreakDays > 0 ? "Longest reading streak in the selected year" : "Start a streak with your next read."} icon={Flame} />
             <MilestoneRow label="Most Productive Day" value={mostProductiveDay ? formatDateLabel(mostProductiveDay.date) : "Not yet"} helper={mostProductiveDay ? `${formatInteger(mostProductiveDay.wordsRead)} estimated words` : "Daily highs appear after reading sessions sync."} icon={Award} />
           </div>
         </ChartCard>
@@ -259,15 +263,15 @@ function YearInReadingContent({ year, report }: { year: number; report: YearInRe
               ))}
             </div>
           ) : (
-            <EmptyState title="No tags yet" description="Synced Matter tags will appear here as a recap cloud." icon={Tags} />
+            <EmptyState title="Tag attribution unavailable" description="Current library tags do not establish reading attribution." icon={Tags} />
           )}
         </ChartCard>
       </div>
 
-      <ChartCard title="Longest Reads" description="A few standout longform pieces from your current-year recap." action={<Trophy className="h-5 w-5 text-dashboard-muted" aria-hidden />}>
-        {report.longformReads.length > 0 ? (
+      <ChartCard title="Longest Reads" description="A few standout longform pieces from your selected-year recap." action={<Trophy className="h-5 w-5 text-dashboard-muted" aria-hidden />}>
+        {attributedReads.length > 0 ? (
           <div className="grid gap-3 md:grid-cols-2">
-            {report.longformReads.slice(0, 4).map((read) => (
+            {attributedReads.slice(0, 4).map((read) => (
               <ArticleRow
                 key={read.itemId}
                 title={read.title ?? "Untitled read"}
@@ -279,7 +283,7 @@ function YearInReadingContent({ year, report }: { year: number; report: YearInRe
             ))}
           </div>
         ) : (
-          <EmptyState title="No longform reads yet" description="Your longest reads will appear once current-year Matter sessions are synced." icon={BookOpen} />
+          <EmptyState title="Item reading attribution unavailable" description="Session time remains available without attributing it to an article." icon={BookOpen} />
         )}
       </ChartCard>
     </motion.div>
@@ -386,11 +390,11 @@ function getReadingPersonalityIcon(label: ReadingPersonalityLabel): DashboardIco
 }
 
 function getHeroSentence(metrics: YearInReadingClientPayload["metrics"], booksEquivalent: number, isLowData: boolean): string {
-  if (metrics.totals.articlesRead === 0) {
-    return "No current-year reading sessions have synced yet. Once Matter activity appears, this page becomes your annual recap.";
+  if (metrics.totals.sessionsCount === 0) {
+    return "No imported sessions in the selected year. This does not establish no reading in Matter.";
   }
 
-  const base = `Your estimated reading volume was ${formatInteger(metrics.totals.wordsRead)} words across ${formatInteger(metrics.totals.articlesRead)} ${pluralize("article", metrics.totals.articlesRead)} — approximately ${formatBooks(booksEquivalent)} based on an ${formatInteger(WORDS_PER_BOOK)}-word book benchmark.`;
+  const base = `Your estimated reading volume was ${formatInteger(metrics.totals.wordsRead)} words across ${formatInteger(metrics.totals.sessionsCount)} ${pluralize("session", metrics.totals.sessionsCount)} — approximately ${formatBooks(booksEquivalent)} based on an ${formatInteger(WORDS_PER_BOOK)}-word book benchmark.`;
   return isLowData ? `${base} It is still early, so every new synced read will reshape the recap.` : base;
 }
 

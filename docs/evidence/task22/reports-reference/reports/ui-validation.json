@@ -1,0 +1,155 @@
+{
+  "testedSourceSha": "8192206bb1995440248110e117776a1296108f36",
+  "buildSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c",
+  "phase": "reports",
+  "syntheticOnly": true,
+  "productionData": false,
+  "appTimezone": "Europe/Athens",
+  "browserTimezone": "America/New_York",
+  "pages": [
+    {
+      "route": "/reports?period=weekly&date=2025-01-01&context=keep&context=again",
+      "scenario": "retained-year-week",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "touch / forms / history / reload",
+      "horizontalOverflow": false,
+      "screenshot": "retained-year-week-reports-390-light.png"
+    },
+    {
+      "route": "/reports?period=yearly&date=2025&context=keep&context=again",
+      "scenario": "retained-year-return",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "touch / forms / history / reload",
+      "horizontalOverflow": false,
+      "screenshot": "retained-year-return-reports-390-light.png"
+    },
+    {
+      "route": "/reports?period=weekly&date=2025-03-01&context=keep&context=again",
+      "scenario": "retained-march-2025-week",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "touch / forms / history / reload",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/reports?period=weekly&date=2024-03-01&context=keep&context=again",
+      "scenario": "retained-march-2024-week",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "touch / forms / history / reload",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/reports?period=weekly&date=2025-01-01&context=keep&context=again",
+      "scenario": "retained-year-week",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "keyboard / forms / history / reload",
+      "horizontalOverflow": false,
+      "screenshot": "retained-year-week-reports-768-light.png"
+    },
+    {
+      "route": "/reports?period=yearly&date=2025&context=keep&context=again",
+      "scenario": "retained-year-return",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "keyboard / forms / history / reload",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/reports?period=weekly&date=2025-03-01&context=keep&context=again",
+      "scenario": "retained-march-2025-week",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "keyboard / forms / history / reload",
+      "horizontalOverflow": false,
+      "screenshot": "retained-march-2025-week-reports-768-light.png"
+    },
+    {
+      "route": "/reports?period=weekly&date=2024-03-01&context=keep&context=again",
+      "scenario": "retained-march-2024-week",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "keyboard / forms / history / reload",
+      "horizontalOverflow": false,
+      "screenshot": "retained-march-2024-week-reports-768-light.png"
+    },
+    {
+      "route": "/reports?period=weekly&date=2025-01-01&context=keep&context=again",
+      "scenario": "retained-year-week",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "keyboard / forms / history / reload",
+      "horizontalOverflow": false,
+      "screenshot": "retained-year-week-reports-1440-dark.png"
+    },
+    {
+      "route": "/reports?period=yearly&date=2025&context=keep&context=again",
+      "scenario": "retained-year-return",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "keyboard / forms / history / reload",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/reports?period=weekly&date=2025-03-01&context=keep&context=again",
+      "scenario": "retained-march-2025-week",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "keyboard / forms / history / reload",
+      "horizontalOverflow": false,
+      "screenshot": "retained-march-2025-week-reports-1440-dark.png"
+    },
+    {
+      "route": "/reports?period=weekly&date=2024-03-01&context=keep&context=again",
+      "scenario": "retained-march-2024-week",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "keyboard / forms / history / reload",
+      "horizontalOverflow": false,
+      "screenshot": "retained-march-2024-week-reports-1440-dark.png"
+    }
+  ],
+  "checks": [
+    {
+      "name": "Reports retained calendar selection: successful year/month/leap round trips, recap, explicit Apply, history/reload, legacy/invalid/default, unavailable and canonical weekly CSV",
+      "result": "passed",
+      "width": 390,
+      "theme": "light"
+    },
+    {
+      "name": "Reports retained calendar selection: successful year/month/leap round trips, recap, explicit Apply, history/reload, legacy/invalid/default, unavailable and canonical weekly CSV",
+      "result": "passed",
+      "width": 768,
+      "theme": "light"
+    },
+    {
+      "name": "Reports retained calendar selection: successful year/month/leap round trips, recap, explicit Apply, history/reload, legacy/invalid/default, unavailable and canonical weekly CSV",
+      "result": "passed",
+      "width": 1440,
+      "theme": "dark"
+    }
+  ],
+  "contrastChecks": [],
+  "scrollChecks": [],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "resourceFailures": [],
+  "externalRequests": [],
+  "libraryDetailPrefetches": [],
+  "unexpectedMutations": []
+}

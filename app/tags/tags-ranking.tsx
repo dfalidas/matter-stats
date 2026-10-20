@@ -1,5 +1,7 @@
 "use client";
 
+import { ReadingAttributionNotice } from "@/components/reading-attribution";
+
 import { useMemo, useState, useTransition } from "react";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -69,12 +71,13 @@ export function TagsRanking({ period, ranking }: TagsRankingProps) {
 
   return (
     <div className="space-y-5">
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <ReadingAttributionNotice />
+      {ranking.totals.articlesRead > 0 && <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Reading time" value={formatDuration(ranking.totals.readingTimeSeconds)} icon={Clock} />
         <StatCard label="Articles" value={formatInteger(ranking.totals.articlesRead)} icon={Newspaper} />
         <StatCard label="Estimated words" value={formatInteger(ranking.totals.wordsRead)} icon={BookOpen} />
         <StatCard label="Highlights" value={formatInteger(ranking.totals.highlights)} icon={Highlighter} />
-      </section>
+      </section>}
 
       <Card className="border-white/10 bg-background/55 shadow-soft">
         <CardHeader className="gap-4 pb-4">
@@ -86,11 +89,11 @@ export function TagsRanking({ period, ranking }: TagsRankingProps) {
                   {periodLabels[period]}
                 </Badge>
                 <Badge variant="outline" className="rounded-full">
-                  {formatInteger(ranking.totals.tags)} tags
+                  {ranking.totals.articlesRead > 0 ? `${formatInteger(ranking.totals.tags)} attributed tags` : "Attribution unavailable"}
                 </Badge>
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
-                Topic chips and rankings from synced Matter tags. Untagged articles are ignored here so missing tags never break metrics.
+                Reading attributed to stored item tags. Library tags alone do not establish what you read.
               </p>
             </div>
 
@@ -100,8 +103,9 @@ export function TagsRanking({ period, ranking }: TagsRankingProps) {
                   key={preset}
                   type="button"
                   variant={preset === period ? "default" : "outline"}
-                  size="sm"
+                  size="sm" className="min-h-11"
                   disabled={isPending}
+                  aria-pressed={preset === period}
                   onClick={() => updatePeriod(preset)}
                 >
                   {periodLabels[preset]}
@@ -117,7 +121,7 @@ export function TagsRanking({ period, ranking }: TagsRankingProps) {
                   key={tag.tagId}
                   type="button"
                   onClick={() => setQuery(tag.tag)}
-                  className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition hover:border-primary/40 hover:bg-primary/15"
+                  className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 min-h-11 py-1.5 text-sm font-medium text-primary transition hover:border-primary/40 hover:bg-primary/15"
                 >
                   <Hash className="h-3.5 w-3.5" aria-hidden />
                   {tag.tag}
@@ -148,8 +152,9 @@ export function TagsRanking({ period, ranking }: TagsRankingProps) {
                     type="button"
                     variant={key === sortKey ? "secondary" : "ghost"}
                     size="sm"
+                    aria-pressed={key === sortKey}
                     onClick={() => setSortKey(key)}
-                    className="rounded-full"
+                    className="min-h-11 rounded-full"
                   >
                     <Icon className="h-4 w-4" aria-hidden />
                     {sortLabels[key]}
@@ -162,8 +167,8 @@ export function TagsRanking({ period, ranking }: TagsRankingProps) {
         </CardHeader>
 
         <CardContent>
-          {ranking.tags.length === 0 ? (
-            <EmptyRanking message="No tagged reading data was found for this period. Sync Matter items with tags or try a broader period." />
+          {ranking.totals.articlesRead === 0 || ranking.tags.length === 0 ? (
+            <EmptyRanking message="No attributed tag results in this period. This does not establish no reading; session-to-item attribution may be unsupported." />
           ) : filteredTags.length === 0 ? (
             <EmptyRanking message={`No tags match “${query.trim()}”.`} />
           ) : (

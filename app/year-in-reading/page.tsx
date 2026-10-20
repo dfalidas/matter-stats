@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { isValidReportReference } from "@/lib/reports-service";
 import { PageShell } from "../_components/page-shell";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { requireAccessSession } from "@/lib/require-auth";
@@ -18,20 +20,24 @@ type YearInReadingResult =
       message: string;
     };
 
-export default async function YearInReadingPage() {
+export default async function YearInReadingPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   await requireAccessSession();
   const now = new Date();
   const localYear = calendarYear(timestampToCalendarDate(now, getAppTimezone()));
   const client = getSupabaseAdminClient();
-  const recapResult = await getYearInReadingResult(client, now);
-  const year = recapResult.ok ? getReportYear(recapResult.report) : localYear;
+  const params = await searchParams;
+  const candidate = Array.isArray(params?.year) ? params.year[0] : params?.year;
+  const reference = isValidReportReference("yearly", candidate) ? candidate : String(localYear);
+  const recapResult = await getYearInReadingResult(client, now, reference);
+  const year = recapResult.ok ? getReportYear(recapResult.report) : Number(reference);
 
   return (
     <PageShell
       eyebrow="Year in Reading"
       title={`Your ${year} in Reading`}
-      description="A cinematic annual recap of your Matter reading: estimated words, articles, publications, authors, tags, topics, streaks, milestones, and momentum."
+      description="An annual recap of imported reading sessions, with time, estimated words, streaks and milestones. Upstream historical coverage is unverified."
     >
+      <Link href={`/reports?period=yearly&date=${year}`} className="mb-5 inline-flex min-h-11 items-center text-sm text-primary">View {year} report and CSV →</Link>
       <YearInReadingOverview year={year} recapResult={recapResult} />
     </PageShell>
   );
@@ -40,9 +46,10 @@ export default async function YearInReadingPage() {
 async function getYearInReadingResult(
   client: ReturnType<typeof getSupabaseAdminClient>,
   now: Date,
+  reference: string,
 ): Promise<YearInReadingResult> {
   try {
-    const report = await getReadingReport(client, "yearly", { now });
+    const report = await getReadingReport(client, "yearly", { now, reference });
     return { ok: true, report: toYearInReadingClientPayload(report) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load year-in-reading recap.";

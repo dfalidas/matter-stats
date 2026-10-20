@@ -1,0 +1,644 @@
+npm ci --cache work/npm-cache
+Exit: 0
+
+added 456 packages, and audited 457 packages in 2m
+
+148 packages are looking for funding
+  run `npm fund` for details
+
+8 high severity vulnerabilities
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+
+npx --no-install next typegen
+Exit: 0
+Generating route types...
+✓ Route types generated successfully
+
+
+npm run typecheck
+Exit: 0
+
+> matter-stats@0.1.0 typecheck
+> tsc --noEmit
+
+
+
+npm run lint
+Exit: 0
+
+> matter-stats@0.1.0 lint
+> eslint .
+
+
+/workspace/matter-stats/.agents/skills/visual-explainer/extension.ts
+  435:1  warning  Unexpected default export of anonymous function  import/no-anonymous-default-export
+
+/workspace/matter-stats/.agents/skills/visual-explainer/plan/plan.js
+  11:79  warning  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+
+/workspace/matter-stats/.agents/skills/visual-explainer/plan/render.mjs
+  322:22  warning  'i' is defined but never used  @typescript-eslint/no-unused-vars
+
+/workspace/matter-stats/work/task22-desktop-dark-probe.mjs
+    5:17  warning  'writeFile' is defined but never used                 @typescript-eslint/no-unused-vars
+    5:28  warning  'readFile' is defined but never used                  @typescript-eslint/no-unused-vars
+   17:7   warning  'testedSourceSha' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  156:9   warning  'month' is assigned a value but never used            @typescript-eslint/no-unused-vars
+  264:9   warning  'scenario' is assigned a value but never used         @typescript-eslint/no-unused-vars
+
+✖ 8 problems (0 errors, 8 warnings)
+
+
+
+npx --no-install tsc -p tests/tsconfig.json
+Exit: 0
+
+
+node --test .test-build/tests/reports-service.test.js .test-build/tests/report-csv.test.js tests/ui-presentation.test.mjs tests/analytics-client-payload.test.mjs
+Exit: 0
+✔ CSV exports canonical aggregated words rather than re-estimating day duration (3.87891ms)
+✔ weekly report stays empty for empty current week and exposes latest week with data (175.237808ms)
+✔ weekly report resolves latest week with data fallback from reading sessions when daily stats missing (60.48743ms)
+✔ latest weekly report evidence uses session local date rather than stale UTC daily rollups (37.805766ms)
+✔ weekly report renders populated historical week with null item_id sessions (67.106646ms)
+✔ report forwards its request-scoped now and exposes a separate selected-date streak (58.24465ms)
+✔ daily report captures default now once when the clock crosses Athens midnight (36.696033ms)
+✔ weekly report retains captured default now while awaiting its latest-week lookup (78.573085ms)
+✔ validates URL-persisted report references by period (1.137445ms)
+✔ resolves historical week, month, and year at Athens local boundaries (3.981948ms)
+✔ yearly report keeps its local 2026 reference and month data despite a 2025 UTC start (333.835881ms)
+✔ historical report production paths retain calendar comparison identity (880.287698ms)
+✔ March 2028 report compares all 29 days of February (103.212506ms)
+✔ report totals, timeline, heatmap, and grouped longform sum one-second session estimates (101.270981ms)
+✔ real server pages construct bounded client props; calendar CSV and totals remain complete (118027.826935ms)
+✔ all protected page guards run before any database access (6.554455ms)
+✔ Overview period controls remain operable during independent metrics failure and preserve URL context (4.563996ms)
+✔ report frequency conversions retain the selected calendar year and unrelated parameters (1.446144ms)
+✔ primary navigation preserves its own deep link without sharing incompatible report periods (23.990472ms)
+✔ article detail distinguishes query failure from a missing item and does not decode a valid percent ID twice (99.42212ms)
+✔ annual recap keeps selected year through an empty successful query and independent query failure (336.855168ms)
+✔ root Overview alias preserves range and repeated URL parameters (1.088302ms)
+✔ out-of-range Library pages offer a first-page recovery while retaining filters (12.320989ms)
+✔ Library keeps native table rows and actual title links for keyboard navigation (2.811843ms)
+✔ Library search submits draft text, author and content type together without losing other filters (2.865019ms)
+✔ successful year to week to year retains calendar selection and recap while weekly ranges, comparisons and CSV stay canonical (811.70329ms)
+✔ successful March to week to month retains March across February and leap-day boundaries (235.714576ms)
+✔ explicit Apply replaces the retained calendar reference after a frequency switch (427.10653ms)
+✔ missing and invalid references use local today consistently; legacy and repeated references use existing first-value validation even during outage (246.974626ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 125519.868075
+
+
+npm run test
+Exit: 0
+
+> matter-stats@0.1.0 test
+> tsc -p tests/tsconfig.json && node --test .test-build/tests/*.test.js tests/*.test.mjs && node scripts/test-disposable-db.mjs
+
+✔ validates real calendar values and positive integer pages (4.378623ms)
+✔ uses one Athens today reference, includes local midnight, and excludes adjacent month (243.668381ms)
+✔ resets an out-of-month day and returns complete totals across database pages (1125.469497ms)
+✔ Athens month boundaries follow DST offsets (7.959843ms)
+✔ sums one-second estimates before pagination for calendar and selected-day totals (15.96992ms)
+✔ future month/day URLs fall back to the current local selection; today is valid (11.002546ms)
+✔ concurrent equivalent queries share their original promise; scopes, bounds and projections are distinct (296.035568ms)
+✔ containing inputs preserve [start,end) for tied microseconds and comparison/history cutoffs (21.239474ms)
+✔ actual Overview/report payloads: complete totals, fixed histogram and CSV under cap 100 (12482.980935ms)
+✔ actual Overview/report payloads: complete totals, fixed histogram and CSV under cap 300 (20764.23566ms)
+✔ actual Overview/report payloads: complete totals, fixed histogram and CSV under cap 1000 (16592.064425ms)
+✔ histogram boundaries include zero/null sessions and preserve per-session rounding and nullable metadata (113.683698ms)
+✔ 10,037 sessions retain complete totals while client size stays bounded within the same month (40549.237153ms)
+✔ session-page: simultaneous reuse propagates failure; new requests recover and see changed data (643.773677ms)
+✔ tag-batch: simultaneous reuse propagates failure; new requests recover and see changed data (507.978528ms)
+✔ metadata supersets coalesce equivalent/compatible ID sets and keep unrelated IDs separate (300.092165ms)
+✔ Reports keeps its captured timezone while awaiting weekly navigation (83.012263ms)
+✔ login preserves incorrect-password and rate-limit responses (14.936822ms)
+✔ login storage failures are generic, diagnosed with identifiers, and issue no cookie (1.263085ms)
+✔ successful login creates and issues one session (0.953502ms)
+✔ shared page guard denies missing, invalid, and rejected storage sessions (2.653671ms)
+✔ both dashboard action boundaries perform zero protected work when authorization fails (7.442245ms)
+✔ authorized dashboard action boundaries call each dependency once (0.352734ms)
+✔ opaque sessions expire, revoke, and respect credential rotation (100.912314ms)
+✔ shared password accepts the configured value and rejects an incorrect value (4.213491ms)
+✔ malformed and storage-error tokens fail closed (13.712617ms)
+✔ successful session stores only its hash and retains secure cookie attributes (12.212801ms)
+✔ failed revocation rejects and cannot be reported as successful (6.362241ms)
+✔ returned and rejected login storage failures propagate to the controlled flow (9.310534ms)
+✔ twenty concurrent attempts atomically allow only the configured limit (42.631055ms)
+✔ normalizes author period query values (2.517049ms)
+✔ normalizes missing author and source metadata (0.406115ms)
+✔ sorts author rankings by each supported metric (18.891661ms)
+✔ Library facets, global selected-tag pages, hot-item metadata and source performance under cap 100 (5422.84793ms)
+✔ Library facets, global selected-tag pages, hot-item metadata and source performance under cap 300 (1488.033501ms)
+✔ Library facets, global selected-tag pages, hot-item metadata and source performance under cap 1000 (905.644705ms)
+✔ more than 10,000 metadata/relation rows reach facets, Metrics and source/tag annotation inputs (77593.597293ms)
+✔ Library tag join retains all other filters, empty results and globally scoped facets (425.683913ms)
+✔ selected-tag period keeps half-open date boundaries and global facets (37.210838ms)
+✔ reserved/long item IDs use escaped byte-bounded filters, with complete hot-item pages in every batch (1608.68519ms)
+✔ metadata empty/exact/final pages: 0 (26.390438ms)
+✔ metadata empty/exact/final pages: 100 (29.458698ms)
+✔ metadata empty/exact/final pages: 300 (166.228096ms)
+✔ metadata empty/exact/final pages: 500 (26.065949ms)
+✔ metadata empty/exact/final pages: 501 (28.615211ms)
+✔ metadata empty/exact/final pages: 1000 (212.644218ms)
+✔ ID batching deduplicates inputs, accepts empty inputs and rejects duplicates across later batches (32.739537ms)
+✔ HTTP fixture treats standalone scalar quote/backslash values literally and logical/in delimiters separately (2.865743ms)
+✔ Library propagates later facet null-response (25.98593ms)
+✔ Library propagates later facet object-response (37.264669ms)
+✔ Library propagates later facet null-row (10.767329ms)
+✔ Library propagates later facet missing-key (16.673364ms)
+✔ Library propagates later facet duplicate (14.263826ms)
+✔ Library propagates later facet repeat-page (20.158655ms)
+✔ Library propagates later facet late-error (12.199627ms)
+✔ later relation/annotation batch failures reject Metrics and source/tag rankings (588.240476ms)
+✔ article annotations and source performance reject later pages/batches (536.197376ms)
+✔ Library rejects later ID batches for tags and highlights instead of returning partial metadata (230.808425ms)
+✔ relation traversal validates the composite key and rejects repeated or missing-key later pages (209.118009ms)
+✔ nullable metadata and object/array/null tag embeds retain their existing interpretation (796.133791ms)
+✔ source performance denominator includes unread source items and sessions with null timestamps (37.239257ms)
+✔ annotation ordering preserves microseconds, tied IDs and the null timestamp tail (15.215049ms)
+✔ live offset consistency: unseen updates are observed, deletions can shift unseen rows, and inserts can fail closed (42.297932ms)
+✔ R5 session retrieval: Overview/Activity/Reports agree for 1200 rows, cap 100 (24431.635924ms)
+✔ R5 session retrieval: Overview/Activity/Reports agree for 1200 rows, cap 300 (11187.978034ms)
+✔ R5 session retrieval: Overview/Activity/Reports agree for 1200 rows, cap 1000 (6115.441343ms)
+✔ R5 session retrieval: Overview/Activity/Reports agree for 10037 rows, cap 100 (110713.554906ms)
+✔ complete IDs and totals for empty/exact/partial pages: 0 (80.06143ms)
+✔ complete IDs and totals for empty/exact/partial pages: 100 (153.767701ms)
+✔ complete IDs and totals for empty/exact/partial pages: 500 (687.514247ms)
+✔ complete IDs and totals for empty/exact/partial pages: 501 (1396.184919ms)
+✔ complete IDs and totals for empty/exact/partial pages: 600 (1166.296432ms)
+✔ complete session input reaches Authors, Sources and Tags without changing attribution (1280.359203ms)
+✔ null/invalid duration values preserve zero-duration sessions and per-session rounding (605.213175ms)
+✔ pagination preserves database microseconds and quotes opaque IDs (105.848227ms)
+✔ complete reads reject duplicate after a successful page (45.712451ms)
+✔ complete reads reject repeat-page after a successful page (16.905147ms)
+✔ complete reads reject invalid-id after a successful page (24.936061ms)
+✔ complete reads reject invalid-timestamp after a successful page (20.703352ms)
+✔ complete reads reject invalid-calendar after a successful page (245.339101ms)
+✔ complete reads reject null-row after a successful page (22.059331ms)
+✔ complete reads reject null-response after a successful page (22.817342ms)
+✔ complete reads reject late-error after a successful page (29.288568ms)
+✔ fenced live traversal supports inserts/deletes/payload updates without offset shifts (293.573884ms)
+✔ live consistency limitations are explicit: backdated inserts, unseen deletes and moved keys (321.895005ms)
+✔ an already-read ID moved forward fails closed instead of being counted twice (59.14469ms)
+✔ current and historical streaks traverse capped history outside the selected range (280.417821ms)
+✔ latest-week lookup stays bounded while the weekly report timeline is complete (2041.34222ms)
+✔ GET without authorization returns 401 (176.674386ms)
+✔ GET with wrong bearer token returns 401 (2.95886ms)
+✔ query-string secret or session cookie alone returns 401 before downstream work (2.360703ms)
+✔ authorized cron request calls sync (3.088028ms)
+✔ rate_limited is a controlled skip delegated to the leased runtime (8.515371ms)
+✔ busy is a controlled skip delegated to the leased runtime (5.750592ms)
+✔ cron does not call full-library backfill (1.961421ms)
+✔ custom ranges reject missing and reversed dates instead of falling back (4.122839ms)
+✔ daily rollups sum canonical per-session estimates and ignore stored and item estimates (65.724605ms)
+✔ daily provenance records explicit timezone and rejects invalid input instead of claiming canonical zero (7.93193ms)
+✔ invocation budgets validate finite bounds and reserve an entire expensive page (8.328328ms)
+✔ request and deadline stops include preparation and discard late results (9.798825ms)
+✔ timeout cancels actual preparation with deterministic timers (2.282331ms)
+✔ normalizes Matter items with deterministic metadata fallbacks (8.670633ms)
+✔ normalizes tags and item tag join rows (6.686506ms)
+✔ normalizes reading sessions and estimates words from fixed reading speed when item facts are missing (0.675674ms)
+✔ normalizes production reading sessions that link the item through object (0.644028ms)
+✔ normalizes Matter session shape without linked item id (2.351476ms)
+✔ keeps support for prior reading session item link shapes (3.019256ms)
+✔ normalizes reading session words from duration despite item metadata (0.398551ms)
+✔ missing foreign keys are skipped instead of throwing (2.41689ms)
+✔ normalizes annotations without crashing on optional note text (0.570553ms)
+✔ normalizes item numbers, progress, hostnames, and reading time estimates (0.438979ms)
+✔ normalizes sparse Matter item responses without inventing missing fields (4.161477ms)
+✔ normalizes reading sessions with API aliases and explicit end times (1.608403ms)
+✔ skips reading sessions with missing required timestamps or duration (1.79407ms)
+✔ extracts Matter reading-session item IDs from likely API shapes (0.313855ms)
+✔ normalizes reading session fixtures from snake_case, camelCase, embedded item, and string item shapes (2.487493ms)
+✔ creates placeholder Matter items with safe Unknown item fallback (0.261959ms)
+✔ summarizes first reading-session raw shape without private content (1.994727ms)
+✔ page envelope rejects missing, divergent and oversized continuation before preparation (360.745274ms)
+✔ bounded plans reject excess rows and bytes without truncation (187.611271ms)
+✔ Task 15: strict feedback rejects permissive numbers and invalid calendars (12.520369ms)
+✔ Task 15: exact retry bounds/classification and upstream finalization margin (13.768157ms)
+✔ manual → scheduled → manual resumes one session contract across invocations (13.659108ms)
+✔ session and library streams retain independent cursors and cooldowns (0.503922ms)
+✔ partial persistence and retry do not advance the completed watermark (1.544939ms)
+✔ only exhausted cycles, including empty cycles, promote cycle start (3.130142ms)
+✔ subsequent cycles use the seven-day application overlap without adding 1ms (1.682562ms)
+✔ an incompatible active endpoint is rejected rather than pairing its cursor with new filters (9.869806ms)
+✔ legacy recoverable restart preserves no unsupported completion claim (0.44669ms)
+✔ lease generation remains exact above JavaScript's safe integer range (12.347753ms)
+✔ missing and malformed lease context fails closed (2.48466ms)
+✔ uses conservative Matter sync limits by default (18.459227ms)
+✔ allows Matter sync limits to be configured with environment variables (0.377337ms)
+✔ builds clear messaging when a bounded batch has more data remaining (0.338931ms)
+✔ builds clear messaging when sync completes (0.140161ms)
+✔ starts recent activity sync at sessions and library backfill at items (0.323312ms)
+✔ uses the current year as the default recent activity window (3.103017ms)
+✔ deduplicates linked Matter item IDs for session-first sync (11.586497ms)
+✔ adds batch counts without mutating the previous count objects (1.934121ms)
+✔ parses Retry-After seconds and HTTP dates (11.482779ms)
+✔ builds friendly rate-limit messages (590.520241ms)
+✔ detects active rate limits for server-side and client-side protection (3.759428ms)
+✔ disables the sync button while pending or while rate-limited (0.316944ms)
+✔ preserves checkpoints when storing Matter rate limits after a 429 (4.656905ms)
+✔ builds no-session guidance when recent activity returns zero sessions and no more pages (2.130163ms)
+✔ keeps more-remains messaging when Matter returns zero sessions with has_more (2.193157ms)
+✔ detects Matter pagination from either has_more or next_cursor (2.163347ms)
+✔ supports selectable recent activity windows (1.190264ms)
+✔ documents sessions-first flow before linked item import (0.85065ms)
+✔ includes unavailable item metadata note when sessions import without item links (2.540489ms)
+✔ reports partial session skips without hiding successful imports (0.231781ms)
+✔ page persistence uses one atomic boundary after bounded preparation (2.111965ms)
+✔ live sync path handles Matter session object mapping and explicit skip reasons (4.052024ms)
+✔ retry messages honor explicit APP_TIMEZONE projection instead of host or browser timezone (3.557182ms)
+✔ uses stable empty-state copy for missing session metadata (5.126042ms)
+✔ detects missing metadata coverage when top rankings are empty (2.07113ms)
+✔ detects metadata coverage when any ranking has data (0.239544ms)
+✔ defaults metrics timezone to Europe/Athens when APP_TIMEZONE is unset (13.771722ms)
+✔ exports the supported period presets in UI order (5.490087ms)
+✔ resolves preset ranges as timezone-aware London calendar boundaries (135.589232ms)
+✔ resolves each period preset to the expected calendar range (55.767307ms)
+✔ resolves custom date ranges and leaves open starts unbounded (33.030957ms)
+✔ calculates previous equivalent period for finite ranges (31.936415ms)
+✔ calculates previous calendar month for month-over-month comparisons (15.537116ms)
+✔ Overview month-to-date uses one intraday now and clamps short months (1111.239562ms)
+✔ Overview period-to-date clamps leap years and preserves DST wall time (275.822972ms)
+✔ local wall-time conversion advances gaps and chooses the earlier repeated time (157.582226ms)
+✔ Overview production caller normalizes cross-month and DST comparison ends (227.707173ms)
+✔ Overview production caller handles normalized day shifts and repeated times (369.0263ms)
+✔ Overview empty period-to-date windows have no heatmap buckets and use as-of labels (512.66425ms)
+✔ returns typed zero metrics for an empty data set (17.694007ms)
+✔ counts reading time from sessions even when item_id is null (330.358869ms)
+✔ aggregates reading metrics, rankings, heatmap, recency, comparison, and streaks (91.740677ms)
+✔ ignores empty and non-positive session fields when building critical metrics (26.547295ms)
+✔ dashboard metrics work with partial item metadata (27.253062ms)
+✔ current streak is independent of every reporting preset and an excluding custom range (655.993191ms)
+✔ current and explicit historical streaks apply today/yesterday/gap semantics (112.299822ms)
+✔ streak dates use Athens midnight and local calendar arithmetic across DST and year boundaries (364.10502ms)
+✔ daily metrics include start, exclude end, and count both Athens repeated-hour sessions (30.559376ms)
+✔ rounds each tiny session before totals, rankings, heatmap, and grouped recent reads (21.654268ms)
+✔ estimates one session at 225 WPM (1.259998ms)
+✔ sums rounded per-session estimates (0.379937ms)
+✔ session ranges are non-overlapping at exact boundaries (0.468241ms)
+✔ histogram includes every session exactly once (3.040245ms)
+✔ returns a neutral deterministic fallback for empty or low-data metrics (6.392649ms)
+✔ classifies systems-heavy topic patterns as The Systems Analyst (0.850481ms)
+✔ classifies short frequent news patterns as The News Grazer (3.353746ms)
+✔ classifies long research-oriented patterns as The Deep Researcher (0.228028ms)
+✔ classifies business and markets patterns as The Strategy Reader (0.942506ms)
+✔ uses stable tiebreaking for equal scores (7.619688ms)
+✔ CSV exports canonical aggregated words rather than re-estimating day duration (3.421064ms)
+✔ weekly report stays empty for empty current week and exposes latest week with data (225.866798ms)
+✔ weekly report resolves latest week with data fallback from reading sessions when daily stats missing (69.324208ms)
+✔ latest weekly report evidence uses session local date rather than stale UTC daily rollups (29.104732ms)
+✔ weekly report renders populated historical week with null item_id sessions (30.636521ms)
+✔ report forwards its request-scoped now and exposes a separate selected-date streak (49.666276ms)
+✔ daily report captures default now once when the clock crosses Athens midnight (35.155254ms)
+✔ weekly report retains captured default now while awaiting its latest-week lookup (48.925147ms)
+✔ validates URL-persisted report references by period (1.166085ms)
+✔ resolves historical week, month, and year at Athens local boundaries (5.455827ms)
+✔ yearly report keeps its local 2026 reference and month data despite a 2025 UTC start (426.185778ms)
+✔ historical report production paths retain calendar comparison identity (890.718476ms)
+✔ March 2028 report compares all 29 days of February (56.951043ms)
+✔ report totals, timeline, heatmap, and grouped longform sum one-second session estimates (90.267185ms)
+✔ canonical binary64 operation order and rounding boundaries stay unchanged (5.169899ms)
+✔ normalizes source period query values (3.669331ms)
+✔ sorts source rankings by each supported metric (1.398357ms)
+✔ R3 characterization: recent defaults remain 25 rows and a fixed initial year bound (15.029326ms)
+✔ R4 characterization: public trigger modes still map to their endpoint streams (1.959057ms)
+✔ R5 session retrieval target (Task 16): 1,200 sessions / 72,000 seconds under cap 100 (1925.939689ms)
+✔ R5 facets/joins (Task 17): complete facets and per-item metadata under cap 100 (714.866786ms)
+✔ R5 query efficiency (Task 18): actual HTTP requests and aggregate-only client payload (11119.389536ms)
+✔ R6 target (W5): sessions on 26–28 September yield current streak 3 as of 28 September regardless of preset (2015.93942ms)
+✔ R6 target (W5): yesterday's streak survives an empty today, while empty today and yesterday yields zero (84.421643ms)
+✔ R7 target (W5): three 60-second sessions estimate 675 words at 225 WPM, not 3,000 item words (3.798336ms)
+✔ R8: the default timezone is Europe/Athens (1.494927ms)
+✔ R8 target (W5): Athens midnight, DST, year ranges, and explicit UTC use local half-open boundaries (5.96332ms)
+✔ R8 target (W5): configured local year changes at Athens midnight independently of UTC (4.242302ms)
+✔ sanitizes sync run errors before they are displayed (26.615857ms)
+✔ returns a useful placeholder when a failed run has no error text (0.229366ms)
+✔ recent successful partial invocation and imported occurrence do not clear stale sessions (88.65644ms)
+✔ sessions and metadata complete independently; zero-session completion refreshes freshness (31.861202ms)
+✔ failed, skipped, rate-limited and budget-limited invocation outcomes preserve last proven completion (71.932805ms)
+✔ staleness is >= exact elapsed threshold, configurable, with explicit timezone display (15.720832ms)
+✔ missing history, never completed, legacy timestamps and unavailable reads are distinct (4.43729ms)
+✔ unknown legacy trigger and old running log never imply active worker (9.416683ms)
+✔ lease expiry boundary and pending retry/manual recovery are explicit (12.562654ms)
+✔ dirty backlog, acknowledgement and readiness transitions without repair execution (17.341743ms)
+✔ legacy, building, blocked, frozen, ready candidate, active cutover and rollback remain separate (256.910008ms)
+✔ bounded local status reads check every independent query failure without false healthy fallbacks (454.800674ms)
+✔ count failures and missing counts preserve independent Settings counts and stream status (58.700123ms)
+✔ Overview library failure is unavailable; an empty successful read is empty (9.69614ms)
+✔ status queries do not change canonical metric totals (238.196504ms)
+✔ an absent stream is explicit and cannot certify idle ingestion (3.563681ms)
+✔ newer failed or unfinished run cannot be hidden by an older successful audit (8.441744ms)
+✔ exact ID correlation retains audit trigger/outcome despite normal audit-before-run ordering (13.118208ms)
+✔ an initial-only correlated audit retains trigger but uses failed/unfinished run evidence (10.599509ms)
+✔ conflicting correlated outcomes remain explicit instead of presenting a success (1.127179ms)
+✔ newer audit-only skipped attempts win even if the older correlated run was created later (7.128249ms)
+✔ close timestamps never correlate distinct IDs; equal/invalid/sub-millisecond ordering stays explicit (37.348848ms)
+✔ either source unavailable qualifies available evidence and cannot claim a latest successful attempt (5.360992ms)
+✔ actual bounded loader exposes tied runs and failure of either source while preserving privacy (55.72452ms)
+✔ normalizes tag period query values (12.750929ms)
+✔ normalizes blank tag names (4.681521ms)
+✔ sorts tag rankings by each supported metric (6.833102ms)
+✔ builds rankings from synced Matter tags without breaking on untagged items (766.651406ms)
+✔ real server pages construct bounded client props; calendar CSV and totals remain complete (248679.261866ms)
+✔ all protected page guards run before any database access (50.546347ms)
+Full audit: 0 finding entries (low 0, moderate 0, high 0, critical 0).
+Production audit: 0 vulnerabilities.
+Full audit: 2 finding entries (low 0, moderate 0, high 2, critical 0).
+Allowed development-only exception: GHSA-vfj7-8cjw-p6xm.
+Production audit: 0 vulnerabilities.
+Full audit: 2 finding entries (low 0, moderate 0, high 2, critical 0).
+Allowed development-only exception: GHSA-vfj7-8cjw-p6xm.
+Production audit: 0 vulnerabilities.
+✔ a realistic clean audit passes (28.192253ms)
+✔ the documented development-only advisory passes (5.068412ms)
+✔ accepted major-version and downgrade proposals do not end the exception (6.872701ms)
+✔ an available compatible remediation ends the exception (6.001009ms)
+✔ new high and critical advisories fail (2.826449ms)
+✔ mixed advisory chains fail (2.962573ms)
+✔ any production vulnerability fails (2.372937ms)
+✔ an array vulnerabilities payload fails even with zero counters (3.976099ms)
+✔ negative and contradictory severity counters fail (5.566009ms)
+✔ a missing required counter fails (2.857266ms)
+✔ severity counters must match the actual entries (1.819783ms)
+✔ an unresolved via reference fails (2.734114ms)
+✔ a cyclic advisory chain fails (8.115867ms)
+✔ malformed remediation metadata fails conservatively (2.897581ms)
+✔ an explicit npm audit error payload fails (1.177447ms)
+✔ a subprocess error fails (2.913315ms)
+✔ a signal fails (0.279734ms)
+✔ an unsupported exit status fails (3.216299ms)
+✔ malformed JSON fails (0.207931ms)
+✔ actual login sets the secure cookie, stores only its hash, and redirects (2223.43321ms)
+✔ actual login does not create sessions for wrong passwords or rate limits (36.235835ms)
+✔ actual login sanitizes returned and rejected limiter and session failures (54.531698ms)
+✔ actual logout revokes, clears, redirects, and prevents replay (30.298391ms)
+✔ actual logout does not clear or redirect when revocation fails (4.676912ms)
+✔ actual page guard and actions fail closed before protected work (1652.272088ms)
+✔ actual dashboard actions revalidate all paths after authorized success and partial failure (289.591214ms)
+✔ daily annotation exact count remains complete under a response cap (1329.49799ms)
+✔ daily annotation invalid count and database errors never become successful zero counts (116.412748ms)
+✔ daily-stat calculation reads all 1,200 sessions under cap 100 with local half-open boundaries (10454.535584ms)
+✔ article source comparison is complete while the 25-session preview stays bounded; null keys retained (8170.865403ms)
+✔ daily-stat calculation propagates a later database error without a partial rollup (228.350813ms)
+✔ nullable-key traversal pins dated and null boundaries against concurrent appends (186.703093ms)
+✔ postcss-nested preserves ampersands, selector lists, pseudo nesting and media transforms with parser 7 (241.343832ms)
+✔ Tailwind preserves apply, group/peer, arbitrary and escaped Unicode selectors with parser 7 (3109.867324ms)
+✔ Tailwind prefix/important scoping and multi-selector variants retain their CSS (1996.460808ms)
+✔ PostCSS maps and valid indexed SourceNode roundtrips work with source-map-js 1.2.2 (42.270882ms)
+✔ production CSS retains the declared dark palette without a literal JSX dark class (7544.168325ms)
+✔ independent daily/monthly references, no method inferred from equality, stale/missing union (149.574493ms)
+✔ three 60 seconds exactly 675; three 1 seconds exactly 12; both DST and calendar boundaries (21.354705ms)
+✔ invalid stored word baseline stays unavailable; invalid daily is separately reported (9.425078ms)
+✔ validation rejects invalid dates, oversized scope, duplicate/invalid daily and timezone inputs (9.120094ms)
+✔ stream handles >10k tied timestamps, fingerprint preservation and repeated results (3414.7942ms)
+✔ source failures, incomplete counts, missing end, mixed snapshot and changed fingerprints fail visibly (1379.710703ms)
+✔ fixture evidence is synthetic and deterministic (17.701517ms)
+✔ repair operator requires isolated acknowledgement and dedicated connection, without production fallback (11.054934ms)
+✔ inspection does not prepare/claim/resume, transitions require explicit target generation and epoch (9.25065ms)
+✔ real lease helper forwards the invocation UUID while preserving TTL and database generation (10.993554ms)
+✔ Task 15: /me and each eligible retry require admission and consume actual request budget (172.496011ms)
+✔ Task 15: automatic retry chain cannot replenish across recreated invocation runtimes (26.904038ms)
+✔ Task 15: request timeout stops at exactly three attempts (85.480968ms)
+✔ Task 15: 429 feedback survives recreation; quota refusal makes zero HTTP calls (30.402502ms)
+✔ Task 15: authentication/validation errors never loop; optional endpoint errors retain classification (32.947663ms)
+✔ Task 15: invalid JSON/envelopes and missing or looping annotation cursors never exhaust successfully (19.771948ms)
+✔ Task 15: lease loss after short wait and caller cancellation prevent another HTTP attempt (4.523884ms)
+✔ Task 15: an ambiguous preparation database write is never automatically retried (4.248082ms)
+✔ Task 15: quota verification and feedback write failures fail closed without HTTP retries (5.245989ms)
+✔ Task 15: malformed account and error envelopes cannot disguise authentication failure (10.290493ms)
+✔ Task 15: unclassified transport errors never become automatic retries after recreation (1.4854ms)
+✔ Task 15: a timed-out authentication error body never triggers another request (47.58375ms)
+✔ P1: item/tag semantics are rejected before successful preparation caching (14.442648ms)
+✔ P1: legacy rejected values recover only deliberately after eligibility; unrelated valid reads survive (6.951942ms)
+✔ P1: cached rejection cannot write after lease loss or an unverifiable sequence (7.402028ms)
+Matter invocation evidence unavailable
+Matter invocation evidence unavailable
+Matter sync failed {
+  syncRunId: null,
+  error: {
+    name: 'Error',
+    message: 'Matter sync failed because the local database update could not be completed.'
+  }
+}
+Matter sync failed {
+  syncRunId: null,
+  error: {
+    name: 'MatterSyncLeaseLostError',
+    message: 'Matter sync failed because the local database update could not be completed.'
+  }
+}
+Matter run update failed {
+  error: {
+    name: 'Error',
+    message: 'Matter sync failed because the local database update could not be completed.'
+  }
+}
+Matter sync failed {
+  syncRunId: 'run-1',
+  error: {
+    name: 'Error',
+    message: 'Matter sync failed because the local database update could not be completed.'
+  }
+}
+Matter sync failed {
+  syncRunId: 'run-1',
+  error: {
+    name: 'Error',
+    message: 'Matter sync failed because the local database update could not be completed.'
+  }
+}
+Matter sync failed {
+  syncRunId: 'run-1',
+  error: {
+    name: 'AbortError',
+    message: 'Matter sync failed because the local database update could not be completed.'
+  }
+}
+Matter sync failed {
+  syncRunId: 'run-2',
+  error: {
+    name: 'Error',
+    message: 'Matter sync failed because the local database update could not be completed.'
+  }
+}
+Matter sync failed {
+  syncRunId: 'run-1',
+  error: {
+    name: 'MatterPageValidationError',
+    message: 'invalid_continuation'
+  }
+}
+Matter sync failed {
+  syncRunId: 'run-1',
+  error: {
+    name: 'Error',
+    message: 'Matter sync failed because the local database update could not be completed.'
+  }
+}
+✔ R4 target (W4): manual→scheduled→manual preserves independent cursors under the shared lease (88.620598ms)
+✔ busy account lease records only invocation audit and denies ingestion or Matter (3.10925ms)
+✔ invocation audit, lease acquisition and run share one UUID without changing fencing (18.689482ms)
+✔ lease infrastructure and invalid context fail closed before Matter or writes (6.78416ms)
+✔ delayed upstream response cannot import or complete after renewal fails (6.380692ms)
+✔ exceptions including cancellation compare-release only their invocation context (9.904583ms)
+✔ production entrypoint resumes manual → scheduled → manual with pinned contract across New Year (14.120591ms)
+✔ production entrypoint isolates sessions → library → sessions (9.768704ms)
+✔ cross-stream and legacy account cooldowns make zero upstream calls and preserve state (18.82347ms)
+✔ conflicting narrow windows reject active contracts without Matter or mutation (4.290608ms)
+✔ failure preserves progress; exhausted and empty cycles promote only captured start (8.701664ms)
+✔ inclusive overlap replay is idempotent and imports sessions without item links (0.680445ms)
+✔ invalid continuation is rejected before preparation or page persistence (4.337668ms)
+✔ rollup failure preserves the committed cursor and later invocation recovers (10.611139ms)
+✔ default invocation commits multiple pages and each next contract/receipt is durable (7.503977ms)
+✔ explicit full history bypasses a completed narrow watermark and repeats idempotently (6.272937ms)
+✔ history request queues behind an active narrow cycle without altering its cursor/coverage (2.789623ms)
+✔ library and scheduled triggers never create history intent from a session-window option (2.785233ms)
+✔ R3 target (W4): a 5,000-session stream resumes across pages/invocations without an annual reset (117.372397ms)
+✔ runner pins tooling, parses local status, and strips application secrets from children (20.026115ms)
+✔ runner refuses cleanup targets outside the OS temporary directory (9.55889ms)
+✔ Docker-unavailable path writes honest sanitized blocked evidence without provisioning (201.49246ms)
+✔ owned preserved singleton is removed and confirmed absent before integration (6.35141ms)
+✔ unrelated singleton is preserved and prevents integration (5.394344ms)
+✔ failed singleton removal or absence readback prevents integration (6.65971ms)
+✔ complete legacy snapshot comparison detects tag, run, and session changes (25.12469ms)
+✔ Task 20 upgrade snapshot excludes not-yet-installed Task 21 evidence but includes generation state (4.016553ms)
+✔ catalog covers the durable lease and every exact RPC/helper signature (9.209244ms)
+✔ catalog inventory includes independent sync streams (14.769948ms)
+✔ actual psql invocation quietly accepts only the complete migration chain (318.807242ms)
+✔ actual output parsing rejects missing, extra, unexpected, and command-tag lines (411.343013ms)
+✔ actual psql execution failures remain failures (137.195609ms)
+✔ actual verification path fails for each absent service_role CRUD privilege (358.034667ms)
+✔ catalog SQL requires every service_role CRUD privilege individually (4.159566ms)
+✔ catalog SQL rejects effective browser table and column privileges for both roles (7.39048ms)
+✔ Task 15 catalog inventories every quota/preparation object and singleton reset denial (0.279672ms)
+✔ accepts a grant denial naming the expected table (12.374298ms)
+✔ accepts an EXECUTE denial naming the expected function (1.712463ms)
+✔ rejects RLS WITH CHECK violation with the same SQLSTATE as revoked-grant evidence (9.150687ms)
+✔ rejects permission denial for the wrong table as revoked-grant evidence (2.846678ms)
+✔ rejects permission denial for a schema as revoked-grant evidence (4.324889ms)
+✔ rejects permission denial for the wrong function as revoked-grant evidence (0.292702ms)
+✔ rejects generic permission error as revoked-grant evidence (0.70362ms)
+✔ rejects RLS-filtered success as revoked-grant evidence (14.355591ms)
+✔ rejects missing column/schema-cache error as revoked-grant evidence (3.23817ms)
+✔ rejects invalid payload/constraint error as revoked-grant evidence (4.507804ms)
+✔ rejects transport error as revoked-grant evidence (2.93258ms)
+✔ rejects missing RPC as revoked-grant evidence (3.631657ms)
+✔ rejects authentication failure as revoked-grant evidence (1.015171ms)
+✔ rejects server error as revoked-grant evidence (1.755405ms)
+✔ rejects malformed and missing responses (1.100317ms)
+✔ recognizes only the exact fresh/upgrade migration stream seed (25.100297ms)
+✔ library migration seed filters compare structurally across JSONB key ordering (0.354898ms)
+✔ independently created stream fixtures have unique ownership markers (4.481869ms)
+✔ equivalent timestamp serialization does not prevent owned stream cleanup (4.376135ms)
+✔ unexpectedly successful delayed browser INSERT is cleaned and seed restored (7.751629ms)
+✔ delayed browser INSERT committed with a lost response is cleaned and seed restored (6.026159ms)
+✔ migration seed is restored after a failed fixture run (1.960943ms)
+✔ another run's stream is neither deleted nor overwritten (2.80684ms)
+✔ ambiguous committed writes are tracked before response validation and cleaned (8.783728ms)
+✔ cleanup preserves unrelated resources and continues after an ownership failure (2.289118ms)
+✔ limiter orchestration accepts two successful groups (11.45064ms)
+✔ limiter orchestration settles every group before cleanup after a failure (5.017891ms)
+✔ limiter orchestration reports response errors, non-booleans, result counts, and persisted counts (6.465706ms)
+✔ Overview, Settings and actual authorized manual feedback share one durable interpretation (8131.438301ms)
+✔ Overview period controls remain operable during independent metrics failure and preserve URL context (8.202085ms)
+✔ report frequency conversions retain the selected calendar year and unrelated parameters (5.345511ms)
+✔ primary navigation preserves its own deep link without sharing incompatible report periods (24.138169ms)
+✔ article detail distinguishes query failure from a missing item and does not decode a valid percent ID twice (177.868611ms)
+✔ annual recap keeps selected year through an empty successful query and independent query failure (437.799267ms)
+✔ root Overview alias preserves range and repeated URL parameters (0.804949ms)
+✔ out-of-range Library pages offer a first-page recovery while retaining filters (12.204411ms)
+✔ Library keeps native table rows and actual title links for keyboard navigation (4.36988ms)
+✔ Library search submits draft text, author and content type together without losing other filters (2.761752ms)
+✔ successful year to week to year retains calendar selection and recap while weekly ranges, comparisons and CSV stay canonical (1173.134811ms)
+✔ successful March to week to month retains March across February and leap-day boundaries (624.067036ms)
+✔ explicit Apply replaces the retained calendar reference after a frequency switch (574.303856ms)
+✔ missing and invalid references use local today consistently; legacy and repeated references use existing first-value validation even during outage (259.434156ms)
+ℹ tests 388
+ℹ suites 0
+ℹ pass 388
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 722932.958119
+
+
+npm run build
+Exit: 0
+
+> matter-stats@0.1.0 build
+> next build
+
+   ▲ Next.js 15.5.27
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 71s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/5) ...
+   Generating static pages (1/5)
+   Generating static pages (2/5)
+   Generating static pages (3/5)
+ ✓ Generating static pages (5/5)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ƒ /                                      132 B         102 kB
+├ ○ /_not-found                            996 B         103 kB
+├ ƒ /activity                            2.42 kB         108 kB
+├ ƒ /api/cron/sync-recent-activity         132 B         102 kB
+├ ƒ /articles                            4.82 kB         121 kB
+├ ƒ /articles/[id]                         163 B         106 kB
+├ ƒ /authors                             2.52 kB         120 kB
+├ ƒ /dashboard                           4.86 kB         219 kB
+├ ƒ /login                               2.51 kB         112 kB
+├ ƒ /reports                             3.82 kB         218 kB
+├ ƒ /settings                            2.16 kB         142 kB
+├ ƒ /sources                             2.64 kB         120 kB
+├ ƒ /tags                                3.11 kB         121 kB
+└ ƒ /year-in-reading                     47.9 kB         296 kB
++ First Load JS shared by all             102 kB
+  ├ chunks/255-3f216dfa517cdf3a.js       46.2 kB
+  ├ chunks/4bd1b696-409494caf8c83275.js  54.2 kB
+  └ other shared chunks (total)          1.94 kB
+
+
+ƒ Middleware                             85.2 kB
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+
+npm run audit:ci
+Exit: 1
+
+> matter-stats@0.1.0 audit:ci
+> node scripts/audit-policy.mjs
+
+Audit policy failed: A compatible remediation is available for tailwindcss-animate; update the reviewed dependency baseline and remove the GHSA-vfj7-8cjw-p6xm exception
+
+
+git diff --check
+Exit: 0
+
+
+git diff --exit-code 880fafb4db67b0a08c0f8ff2e717f1d88786c8ba -- supabase .github vercel.json package.json package-lock.json lib app/_components app/dashboard app/activity app/articles app/settings app/year-in-reading components tailwind.config.ts
+Exit: 0

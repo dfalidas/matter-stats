@@ -1,0 +1,180 @@
+{
+  "testedSourceSha": "8192206bb1995440248110e117776a1296108f36",
+  "buildSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c",
+  "phase": "flows",
+  "syntheticOnly": true,
+  "productionData": false,
+  "appTimezone": "Europe/Athens",
+  "browserTimezone": "America/New_York",
+  "pages": [
+    {
+      "route": "/dashboard",
+      "scenario": "presets",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "browser forms / pointer / keyboard",
+      "horizontalOverflow": false,
+      "screenshot": "presets-dashboard-390-light.png"
+    },
+    {
+      "route": "/activity",
+      "scenario": "selected-day",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "browser forms / pointer / keyboard",
+      "horizontalOverflow": false,
+      "screenshot": "selected-day-activity-390-light.png"
+    },
+    {
+      "route": "/authors",
+      "scenario": "linked",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/sources",
+      "scenario": "linked",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/tags",
+      "scenario": "linked",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/year-in-reading",
+      "scenario": "linked",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "linked-year-in-reading-390-light.png"
+    },
+    {
+      "route": "/authors",
+      "scenario": "linked",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/sources",
+      "scenario": "linked",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "linked-sources-768-light.png"
+    },
+    {
+      "route": "/tags",
+      "scenario": "linked",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/year-in-reading",
+      "scenario": "linked",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/authors",
+      "scenario": "linked",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/sources",
+      "scenario": "linked",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/tags",
+      "scenario": "linked",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/year-in-reading",
+      "scenario": "linked",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    }
+  ],
+  "checks": [
+    {
+      "name": "Overview inclusive range, query preservation, invalid recovery, presets, back/forward/reload",
+      "result": "passed"
+    },
+    {
+      "name": "Activity future/invalid/out-of-month, today, touch selection, page-independent totals and Athens timestamps",
+      "result": "passed"
+    },
+    {
+      "name": "Reports selected year, editable input, comparison labels, legacy deep links, history, recap round trip and canonical CSV",
+      "result": "passed"
+    },
+    {
+      "name": "Library stable pagination, combined filters, empty recovery, nullable details and unsupported attribution",
+      "result": "passed"
+    },
+    {
+      "name": "retained legacy linked rankings, search/sort and distinct annual recap",
+      "result": "passed",
+      "widths": [
+        390,
+        768,
+        1440
+      ]
+    },
+    {
+      "name": "synthetic login errors, logout revocation, cookie removal and replay denial",
+      "result": "passed"
+    }
+  ],
+  "contrastChecks": [],
+  "scrollChecks": [],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "resourceFailures": [],
+  "externalRequests": [],
+  "libraryDetailPrefetches": [],
+  "unexpectedMutations": []
+}

@@ -1,0 +1,29 @@
+{
+  "testedSourceSha": "8192206bb1995440248110e117776a1296108f36",
+  "buildSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c",
+  "checks": [
+    {
+      "command": "npx --no-install eslint scripts/task22-ui-verify.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "warnings": 0
+    },
+    {
+      "command": "node --check scripts/task22-ui-verify.mjs",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "command": "TASK22_PHASE=reports TASK22_BUILD_SOURCE_SHA=3c54ea8511d90538074a9c9d328eb067a917229c TASK22_EVIDENCE_DIR=docs/evidence/task22/reports-reference/reports TASK22_PLAYWRIGHT_MODULE=/opt/codex/runtimes/cua/lib/node_modules/playwright/index.mjs node scripts/task22-ui-verify.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "manifest": "reports/ui-validation.json"
+    },
+    {
+      "command": "TASK22_PHASE=flows TASK22_BUILD_SOURCE_SHA=3c54ea8511d90538074a9c9d328eb067a917229c TASK22_EVIDENCE_DIR=docs/evidence/task22/reports-reference/flows TASK22_PLAYWRIGHT_MODULE=/opt/codex/runtimes/cua/lib/node_modules/playwright/index.mjs node scripts/task22-ui-verify.mjs",
+      "exitCode": 0,
+      "status": "passed",
+      "manifest": "flows/ui-validation.json"
+    }
+  ]
+}

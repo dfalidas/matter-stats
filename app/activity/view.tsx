@@ -31,6 +31,7 @@ export function ActivityView({ data }: { data: AwaitedActivity }) {
         <input
           type="month"
           value={data.month}
+          max={data.today.slice(0, 7)}
           onChange={(event) => navigate("month", event.target.value)}
           className="min-h-11 rounded-lg border bg-card px-3"
         />
@@ -54,6 +55,7 @@ export function ActivityView({ data }: { data: AwaitedActivity }) {
               onClick={() => navigate("day", date)}
               aria-label={`${date}${detail}`}
               aria-pressed={data.selectedDay === date}
+              aria-current={date === data.today ? "date" : undefined}
               className={`aspect-square min-h-11 rounded-lg border p-1 text-left text-xs ${
                 data.selectedDay === date ? "border-primary bg-primary/10" : activity ? "bg-primary/10" : "bg-card"
               } disabled:border-transparent disabled:bg-transparent disabled:text-muted-foreground/40`}
@@ -64,7 +66,7 @@ export function ActivityView({ data }: { data: AwaitedActivity }) {
           );
         })}
       </div>
-      <section className="mt-10 border-t pt-7">
+      <section className="mt-10 border-t pt-7" aria-label="Selected day">
         <h2 className="text-2xl font-semibold">
           {formatCalendarDate(data.selectedDay, {
             weekday: "long",
@@ -72,8 +74,8 @@ export function ActivityView({ data }: { data: AwaitedActivity }) {
             month: "long",
           })}
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {formatDuration(data.dayTotal.seconds)} · ≈{data.dayTotal.estimatedWords.toLocaleString()} estimated words · {data.dayTotal.sessions} sessions
+        <p role="status" className="mt-1 text-sm text-muted-foreground">
+          <span className="sr-only">{data.selectedDay}: </span>{formatDuration(data.dayTotal.seconds)} · ≈{data.dayTotal.estimatedWords.toLocaleString()} estimated words · {data.dayTotal.sessions} sessions
         </p>
         <p className="mt-1 text-xs text-muted-foreground">Estimated from reading time at 225 words/min</p>
         <div className="mt-5 divide-y border-y">
@@ -94,13 +96,13 @@ export function ActivityView({ data }: { data: AwaitedActivity }) {
                 <p className="text-xs text-muted-foreground">≈{session.estimatedWords.toLocaleString()} words</p>
               </div>
             </article>
-          )) : <p className="py-8 text-sm text-muted-foreground">No reading activity on this day.</p>}
+          )) : <p className="py-8 text-sm text-muted-foreground">No imported sessions on this day. This does not establish no reading in Matter.</p>}
         </div>
         {data.totalPages > 1 && (
           <nav className="mt-5 flex items-center gap-3" aria-label="Session pages">
-            <PageLink data={data} page={Math.max(1, data.page - 1)}>Previous</PageLink>
+            <PageLink data={data} page={data.page - 1}>Previous</PageLink>
             <span className="text-sm text-muted-foreground">Page {data.page} of {data.totalPages}</span>
-            <PageLink data={data} page={Math.min(data.totalPages, data.page + 1)}>Next</PageLink>
+            <PageLink data={data} page={data.page + 1}>Next</PageLink>
           </nav>
         )}
       </section>
@@ -109,8 +111,12 @@ export function ActivityView({ data }: { data: AwaitedActivity }) {
 }
 
 function PageLink({ data, page, children }: { data: AwaitedActivity; page: number; children: React.ReactNode }) {
+  const params = new URLSearchParams(useSearchParams());
+  const className = "inline-flex min-h-11 items-center rounded-lg border px-4 py-3 text-sm";
+  if (page < 1 || page > data.totalPages) return <span aria-disabled="true" className={`${className} text-muted-foreground`}>{children}</span>;
+  params.set("month", data.month); params.set("day", data.selectedDay); params.set("page", String(page));
   return (
-    <Link className="rounded-lg border px-4 py-3 text-sm" href={`/activity?month=${data.month}&day=${data.selectedDay}&page=${page}`}>
+    <Link className={className} href={`/activity?${params}` as Route}>
       {children}
     </Link>
   );

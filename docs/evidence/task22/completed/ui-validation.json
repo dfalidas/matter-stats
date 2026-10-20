@@ -1,0 +1,1815 @@
+{
+  "testedSourceSha": "9097b2298f3a4641b97a2d81bcae3e644e76fc64",
+  "buildSourceSha": "877fae00126141b60fc7a60f6690c8f02a9cab22",
+  "syntheticOnly": true,
+  "productionSynchronizationVerified": false,
+  "appTimezone": "Europe/Athens",
+  "browserTimezone": "America/New_York",
+  "normalLayoutPages": 66,
+  "statePages": 72,
+  "renderedPageChecks": 159,
+  "distinctRecordedCombinations": 153,
+  "screenshots": 30,
+  "behavioralGroups": 21,
+  "contrastChecks": 30,
+  "minimumMeasuredContrast": 5.4,
+  "scrollChecks": 66,
+  "pageErrors": [],
+  "externalRequests": [],
+  "unexpectedMutations": [],
+  "libraryDetailPrefetches": [],
+  "phases": [
+    {
+      "name": "layout-390",
+      "phase": "layout",
+      "width": "390",
+      "startedAt": "2026-10-19T17:31:48.138Z",
+      "finishedAt": "2026-10-19T17:34:36.801Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "layout-768",
+      "phase": "layout",
+      "width": "768",
+      "startedAt": "2026-10-19T17:34:36.810Z",
+      "finishedAt": "2026-10-19T17:35:55.565Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "layout-1440",
+      "phase": "layout",
+      "width": "1440",
+      "startedAt": "2026-10-19T17:35:55.569Z",
+      "finishedAt": "2026-10-19T17:37:10.088Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "flows",
+      "phase": "flows",
+      "startedAt": "2026-10-19T17:37:10.098Z",
+      "finishedAt": "2026-10-19T17:39:46.218Z",
+      "exitCode": 0,
+      "status": "passed"
+    },
+    {
+      "name": "states",
+      "phase": "states",
+      "startedAt": "2026-10-19T17:39:46.225Z",
+      "finishedAt": "2026-10-19T17:42:57.866Z",
+      "exitCode": 0,
+      "status": "passed"
+    }
+  ],
+  "checks": [
+    {
+      "name": "route/theme/scroll matrix",
+      "result": "passed",
+      "width": 390,
+      "theme": "light",
+      "routes": 11
+    },
+    {
+      "name": "navigation/account keyboard and pointer operation",
+      "result": "passed",
+      "width": 390,
+      "theme": "light"
+    },
+    {
+      "name": "route/theme/scroll matrix",
+      "result": "passed",
+      "width": 390,
+      "theme": "dark",
+      "routes": 11
+    },
+    {
+      "name": "navigation/account keyboard and pointer operation",
+      "result": "passed",
+      "width": 390,
+      "theme": "dark"
+    },
+    {
+      "name": "Library table horizontal keyboard and trackpad scrolling",
+      "result": "passed",
+      "width": 768,
+      "theme": "light",
+      "keyboardScroll": 180,
+      "trackpadScroll": 180
+    },
+    {
+      "name": "route/theme/scroll matrix",
+      "result": "passed",
+      "width": 768,
+      "theme": "light",
+      "routes": 11
+    },
+    {
+      "name": "navigation/account keyboard and pointer operation",
+      "result": "passed",
+      "width": 768,
+      "theme": "light"
+    },
+    {
+      "name": "route/theme/scroll matrix",
+      "result": "passed",
+      "width": 768,
+      "theme": "dark",
+      "routes": 11
+    },
+    {
+      "name": "navigation/account keyboard and pointer operation",
+      "result": "passed",
+      "width": 768,
+      "theme": "dark"
+    },
+    {
+      "name": "route/theme/scroll matrix",
+      "result": "passed",
+      "width": 1440,
+      "theme": "light",
+      "routes": 11
+    },
+    {
+      "name": "navigation/account keyboard and pointer operation",
+      "result": "passed",
+      "width": 1440,
+      "theme": "light"
+    },
+    {
+      "name": "rendered chart tooltip and axis contrast",
+      "result": "passed",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "name": "route/theme/scroll matrix",
+      "result": "passed",
+      "width": 1440,
+      "theme": "dark",
+      "routes": 11
+    },
+    {
+      "name": "navigation/account keyboard and pointer operation",
+      "result": "passed",
+      "width": 1440,
+      "theme": "dark"
+    },
+    {
+      "name": "Overview inclusive range, query preservation, invalid recovery, presets, back/forward/reload",
+      "result": "passed"
+    },
+    {
+      "name": "Activity future/invalid/out-of-month, today, touch selection, page-independent totals and Athens timestamps",
+      "result": "passed"
+    },
+    {
+      "name": "Reports selected year, editable input, comparison labels, legacy deep links, history, recap round trip and canonical CSV",
+      "result": "passed"
+    },
+    {
+      "name": "Library stable pagination, combined filters, empty recovery, nullable details and unsupported attribution",
+      "result": "passed"
+    },
+    {
+      "name": "retained legacy linked rankings, search/sort and distinct annual recap",
+      "result": "passed",
+      "widths": [
+        390,
+        768,
+        1440
+      ]
+    },
+    {
+      "name": "synthetic login errors, logout revocation, cookie removal and replay denial",
+      "result": "passed"
+    },
+    {
+      "name": "independent failures and never/unknown/empty/partial/stale/metadata/derived/candidate status matrix",
+      "result": "passed"
+    }
+  ],
+  "pages": [
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-dashboard-390-light.png",
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/activity",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-activity-390-light.png",
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/activity",
+      "scenario": "scroll-end",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "scroll-end-activity-390-light.png",
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/articles",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-articles-390-light.png",
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/articles/synthetic-item-000",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/reports?period=yearly&date=2025",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-reports-390-light.png",
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/authors",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/sources",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/tags",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/year-in-reading?year=2025",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/login",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/settings",
+      "scenario": "account",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "account-settings-390-light.png",
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/activity",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/articles",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/articles/synthetic-item-000",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-articlessynthetic-item-000-390-dark.png",
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/reports?period=yearly&date=2025",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/authors",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/sources",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/tags",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/year-in-reading?year=2025",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/login",
+      "scenario": "invalid-password",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "browser forms / pointer / keyboard",
+      "horizontalOverflow": false,
+      "screenshot": "invalid-password-login-390-dark.png",
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/login",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "dark",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-390"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-dashboard-768-light.png",
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/activity",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-activity-768-light.png",
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/articles",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-articles-768-light.png",
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/articles",
+      "scenario": "table-keyboard",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "keyboard",
+      "horizontalOverflow": false,
+      "screenshot": "table-keyboard-articles-768-light.png",
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/articles",
+      "scenario": "table-horizontal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "table-horizontal-articles-768-light.png",
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/articles/synthetic-item-000",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/reports?period=yearly&date=2025",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-reports-768-light.png",
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/authors",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/sources",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/tags",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/year-in-reading?year=2025",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/login",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/activity",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/articles",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/articles/synthetic-item-000",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-articlessynthetic-item-000-768-dark.png",
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/reports?period=yearly&date=2025",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/authors",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/sources",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/tags",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/year-in-reading?year=2025",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/login",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/settings",
+      "scenario": "account",
+      "width": 768,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "account-settings-768-dark.png",
+      "evidenceDirectory": "layout-768"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-dashboard-1440-light.png",
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/activity",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-activity-1440-light.png",
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/articles",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-articles-1440-light.png",
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/articles/synthetic-item-000",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/reports?period=yearly&date=2025",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-reports-1440-light.png",
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/authors",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/sources",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/tags",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/year-in-reading?year=2025",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/login",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/activity",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/articles",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/articles/synthetic-item-000",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "normal-articlessynthetic-item-000-1440-dark.png",
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/reports?period=yearly&date=2025",
+      "scenario": "chart-hover",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "chart-hover-reports-1440-dark.png",
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/reports?period=yearly&date=2025",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/authors",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/sources",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/tags",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/year-in-reading?year=2025",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/login",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "dark",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "layout-1440"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "presets",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "browser forms / pointer / keyboard",
+      "horizontalOverflow": false,
+      "screenshot": "presets-dashboard-390-light.png",
+      "evidenceDirectory": "flows"
+    },
+    {
+      "route": "/activity",
+      "scenario": "selected-day",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "browser forms / pointer / keyboard",
+      "horizontalOverflow": false,
+      "screenshot": "selected-day-activity-390-light.png",
+      "evidenceDirectory": "flows"
+    },
+    {
+      "route": "/authors",
+      "scenario": "linked",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "flows"
+    },
+    {
+      "route": "/sources",
+      "scenario": "linked",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "flows"
+    },
+    {
+      "route": "/tags",
+      "scenario": "linked",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "flows"
+    },
+    {
+      "route": "/year-in-reading",
+      "scenario": "linked",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "linked-year-in-reading-390-light.png",
+      "evidenceDirectory": "flows"
+    },
+    {
+      "route": "/authors",
+      "scenario": "linked",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "flows"
+    },
+    {
+      "route": "/sources",
+      "scenario": "linked",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "linked-sources-768-light.png",
+      "evidenceDirectory": "flows"
+    },
+    {
+      "route": "/tags",
+      "scenario": "linked",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "flows"
+    },
+    {
+      "route": "/year-in-reading",
+      "scenario": "linked",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "flows"
+    },
+    {
+      "route": "/authors",
+      "scenario": "linked",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "flows"
+    },
+    {
+      "route": "/sources",
+      "scenario": "linked",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "flows"
+    },
+    {
+      "route": "/tags",
+      "scenario": "linked",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "flows"
+    },
+    {
+      "route": "/year-in-reading",
+      "scenario": "linked",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "flows"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "partial",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "partial-dashboard-390-light.png",
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "partial",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "partial",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "partial",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "partial",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "partial",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "stale",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "stale",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "stale",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "stale",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "stale",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "stale",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "never",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "never",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "never",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "never",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "never",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "never",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "unknown",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "unknown",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "unknown",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "unknown",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "unknown",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "unknown",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "metadata-incomplete",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "metadata-incomplete",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "metadata-incomplete",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "metadata-incomplete",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "metadata-incomplete",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "metadata-incomplete",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "derived-pending",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "derived-pending",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "derived-pending",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "derived-pending",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "derived-pending",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "derived-pending",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "candidate",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "candidate-dashboard-390-light.png",
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "candidate",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "candidate",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "candidate",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "candidate-settings-768-light.png",
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "candidate",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "candidate",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "status-error",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "status-error",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "status-error",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "status-error",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "status-error",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "status-error",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "library-error",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "library-error",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "library-error",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "library-error",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "library-error",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "library-error",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "metrics-error",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "metrics-error-dashboard-390-light.png",
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "metrics-error",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "metrics-error",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "metrics-error",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "metrics-error",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "metrics-error",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "empty",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "empty",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "empty",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "empty",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "empty",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    },
+    {
+      "route": "/settings",
+      "scenario": "empty",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "evidenceDirectory": "states"
+    }
+  ]
+}

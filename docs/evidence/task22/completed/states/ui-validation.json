@@ -1,0 +1,677 @@
+{
+  "testedSourceSha": "9097b2298f3a4641b97a2d81bcae3e644e76fc64",
+  "buildSourceSha": "877fae00126141b60fc7a60f6690c8f02a9cab22",
+  "phase": "states",
+  "syntheticOnly": true,
+  "productionData": false,
+  "appTimezone": "Europe/Athens",
+  "browserTimezone": "America/New_York",
+  "pages": [
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "normal",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "partial",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "partial-dashboard-390-light.png"
+    },
+    {
+      "route": "/settings",
+      "scenario": "partial",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "partial",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "partial",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "partial",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "partial",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "stale",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "stale",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "stale",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "stale",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "stale",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "stale",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "never",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "never",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "never",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "never",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "never",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "never",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "unknown",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "unknown",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "unknown",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "unknown",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "unknown",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "unknown",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "metadata-incomplete",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "metadata-incomplete",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "metadata-incomplete",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "metadata-incomplete",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "metadata-incomplete",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "metadata-incomplete",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "derived-pending",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "derived-pending",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "derived-pending",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "derived-pending",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "derived-pending",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "derived-pending",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "candidate",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "candidate-dashboard-390-light.png"
+    },
+    {
+      "route": "/settings",
+      "scenario": "candidate",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "candidate",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "candidate",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "candidate-settings-768-light.png"
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "candidate",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "candidate",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "status-error",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "status-error",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "status-error",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "status-error",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "status-error",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "status-error",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "library-error",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "library-error",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "library-error",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "library-error",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "library-error",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "library-error",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "metrics-error",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false,
+      "screenshot": "metrics-error-dashboard-390-light.png"
+    },
+    {
+      "route": "/settings",
+      "scenario": "metrics-error",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "metrics-error",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "metrics-error",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "metrics-error",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "metrics-error",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "empty",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "empty",
+      "width": 390,
+      "theme": "light",
+      "height": 844,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "empty",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "empty",
+      "width": 768,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/dashboard",
+      "scenario": "empty",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    },
+    {
+      "route": "/settings",
+      "scenario": "empty",
+      "width": 1440,
+      "theme": "light",
+      "height": 1000,
+      "input": "render / scroll",
+      "horizontalOverflow": false
+    }
+  ],
+  "checks": [
+    {
+      "name": "independent failures and never/unknown/empty/partial/stale/metadata/derived/candidate status matrix",
+      "result": "passed"
+    }
+  ],
+  "contrastChecks": [],
+  "scrollChecks": [],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "resourceFailures": [],
+  "externalRequests": [],
+  "libraryDetailPrefetches": [],
+  "unexpectedMutations": []
+}

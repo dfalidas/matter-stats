@@ -1,0 +1,7 @@
+PASS Overview inclusive range, query preservation, invalid recovery, presets, back/forward/reload
+PASS Activity future/invalid/out-of-month, today, touch selection, page-independent totals and Athens timestamps
+PASS Reports selected year, editable input, comparison labels, legacy deep links, history, recap round trip and canonical CSV
+PASS Library stable pagination, combined filters, empty recovery, nullable details and unsupported attribution
+PASS retained legacy linked rankings, search/sort and distinct annual recap
+PASS synthetic login errors, logout revocation, cookie removal and replay denial
+Verified 14 rendered route/state/viewport/theme combinations and 6 behavioral groups at 8192206bb1995440248110e117776a1296108f36.

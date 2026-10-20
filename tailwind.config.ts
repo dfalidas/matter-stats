@@ -3,6 +3,8 @@ import tailwindcssAnimate from "tailwindcss-animate";
 
 const config: Config = {
   darkMode: ["class"],
+  // The declared runtime theme must survive content pruning.
+  safelist: ["dark"],
   content: [
     "./app/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",

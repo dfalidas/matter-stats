@@ -2,7 +2,14 @@ import { PageShell } from "../_components/page-shell";
 import { ReportsOverview } from "./reports-overview";
 import { getSupabaseAdminClient } from "@/lib/supabase-admin";
 import { requireAccessSession } from "@/lib/require-auth";
-import { getReadingReport, toReportsClientPayload, isValidReportReference, REPORT_PERIODS, type ReportPeriod } from "@/lib/reports-service";
+import {
+  getReadingReport,
+  toReportsClientPayload,
+  isValidReportReference,
+  REPORT_PERIODS,
+  type ReportPeriod,
+} from "@/lib/reports-service";
+import { timestampToCalendarDate } from "@/lib/calendar";
 
 const DEFAULT_REPORT_PERIOD: ReportPeriod = "weekly";
 
@@ -16,7 +23,17 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   await requireAccessSession();
   const params = await searchParams;
   const period = normalizeReportPeriod(params?.period);
-  const reference = normalizeReference(period, params?.date ?? params?.weekStart);
+  // Retain the validated calendar selection separately from Monday/month/year
+  // aggregation boundaries. Use the service's local-today fallback for invalid
+  // or absent references, including when the report query is unavailable.
+  const today = timestampToCalendarDate(new Date());
+  const reference =
+    normalizeReference(period, params?.date ?? params?.weekStart) ??
+    (period === "yearly"
+      ? today.slice(0, 4)
+      : period === "monthly"
+        ? today.slice(0, 7)
+        : today);
   const client = getSupabaseAdminClient();
   const reportsResult = await getReportsResult(client, period, reference);
 
@@ -26,7 +43,11 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       title="Reading reports"
       description="Weekly, monthly, and yearly reviews built from synced session duration—not inferred article activity."
     >
-      <ReportsOverview period={period} reportsResult={reportsResult} />
+      <ReportsOverview
+        period={period}
+        reference={reference}
+        reportsResult={reportsResult}
+      />
     </PageShell>
   );
 }

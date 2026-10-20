@@ -1,0 +1,28 @@
+{
+  "attempts": [
+    {
+      "name": "new regression against baseline behavior",
+      "sourceSha": "880fafb4db67b0a08c0f8ff2e717f1d88786c8ba",
+      "passed": 9,
+      "failed": 4,
+      "status": "failed",
+      "note": "Three successful-payload cases expose normalized-boundary selection; new fallback contract also absent."
+    },
+    {
+      "name": "first corrected UI regression run",
+      "sourceSha": "uncommitted correction before 22f639a",
+      "passed": 12,
+      "failed": 1,
+      "status": "failed",
+      "note": "Test compared Date object to string; corrected assertion to ISO timestamp, then 13/13 passed."
+    },
+    {
+      "name": "first Reports browser phase",
+      "testedSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c",
+      "buildSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c",
+      "status": "failed",
+      "reason": "Generic unavailable fixture leaves raw sessions readable; Reports correctly loaded. Switched harness to existing metrics-error fixture. No completed manifest; excluded from passed counts.",
+      "preservedWorkspacePath": "work/reports-reference/reports-attempt1"
+    }
+  ]
+}

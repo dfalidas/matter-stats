@@ -1,0 +1,26 @@
+{
+  "testedSourceSha": "8192206bb1995440248110e117776a1296108f36",
+  "buildSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c",
+  "frames": [
+    {
+      "file": "reports/retained-year-week-reports-390-light.png",
+      "observation": "2025 selection and recap beside Dec30-Jan5 range; primary controls unobstructed."
+    },
+    {
+      "file": "reports/retained-year-return-reports-390-light.png",
+      "observation": "2025 input, annual range and recap; comparison 2024."
+    },
+    {
+      "file": "reports/retained-march-2025-week-reports-768-light.png",
+      "observation": "March1 selection, February24-March2 range, previous week and 233 words; controls fit."
+    },
+    {
+      "file": "reports/retained-year-week-reports-1440-dark.png",
+      "observation": "2025 selection and recap; actual cross-year week and 2254 words; dark layout legible."
+    },
+    {
+      "file": "reports/retained-march-2024-week-reports-1440-dark.png",
+      "observation": "March1 selection, leap week February26-March3, 225 words; dark controls and labels legible."
+    }
+  ]
+}
