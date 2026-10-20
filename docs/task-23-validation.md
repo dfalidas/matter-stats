@@ -16,7 +16,7 @@ a local dirty-worktree run keyed by base SHA does not certify that base's code.
 | PR + main database gate / correct SHA | Workflow already triggers both; DB job restricted to PR head | Main skips DB; fallback expression/evidence absent | Remove PR-only condition; PR head or pushed SHA checkout, checked against event payload; retain merge event SHA separately | Event/mismatch/workflow regressions pass; actual PR CI recorded below/in PR; main-push execution remains unobserved until merge |
 | Minimal secret-free isolated infrastructure | CLI 2.48.3, OS-temp local stacks, synthetic fixtures, env allowlist and dedicated variables | Application checkout persisted credentials; repeated full app tests in DB job | Both checkouts disable persisted credentials; keep read-only permissions/pins; compile test prerequisites once instead of rerunning app tests | Focused workflow/isolation regressions pass; no secret or dependency added |
 | Preserve complete fresh/upgrade path | Task 22 reviewed full CI passed; baseline 20260519090000 and intermediate preservation already present | Extend without replacing | Reuse every existing migration/preservation/security/runtime suite on both paths | Local full attempt and exact-head CI outcomes are separate below; no PostgreSQL-only substitute |
-| Exhaustive current schema security | Existing inventories and suites cover Tasks 11–21 | Additions/overloads/views could escape inventory; legacy function properties partly asserted | Closed discovery of 26 app tables, zero views and 49 function signatures; exclude extension-owned members; broader browser privilege checks; shared PUBLIC/service/security/search_path validation for both legacy functions | SQL-generator/unit regressions pass; real rollback-only table/view/overload negative controls are part of full gate |
+| Exhaustive current schema security | Existing inventories and suites cover Tasks 11–21 | Additions/overloads/views could escape inventory; legacy function properties partly asserted | Closed discovery of 26 app tables, zero views and 49 function signatures; exclude extension-owned members; broader browser privilege checks and protected-state service TRUNCATE denial; shared PUBLIC/service/security/search_path validation for both legacy functions | SQL-generator/unit regressions pass; real rollback-only table/view/overload and prohibited service-TRUNCATE negative controls are part of full gate |
 | Valid SQL/Data API denial/allowance | Exact object-specific 42501 assertions, service controls, Auth roles and limiter concurrency | Restore target has no independent Data API check | Reuse shared denial/allowance assertions for restored tables and read RPCs; preserve full source suites | Focused failure-propagation tests pass; real restore/security outcome requires completed full gate |
 | Fail closed and distinguish infrastructure | Runner blocked Docker path already nonzero | Sparse partial evidence; raw child errors; unbounded child commands | Persist per-phase outcomes before execution; bound child processes; classify known capacity/image/transport/timeouts; no fallback/retry loop; require security completion report | Failure/classification/blocked-evidence tests pass; unavailable execution never counted passed |
 | Sanitized evidence and owned cleanup | JSON results/failure/cleanup + pinned upload action | Event/tools, unfinished groups and cleanup verification incomplete | Identity, toolchain, migration and per-suite allowlisted reports; pending-before-action cleanup, verify absence of exact owned containers/volumes/networks; remove only invocation temp directory | Focused identity/outcome tests pass; actual infrastructure cleanup is reported per invocation |
@@ -63,7 +63,7 @@ committed exact-head verification is reported separately.
 | `npm run typecheck` | Passed |
 | `npm run lint` | Passed; changed orchestration/integration modules separately linted, zero errors |
 | `npm run test` | Passed: **395 tests, 395 passed, 0 failed/cancelled/skipped/TODO**; ordinary opt-in database suite did not execute and is not counted as a database pass |
-| Focused evidence/orchestration/catalog tests | **24 passed, 0 failed/cancelled/skipped/TODO** after final implementation edits; these are unit/orchestration checks, not database verification |
+| Focused evidence/orchestration/catalog tests | **26 passed, 0 failed/cancelled/skipped/TODO** after final implementation edits; these are unit/orchestration checks, not database verification |
 | `npm run build` | Passed; synthetic configuration, no live database/Matter access |
 | `npm run audit:ci`, first attempt | Failed before audit, **ENOSPC** creating audit-results while Docker image extraction consumed disk; no advisory result from this attempt |
 | `npm run audit:ci`, supported-toolchain rerun | Passed, unchanged policy: **8 high full-graph entries; low/moderate/critical 0; production 0**. No exception expanded or finding suppressed |
@@ -96,6 +96,42 @@ explicit synthetic identity; the production runner still checks the actual event
 commit. The focused suite passes under simulated PR environment variables. No real
 identity assertion was weakened. The initial database job's separate result is
 retained in the PR; final-head CI must rerun both jobs after this correction.
+
+## Complete paths and first rehearsal attempt (historical, 2026-10-20)
+
+[Run 39425193573](https://github.com/dfalidas/matter-stats/actions/runs/39425193573)
+tested implementation **`ebfd2f931937110204aa1807f744c28849b8c3fc`** for the DB
+job and application merge **`6b70f531973f6191f69a8511ebe527e2f5892ae1`**.
+Application verification passed all required steps, **395/395 tests**, no
+failures/cancellations/skips/TODO, build and unchanged audit (8 high development
+entries, zero production vulnerabilities), Node 22.23.3/npm 10.9.9.
+
+The [DB artifact](https://github.com/dfalidas/matter-stats/actions/runs/39425193573/artifacts/12266940987)
+was downloaded and its JSON independently inspected. Both **fresh AND upgrade**
+completed all original suites, all 20 migrations, the closed catalog and
+preservation. The overall database job **FAILED** its new backup/restore phase:
+**28 passed / 1 failed / 0 skipped / 0 TODO / 0 blocked / 0 not-run** phase groups.
+All three owned stacks were **verified removed** and the temporary root removed.
+No successful backup/restore or complete database gate is claimed for this attempt.
+
+Source inspection identified a fixture collision: existing real-runtime suites
+can leave a scheduled invocation row, while the first restore seed unconditionally
+inserted that singleton key. The seed now uses the existing bounded invocation
+RPC to record its synthetic attempt/result. Restoration explicitly requests the
+documented PostgREST schema reload. The runner also checks service-role TRUNCATE
+restrictions on every protected additive table, including generations, with a
+rollback-only prohibited-grant negative control. A shared subphase recorder now
+retains target/seed/snapshot/dump/restore/preservation/catalog/Data API outcomes;
+SQL failures retain only SQLSTATE, not secret-bearing raw stderr. Metadata child
+processes use the same existing environment allowlist. Focused checks: **26 passed**,
+including failed-stage propagation and simulated PR metadata.
+
+These corrections require a new complete exact-head CI run. **The latest acceptance
+run, actual checked-out head/merge SHAs, outcomes/counts and artifact links are
+maintained in [draft PR #86](https://github.com/dfalidas/matter-stats/pull/86).**
+The historical failure above is never relabeled; an earlier head's artifact does
+not certify the final head. Main-push execution still requires a separately
+authorized merge, and no staging/production gate is closed by CI alone.
 
 ## Evidence, impact and rollback
 

@@ -4,6 +4,12 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+export function sanitizedEnvironment(extra = {}) {
+  const keep = ["PATH", "HOME", "USER", "TMPDIR", "TEMP", "TMP", "SystemRoot", "COMSPEC", "NODE_EXTRA_CA_CERTS", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "npm_config_cache", "npm_config_https_proxy"];
+  return Object.fromEntries([...keep.filter((key) => process.env[key]).map((key) => [key, process.env[key]]), ...Object.entries(extra)]);
+}
+
+
 export function ciIdentity(env, event, testedSha) {
   assert.match(testedSha, /^[a-f0-9]{40}$/);
   const eventName = env.GITHUB_EVENT_NAME ?? 'local';
@@ -44,12 +50,12 @@ export function phaseRecorder(names, persist) {
 }
 
 export function executionIdentity(env = process.env) {
-  const testedSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  const testedSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', env:sanitizedEnvironment() }).trim();
   const event = env.GITHUB_EVENT_PATH ? JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8')) : {};
   return { ...ciIdentity(env, event, testedSha),
-    worktreeDirty: Boolean(execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }).trim()),
+    worktreeDirty: Boolean(execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8', env:sanitizedEnvironment() }).trim()),
     node: process.version,
-    npm: execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim(),
+    npm: execFileSync('npm', ['--version'], { encoding: 'utf8', env:sanitizedEnvironment() }).trim(),
   };
 }
 

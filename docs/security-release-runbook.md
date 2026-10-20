@@ -173,7 +173,7 @@ sha256sum "$BACKUP_FILE" > "$BACKUP_FILE.sha256"
 # Into a NEW, dedicated Supabase target with compatible managed prerequisites:
 psql -X --dbname='service=isolated_restore' --single-transaction \
   --variable ON_ERROR_STOP=1 --command 'SET LOCAL session_replication_role=replica' \
-  --file="$BACKUP_FILE"
+  --file="$BACKUP_FILE" --command "NOTIFY pgrst, 'reload schema';"
 ```
 
 This dump includes destructive clean statements **only for the selected schemas**;
@@ -275,9 +275,12 @@ existing intermediate Task 11–15/19–21 preservation comparisons. The same se
 login concurrency, leases, atomic pages/rollups, canonical word boundaries,
 continuation, quotas, preview, repair/generation rollback and status suites run on
 both. Catalog discovery rejects any non-extension public app relation/view or
-function outside explicit coverage. There are currently **no app views**. Real
+function outside explicit coverage. There are currently **no app views**.
+Service-role TRUNCATE is rejected for all protected additive state, including
+Task 20 generation/capture tables; legacy ALL-grant tables retain their contract. Real
 negative controls add a table/view/function overload inside rollback-only SQL
-transactions and require the exact uncovered-object failure. Valid operation
+transactions and require the exact uncovered-object failure; a temporary service-role
+TRUNCATE grant must also fail the same catalog check. Valid operation
 controls and object-specific `42501` denials remain mandatory; malformed payloads,
 missing RPCs, transport or unrelated SQL errors never count as successful denials.
 
@@ -310,6 +313,8 @@ partial sync may continue under its durable mechanism when authorized. Historica
 Matter coverage and unsupported item attribution remain unverified. Do not reset
 partial state or equate successful imports, reconciled stored data or Git integration
 statuses with verified complete history or production readiness.
+
+Schema restore explicitly requests a [PostgREST schema cache reload](https://supabase.com/docs/guides/troubleshooting/refresh-postgrest-schema); missing RPCs after restore remain failures.
 
 Official sources checked 2026-10-20: Supabase [backups](https://supabase.com/docs/guides/platform/backups),
 [logical restore](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore),

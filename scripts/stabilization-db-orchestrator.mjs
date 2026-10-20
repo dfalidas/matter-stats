@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
-import { executionIdentity, phaseRecorder } from "./database-evidence.mjs";
-import { rehearseRestore, restoreSnapshotSql } from "./disposable-restore.mjs";
+import { executionIdentity, phaseRecorder, sanitizedEnvironment } from "./database-evidence.mjs";
+import { rehearseRestore, restoreSnapshotSql, RESTORE_PHASES } from "./disposable-restore.mjs";
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -18,10 +18,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const migrationsSource = path.join(repoRoot, "supabase/migrations");
 export const PRE_STATUS_TABLES = INVENTORIED_TABLES.filter(table => !STATUS_TABLES.includes(table));
 
-export function sanitizedEnvironment(extra = {}) {
-  const keep = ["PATH", "HOME", "USER", "TMPDIR", "TEMP", "TMP", "SystemRoot", "COMSPEC", "NODE_EXTRA_CA_CERTS", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "npm_config_cache", "npm_config_https_proxy"];
-  return Object.fromEntries([...keep.filter((key) => process.env[key]).map((key) => [key, process.env[key]]), ...Object.entries(extra)]);
-}
+export { sanitizedEnvironment } from "./database-evidence.mjs";
 
 export function parseStatusEnv(output) {
   return Object.fromEntries(output.split(/\r?\n/).flatMap((line) => {
@@ -51,7 +48,8 @@ function command(binary, args, { cwd = repoRoot, env = sanitizedEnvironment(), i
   if (result.error) throw Object.assign(new Error(`Disposable command unavailable or timed out (${result.error.code ?? 'unknown'}).`), { failureKind: "infrastructure", category:result.error.code === 'ETIMEDOUT' ? 'timeout' : 'command-unavailable' });
   if (result.status !== 0) {
     const category = commandFailureCategory(result.stderr);
-    throw Object.assign(new Error(`Disposable ${path.basename(binary)} failed (exit ${result.status}; ${category}). Raw output withheld.`), { failureKind: ['disk-capacity','image-pull','timeout','transport','command-unavailable'].includes(category) ? 'infrastructure' : 'assertion-or-suite', category });
+    const databaseCode = result.stderr.match(/(?:ERROR|FATAL):\s+([0-9A-Z]{5}):/)?.[1] ?? null;
+    throw Object.assign(new Error(`Disposable ${path.basename(binary)} failed (exit ${result.status}; ${category}; SQLSTATE ${databaseCode ?? "unavailable"}). Raw output withheld.`), { failureKind: ['disk-capacity','image-pull','timeout','transport','command-unavailable'].includes(category) ? 'infrastructure' : 'assertion-or-suite', category, databaseCode });
   }
   return result.stdout;
 }
@@ -167,7 +165,7 @@ export async function removeOwnedLegacySingleton({ query, ownershipMarker, runIn
 
 function containerPsql(projectId, sql, { quiet = true } = {}) {
   const flags = quiet ? "-XAtq" : "-XAt";
-  return command("docker", ["exec", "-i", `supabase_db_${projectId}`, "psql", flags, "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres", "-f", "-"], { input: sql });
+  return command("docker", ["exec", "-i", `supabase_db_${projectId}`, "psql", flags, "-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=verbose", "-U", "postgres", "-d", "postgres", "-f", "-"], { input: sql });
 }
 
 async function catalog(projectId, migrationsDir) {
@@ -473,6 +471,7 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
   let activePath = "configuration";
   let evidence;
   let failureEvidence;
+  let restoreProgress;
   try {
     const actualCli = cli(['--version']).trim();
     assert.equal(actualCli, SUPABASE_CLI_VERSION, 'unexpected Supabase CLI version');
@@ -492,17 +491,20 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
     }
     activePath = "backup-restore";
     phases.begin('backup-restore');
+    restoreProgress = phaseRecorder(['target', ...RESTORE_PHASES], data => writeFileSync(path.join(evidenceDir,'backup-restore-outcomes.json'), JSON.stringify(data,null,2)+'\n'));
+    restoreProgress.begin('target');
     const restoreStack = { ...stacks[0], name:'restore', projectId:`matter-stats-restore-${suffix}`, workdir:path.join(root,'restore'), apiPort:57421, dbPort:57422, shadowPort:57420, studioPort:57423, inbucketPort:57424, analyticsPort:57427 };
     await configureStack(restoreStack.workdir, restoreStack);
     // Retain the fresh source; free the completed upgrade stack before restore.
     stopStack(stacks[1]);
     registerStack(restoreStack);
     cli(['start','--workdir',restoreStack.workdir]);
+    restoreProgress.end();
     const restoreEvidence = await rehearseRestore({
-      source: stacks[0].projectId, target: restoreStack.projectId,
+      source: stacks[0].projectId, target: restoreStack.projectId, progress:restoreProgress,
       sql: containerPsql,
       dump: project => command('docker', ['exec', `supabase_db_${project}`, 'pg_dump', '-U','postgres','-d','postgres', '--schema=public','--schema=supabase_migrations','--clean','--if-exists','--no-owner']),
-      restore: (project, backup) => containerPsql(project, `begin; set local session_replication_role=replica;\n${backup}\ncommit;`),
+      restore: (project, backup) => containerPsql(project, `begin; set local session_replication_role=replica;\n${backup}\ncommit;\nnotify pgrst, 'reload schema';`),
       verifyCatalog: project => catalog(project, migrationsSource),
       verifyDataApi: project => {
         configureDisposableGateway(project);
@@ -522,12 +524,14 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
     return evidence;
   } catch (error) {
     phases.fail(error.failureKind);
+    restoreProgress?.fail(error.failureKind);
     failureEvidence = {
       status: "failed",
       gitSha: sha,
       failedPath: activePath,
       failureKind: error.failureKind ?? "assertion-or-suite",
       category: error.category ?? "assertion-or-execution",
+      databaseCode: error.databaseCode ?? null,
       paths: results,
       // Subprocess stderr can contain generated local credentials. Raw child
       // output is withheld; retain only known classifications and phase results.

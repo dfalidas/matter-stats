@@ -56,6 +56,6 @@ The W2 version/results above are historical. Next.js remains 15.5.27; the existi
 Tailwind selector override and audit policy are unchanged, with no new advisory
 exceptions. npm regenerated the sharp/platform/libvips lock entries, a native
 PNG decode/resize smoke check passed, and production audit reports zero findings.
-See [task-13-validation.md](task-13-validation.md) for actual tested SHAs, full
+See [task-13-validation.md](../task-13-validation.md) for actual tested SHAs, full
 CI/disposable results, gateway investigation and cleanup evidence.
 

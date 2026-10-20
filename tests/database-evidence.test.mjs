@@ -45,3 +45,12 @@ test('infrastructure classification distinguishes capacity, image, transport and
   const {commandFailureCategory} = await import('../scripts/stabilization-db-orchestrator.mjs');
   for (const [message,category] of [['no space left on device','disk-capacity'],['failed to register layer','image-pull'],['connect ETIMEDOUT','timeout'],['fetch failed','transport'],['AssertionError [ERR_ASSERTION]','assertion'],['unexpected SQL syntax error','execution']]) assert.equal(commandFailureCategory(message), category);
 });
+
+test('restore evidence records the failing stage and leaves later stages not run', async () => {
+  const {RESTORE_PHASES} = await import('../scripts/disposable-restore.mjs');
+  let report;
+  const progress=phaseRecorder(RESTORE_PHASES, data=>{report=structuredClone(data);});
+  await assert.rejects(rehearseRestore({source:'source',target:'target',sql:async()=> 'snapshot',dump:async()=>{throw new Error('dump failed');},progress}), /dump failed/);
+  assert.equal(report.counts.passed,2);assert.equal(report.counts.failed,1);assert.equal(report.counts['not-run'],4);
+  assert.equal(report.steps.find(s=>s.name==='dump').status,'failed');
+});

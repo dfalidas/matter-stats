@@ -49,6 +49,10 @@ BEGIN
       AND NOT (p.oid=ANY(ARRAY[${INVENTORIED_FUNCTIONS.map(s => `to_regprocedure('public.${s}')`).join(', ')}]::oid[]));
   IF unexpected IS NOT NULL THEN RAISE EXCEPTION 'uncovered app function: %', unexpected; END IF;
   FOREACH table_name IN ARRAY ARRAY[${inventory}] LOOP
+    IF table_name = ANY(ARRAY[${['matter_sync_leases', ...PAGE_TABLES, ...CONTINUATION_TABLES, ...REQUEST_TABLES, ...GENERATION_TABLES, ...STATUS_TABLES].map(t => `'${t}'`).join(', ')}])
+       AND has_table_privilege('service_role', format('public.%I', table_name), 'TRUNCATE') THEN
+      RAISE EXCEPTION 'service_role can truncate protected state public.%', table_name;
+    END IF;
     IF to_regclass(format('public.%I', table_name)) IS NULL THEN
       RAISE EXCEPTION 'missing inventoried table public.%', table_name;
     END IF;
@@ -133,6 +137,7 @@ export function catalogCoverageProbesSql() {
     ["create table public.disposable_uncovered_table(id integer)", "uncovered app relation/view: disposable_uncovered_table"],
     ["create view public.disposable_uncovered_view as select 1 as id", "uncovered app relation/view: disposable_uncovered_view"],
     ["create function public.repair_words(text) returns text language sql as 'select $1'", "uncovered app function: repair_words(text)"],
+    ["grant truncate on public.reading_generations to service_role", "service_role can truncate protected state public.reading_generations"],
   ];
   return probes.map(([create, expected]) => `begin;
     ${create};

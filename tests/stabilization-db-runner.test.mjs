@@ -111,3 +111,13 @@ test("closed catalog inventory detects new tables, views and exact function over
   assert.match(sql, /invalid limiter definer\/owner\/search_path/);
   assert.match(sql, /invalid legacy trigger security properties/);
 });
+
+
+test("catalog rejects service-role truncation of generations and other protected state, with a real SQL negative control", async () => {
+  const { GENERATION_TABLES } = await import("../scripts/reading-generation-inventory.mjs");
+  const { catalogCoverageProbesSql } = await import("../scripts/stabilization-db-runner.mjs");
+  const sql = catalogSql();
+  for (const table of GENERATION_TABLES) assert.ok(sql.includes(`'${table}'`));
+  assert.match(sql, /service_role can truncate protected state/);
+  assert.match(catalogCoverageProbesSql(), /grant truncate on public.reading_generations to service_role/);
+});

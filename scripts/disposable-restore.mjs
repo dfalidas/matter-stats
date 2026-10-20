@@ -46,22 +46,29 @@ update public.matter_quota set sequence=sequence+23,not_before='2099-01-01T00:00
 update public.matter_request_work set requests='{"synthetic":{"attempts":3,"pending":true,"next_at":"2099-01-01T00:00:00Z"}}' where slot='bootstrap';
 insert into public.matter_page_receipts(stream,receipt_id,fingerprint) values('recent_sessions','00000000-0000-4000-8000-000000000223','synthetic-restore');
 insert into public.matter_dirty_rollups(date,revision,timezone) values('2026-05-19','00000000-0000-4000-8000-000000000323','Europe/Athens');
-insert into public.matter_invocation_status(trigger,id,attempted_at,outcome) values('scheduled','00000000-0000-4000-8000-000000000423','2026-10-01T00:00:00Z','partial');
+select public.record_matter_invocation('00000000-0000-4000-8000-000000000423','scheduled','attempted');
+select public.record_matter_invocation('00000000-0000-4000-8000-000000000423','scheduled','partial');
 `;
 
-export async function rehearseRestore({ source, target, sql, dump, restore, verifyCatalog, verifyDataApi }) {
+export const RESTORE_PHASES = ['synthetic-seed', 'source-snapshot', 'dump', 'restore', 'preservation', 'catalog', 'data-api'];
+
+export async function rehearseRestore({ source, target, sql, dump, restore, verifyCatalog, verifyDataApi, progress }) {
   assert.notEqual(source, target, 'restore requires a separate disposable target');
-  await sql(source, restoreSeedSql);
-  const before = await sql(source, restoreSnapshotSql);
-  // The dump is kept in memory by the orchestrator, never uploaded or written
-  // to the checkout. Source is quiescent, all data is synthetic.
-  const backup = await dump(source);
-  assert.ok(backup.length > 0, 'empty backup');
-  await restore(target, backup);
-  assert.equal(await sql(target, restoreSnapshotSql), before, 'restored raw/progress/generation/status state differs');
-  await verifyCatalog(target);
-  // Run controls after equality: Auth/security fixtures intentionally mutate state.
-  await verifyDataApi(target);
+  const step = async (name, operation) => {
+    progress?.begin(name);
+    try { const result = await operation(); progress?.end(); return result; }
+    catch (error) { progress?.fail(error.failureKind); throw error; }
+  };
+  await step('synthetic-seed', () => sql(source, restoreSeedSql));
+  const before = await step('source-snapshot', () => sql(source, restoreSnapshotSql));
+  // The dump is kept in memory, never uploaded or written to the checkout.
+  const backup = await step('dump', async () => {
+    const value = await dump(source); assert.ok(value.length > 0, 'empty backup'); return value;
+  });
+  await step('restore', () => restore(target, backup));
+  await step('preservation', async () => assert.equal(await sql(target, restoreSnapshotSql), before, 'restored raw/progress/generation/status state differs'));
+  await step('catalog', () => verifyCatalog(target));
+  await step('data-api', () => verifyDataApi(target));
   return { status: 'passed', syntheticOnly: true, separateTarget: true, tablesCompared: INVENTORIED_TABLES.length,
     schemaAndSecurity: 'passed', rawAndProgress: 'passed', dataApi: 'passed', backupUploaded: false };
 }

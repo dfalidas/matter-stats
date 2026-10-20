@@ -2,7 +2,7 @@
   "date": "2026-10-20",
   "baseSha": "323b2d5d956312b7973484b5e5c3f37c14afb9be",
   "worktreeDirty": true,
-  "scope": "local implementation work; not exact committed-head certification",
+  "scope": "local implementation work; 395-test full suite before two added security/evidence tests, followed by focused 26-test validation; exact committed-head certification is reported separately",
   "node": "22.23.3",
   "npm": "10.9.9",
   "commands": [
@@ -51,7 +51,7 @@
     "todo": 0
   },
   "focusedTests": {
-    "passed": 24,
+    "passed": 26,
     "failed": 0,
     "cancelled": 0,
     "skipped": 0,
