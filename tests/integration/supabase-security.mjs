@@ -9,6 +9,7 @@ if (process.env.DISPOSABLE_DB_ACK !== "yes" || required.some((key) => !process.e
 }
 
 const url = process.env.STABILIZATION_TEST_SUPABASE_URL;
+assert.ok(['127.0.0.1', 'localhost'].includes(new URL(url).hostname), 'security tests require orchestrator-local Data API');
 const anonKey = process.env.STABILIZATION_TEST_SUPABASE_ANON_KEY;
 const serviceKey = process.env.STABILIZATION_TEST_SUPABASE_SERVICE_ROLE_KEY;
 const options = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } };
@@ -239,3 +240,5 @@ try {
     throw new AggregateError(cleanupFailures, `Cleanup failed (${cleanupFailures.length} resource(s)); all remaining cleanup was attempted`);
   }
 }
+
+console.log(JSON.stringify({status:"passed", fixtures:fixtures.length, limiterGroups:2, requestsPerGroup:20, cleanup:"passed"}));

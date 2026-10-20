@@ -21,13 +21,38 @@ export const INVENTORIED_TABLES = [
   "matter_sync_streams", "matter_sync_leases", ...PAGE_TABLES, ...CONTINUATION_TABLES, ...REQUEST_TABLES, ...GENERATION_TABLES, ...STATUS_TABLES,
 ];
 
+export const INVENTORIED_FUNCTIONS = [
+  'set_updated_at()', 'record_app_login_attempt(text,boolean,integer,integer)',
+  ...LEASE_FUNCTION_SIGNATURES, ...PAGE_FUNCTION_SIGNATURES, ...CONTINUATION_FUNCTION_SIGNATURES,
+  ...REQUEST_FUNCTION_SIGNATURES, ...GENERATION_FUNCTION_SIGNATURES, ...STATUS_FUNCTION_SIGNATURES,
+];
+// There are currently no application views. A new view must acquire an explicit
+// security contract and tests before this closed inventory can be expanded.
+export const INVENTORIED_VIEWS = [];
+
 export function catalogSql(tables = INVENTORIED_TABLES) {
   const inventory = tables.map((table) => `'${table}'`).join(", ");
   return String.raw`
 DO $catalog$
-DECLARE table_name text; privilege_name text; browser_role text; function_signature text;
+DECLARE unexpected text; table_name text; privilege_name text; browser_role text; function_signature text;
 BEGIN
+  SELECT string_agg(c.relname, ', ' ORDER BY c.relname) INTO unexpected
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','f')
+      AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid='pg_class'::regclass AND d.objid=c.oid AND d.deptype='e')
+      AND NOT (c.relkind IN ('r','p') AND c.relname=ANY(ARRAY[${inventory}]));
+  IF unexpected IS NOT NULL THEN RAISE EXCEPTION 'uncovered app relation/view: %', unexpected; END IF;
+  SELECT string_agg(p.oid::regprocedure::text, ', ' ORDER BY p.oid::regprocedure::text) INTO unexpected
+    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname='public'
+      AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid='pg_proc'::regclass AND d.objid=p.oid AND d.deptype='e')
+      AND NOT (p.oid=ANY(ARRAY[${INVENTORIED_FUNCTIONS.map(s => `to_regprocedure('public.${s}')`).join(', ')}]::oid[]));
+  IF unexpected IS NOT NULL THEN RAISE EXCEPTION 'uncovered app function: %', unexpected; END IF;
   FOREACH table_name IN ARRAY ARRAY[${inventory}] LOOP
+    IF table_name = ANY(ARRAY[${['matter_sync_leases', ...PAGE_TABLES, ...CONTINUATION_TABLES, ...REQUEST_TABLES, ...GENERATION_TABLES, ...STATUS_TABLES].map(t => `'${t}'`).join(', ')}])
+       AND has_table_privilege('service_role', format('public.%I', table_name), 'TRUNCATE') THEN
+      RAISE EXCEPTION 'service_role can truncate protected state public.%', table_name;
+    END IF;
     IF to_regclass(format('public.%I', table_name)) IS NULL THEN
       RAISE EXCEPTION 'missing inventoried table public.%', table_name;
     END IF;
@@ -54,12 +79,12 @@ BEGIN
         WHERE c.oid = to_regclass(format('public.%I', table_name)) AND a.grantee = 0) THEN
       RAISE EXCEPTION 'PUBLIC retains table privilege on public.%', table_name;
     END IF;
-    IF has_table_privilege('anon', format('public.%I', table_name), 'SELECT,INSERT,UPDATE,DELETE')
-       OR has_table_privilege('authenticated', format('public.%I', table_name), 'SELECT,INSERT,UPDATE,DELETE') THEN
+    IF has_table_privilege('anon', format('public.%I', table_name), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+       OR has_table_privilege('authenticated', format('public.%I', table_name), 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') THEN
       RAISE EXCEPTION 'browser role retains CRUD privilege on public.%', table_name;
     END IF;
     FOREACH browser_role IN ARRAY ARRAY['anon', 'authenticated'] LOOP
-      FOREACH privilege_name IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE'] LOOP
+      FOREACH privilege_name IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'REFERENCES'] LOOP
         IF has_any_column_privilege(browser_role, format('public.%I', table_name), privilege_name) THEN
           RAISE EXCEPTION '% retains column-level % privilege on public.%', browser_role, privilege_name, table_name;
         END IF;
@@ -71,7 +96,7 @@ BEGIN
   END IF;
   IF has_table_privilege('service_role','public.matter_sync_continuation','TRUNCATE') THEN RAISE EXCEPTION 'continuation can be truncated'; END IF;
   IF has_table_privilege('service_role','public.matter_quota','TRUNCATE') OR has_table_privilege('service_role','public.matter_request_work','TRUNCATE') THEN RAISE EXCEPTION 'request state can be truncated'; END IF;
-  FOREACH function_signature IN ARRAY ARRAY[${[...LEASE_FUNCTION_SIGNATURES, ...PAGE_FUNCTION_SIGNATURES, ...CONTINUATION_FUNCTION_SIGNATURES, ...REQUEST_FUNCTION_SIGNATURES, ...GENERATION_FUNCTION_SIGNATURES, ...STATUS_FUNCTION_SIGNATURES].map((signature) => `'public.${signature}'`).join(", ")}] LOOP
+  FOREACH function_signature IN ARRAY ARRAY[${INVENTORIED_FUNCTIONS.map((signature) => `'public.${signature}'`).join(", ")}] LOOP
     IF to_regprocedure(function_signature) IS NULL THEN
       RAISE EXCEPTION 'missing lease function %', function_signature;
     END IF;
@@ -85,28 +110,46 @@ BEGIN
         WHERE p.oid = to_regprocedure(function_signature) AND a.grantee = 0) THEN
       RAISE EXCEPTION 'PUBLIC retains EXECUTE on %', function_signature;
     END IF;
-    IF (SELECT prosecdef OR NOT coalesce('search_path=""' = ANY(proconfig), false) FROM pg_proc WHERE oid = to_regprocedure(function_signature)) THEN
+    IF function_signature = 'public.record_app_login_attempt(text,boolean,integer,integer)' THEN
+      IF (SELECT NOT prosecdef OR proowner <> 'postgres'::regrole OR proconfig IS DISTINCT FROM ARRAY['search_path=pg_catalog, public'] FROM pg_proc WHERE oid=to_regprocedure(function_signature)) THEN
+        RAISE EXCEPTION 'invalid limiter definer/owner/search_path';
+      END IF;
+    ELSIF function_signature = 'public.set_updated_at()' THEN
+      IF (SELECT prosecdef OR proconfig IS NOT NULL FROM pg_proc WHERE oid=to_regprocedure(function_signature)) THEN
+        RAISE EXCEPTION 'invalid legacy trigger security properties';
+      END IF;
+    ELSIF (SELECT prosecdef OR NOT coalesce('search_path=""' = ANY(proconfig), false) FROM pg_proc WHERE oid = to_regprocedure(function_signature)) THEN
       RAISE EXCEPTION 'lease function must be invoker with empty search_path: %', function_signature;
     END IF;
   END LOOP;
-  IF to_regprocedure('public.set_updated_at()') IS NULL
-     OR to_regprocedure('public.record_app_login_attempt(text,boolean,integer,integer)') IS NULL THEN
-    RAISE EXCEPTION 'required function signature is missing';
-  END IF;
-  IF NOT has_function_privilege('service_role', 'public.set_updated_at()', 'EXECUTE')
-     OR NOT has_function_privilege('service_role', 'public.record_app_login_attempt(text,boolean,integer,integer)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'service_role lacks required function EXECUTE';
-  END IF;
-  IF has_function_privilege('anon', 'public.set_updated_at()', 'EXECUTE')
-     OR has_function_privilege('authenticated', 'public.set_updated_at()', 'EXECUTE')
-     OR has_function_privilege('anon', 'public.record_app_login_attempt(text,boolean,integer,integer)', 'EXECUTE')
-     OR has_function_privilege('authenticated', 'public.record_app_login_attempt(text,boolean,integer,integer)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'browser role retains inherited or direct function EXECUTE';
-  END IF;
+
 END
 $catalog$;
 SELECT version FROM supabase_migrations.schema_migrations ORDER BY version;
 `;
+}
+
+// Negative controls execute the SAME catalog assertion, in a rollback-only
+// transaction. No missing RPC, transport error or unrelated SQL failure counts.
+export function catalogCoverageProbesSql() {
+  const assertion = catalogSql().split('SELECT version FROM')[0];
+  const probes = [
+    ["create table public.disposable_uncovered_table(id integer)", "uncovered app relation/view: disposable_uncovered_table"],
+    ["create view public.disposable_uncovered_view as select 1 as id", "uncovered app relation/view: disposable_uncovered_view"],
+    ["create function public.repair_words(text) returns text language sql as 'select $1'", "uncovered app function: repair_words(text)"],
+    ["grant truncate on public.reading_generations to service_role", "service_role can truncate protected state public.reading_generations"],
+  ];
+  return probes.map(([create, expected]) => `begin;
+    ${create};
+    do $probe$ begin
+      begin
+        execute $assertion$${assertion}$assertion$;
+        raise exception 'catalog accepted uncovered object';
+      exception when raise_exception then
+        if sqlerrm <> '${expected}' then raise; end if;
+      end;
+    end $probe$;
+    rollback;`).join('\n');
 }
 
 export function runPsql({ databaseUrl, sql, psqlBinary = "psql", env = process.env }) {

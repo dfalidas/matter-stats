@@ -1,380 +1,351 @@
-# W1–W3 security release runbook
+# Current release and recovery runbook
 
-## Continuous integration
+Operational entry point for Tasks 01–23, reviewed 2026-10-20 against main
+`323b2d5d956312b7973484b5e5c3f37c14afb9be`. Task 23 changes CI/tooling/docs only.
+Executing production migrations, backups, repair, cutover, deployment, credential
+rotation or real Matter sync requires separate authorization. No such operation
+was performed for this document. Record observations for the actual target;
+repository implementation and automatic Git deployment statuses are not production certification.
 
-`.github/workflows/ci.yml` runs on pull requests targeting `main` and pushes to
-`main`. It installs the lockfile with `npm ci`, generates Next.js route types,
-and runs typechecking, linting, unit tests, the production build, and dependency
-audits on Node.js 22 LTS. The regular verification job does not require
-application secrets or contact Matter or Supabase. Equivalent local commands are:
+## Preflight checklist
+
+- [ ] Record exact candidate Git SHA, target/environment identity privately, reviewer,
+  maintenance window, abort owner and the compatible application recovery SHA.
+- [ ] Read successful checks **for that candidate**: `verify` and
+  `Fresh and upgrade database verification` in workflow `CI`. These are the exact
+  check names recommended for branch protection. Repository rules were not changed
+  or verified here. The application job checks GitHub's PR merge commit; the database
+  job checks PR head. On pushes both check the pushed main commit. Retain both SHAs.
+- [ ] Inspect sanitized artifact outcomes and cleanup, not just a green status.
+  A blocked/not-run/failed database path is an unresolved gate. Verify all 20 ordered
+  migrations in `supabase/migrations` against actual target history; latest is
+  `20261015141435_truthful_sync_status.sql`. Record actual Postgres/extension,
+  PostgREST, platform configuration and exact RPC signatures/ACLs, with the inventories
+  in `scripts/*inventory.mjs` and `scripts/stabilization-db-runner.mjs`.
+- [ ] Match runtime: supported CI Node 22, exact `package-lock.json`, Supabase CLI
+  **2.48.3**, Next **15.5.27**. Capture actual Node/npm/CLI versions. The manifest's
+  `>=20.9.0` minimum alone is not evidence that another runtime was tested. Confirm
+  Vercel Node/Fluid Compute and the effective 180-second action/cron limits.
+- [ ] Confirm names and scope of server-only configuration below. Verify trusted proxy
+  forwarding for limiter client identity. Never copy server keys into `NEXT_PUBLIC_*`.
+- [ ] Record source coverage uncertainty, partial cycle/checkpoint and retry state,
+  frozen/building/active/previous generations, pending dirty revisions and invocation
+  evidence. Review [status meanings](task-21-status.md). Do not infer completeness from counts.
+- [ ] Identify the encrypted off-site backup, its time/source/schema/candidate identity,
+  checksums, scope/exclusions, restore target/version and successful restore validation.
+  A synthetic rehearsal is not a production backup. Missing actual backup/restore
+  evidence blocks destructive recovery and historical cutover.
+- [ ] Keep unresolved audit findings and Task 24/external gates visible. Task 22's
+  local npm 11 remediation-metadata failure and CI pass remain separate historical
+  results in [its QA record](task-22-qa.md). Compare again with Node 22/npm 10 and
+  unchanged policy; never weaken exceptions to obtain green checks.
+
+## Compatibility table
+
+These are capabilities of the implementation, not blanket approval of older releases.
+An application rollback must select an exact reviewed SHA and satisfy **all** its
+schema, generation, auth and environment contracts.
+
+| Application family | Required schema/read contract | Allowed release/recovery use |
+| --- | --- | --- |
+| Pre-security / deterministic-cookie releases | Lack revocable hashed sessions and atomic login limiter | Not an approved rollback. Never restore obsolete cookie authentication. |
+| Task 11 or earlier sync | Legacy singleton / independent stream without account fencing | Keep all entry points disabled after modern rollout; ordinary old service-role writes bypass cooperative fencing. |
+| Task 12 sync | Lease fencing, but separate row/checkpoint mutations | Incompatible writer: lacks atomic page receipts and dirty-work recovery. |
+| Task 13–14 sync | Atomic pages; Task 14 adds bounded continuation/history intent | Incompatible with Task 15 shared quota/retry contract. Keep old writers/previews stopped; retaining additive tables is insufficient. |
+| Tasks 15–18 | Quota/preparation and canonical raw-session analytics | Older provenance writers can erase known calculation provenance; old persisted-derived readers cannot observe Task 20 generations. Exclude them from a current release. |
+| Task 19 | Adds explicit provenance; read-only preview | Preview remains read-only. Application persisted-estimate/daily readers are incompatible after Task 20 generation activation. |
+| Task 20 | Generation-pinned article estimate and exported daily helpers; raw-session analytics stay canonical | Requires full Task 20 chain. Its SQL triggers preserve active/previous generations during cooperating ingestion. Does not have Task 21's truthful status UI; not a normal operational rollback when that status is required. |
+| Task 21 reviewed final code / Task 22 / Task 23 | Full chain through Task 21; opaque DB sessions; quota/fencing/pages/continuation; generation-aware derived reads and truthful status | Candidate compatible family. Select a reviewed SHA with passing checks and matching configuration. Task 22 changes presentation; Task 23 changes no runtime behavior. |
+
+Overview, Activity, Reports, Metrics/rankings and annual views calculate reading
+values from raw sessions. `getArticleDetail` pins generation estimates;
+`getDashboardSummary`/`getReadingTrend` use selected daily generations (the latter
+helpers are not currently dashboard route readers). Raw SQL/table exports of old
+derived columns do not reflect cutover. See the complete
+[Task 20 reader/writer inventory](task-20-operator-guide.md#contract-and-inventory).
+No older deployment is made compatible merely by leaving migrations installed.
+
+## Release order
+
+1. **Disable ingress before a compatibility boundary.** Pause cron delivery at the
+   hosting layer, restrict the cron endpoint and block manual Dashboard/Settings
+   recent-sync, library, history and recovery actions. Block old production/preview
+   URLs, local jobs, background executions, operator repair/import/SQL writers and
+   direct callers using the server role. Inventory actual deployed sources; no
+   application maintenance switch is added here. Disable access to repair tooling.
+2. **Drain or stop incompatible readers and writers**, including previews and
+   already-running functions. Verify executions have stopped. Waiting one 120-second
+   lease TTL does not drain older unfenced code. Prevent old deployments resuming.
+   For a frozen Task 20 run, inspect its durable state and use its fenced resume or
+   cancel procedure; do not clear the barrier by direct UPDATE.
+3. **Take the required backup** after quiescing all relevant writes. Record its identity,
+   exclusions and restore evidence using the Free-plan procedure below. Keep ingress
+   stopped until the recovery point and rollback choice are accepted.
+4. **Apply only outstanding migrations, in timestamp order.** Use the full directory,
+   not a historical shortened list. Verify the actual target before any approved
+   operation. With the pinned CLI, inspect `migration list --help`,
+   `migration list --linked`, and `db push --help`; review `db push --dry-run` before
+   an authorized `db push` against the deliberately linked target. No migration is
+   rewritten, down-migrated or skipped. The two `20260929` migrations precede login
+   code; Task 19 provenance precedes Task 20 generations, then Task 21 status.
+5. **Verify schema/security/preservation.** Compare migration history and exact table,
+   function and view inventory, RLS, PUBLIC/browser denial, intended service grants,
+   invoker/search paths (the limiter deliberately remains its reviewed definer), and
+   raw/progress/generation snapshots. Use read-only audit
+   `supabase/audit/stabilization-read-only.sql` and Security Advisor as authorized.
+   Run valid allowance/denial/concurrency probes on an isolated representative target,
+   never mutate personal production rows as a permission test. Unexpected objects,
+   missing RPCs or failed reads are blockers, not permission-denial evidence.
+6. **Configure server-only values** for the compatible application and redeploy only
+   after target checks. Release the reviewed compatible code with ingress still
+   stopped. Verify old readers/writers remain inaccessible. No repair begins merely
+   because its migration is installed.
+7. **Controlled verification**: record deployed SHA, schema/configuration/toolchain,
+   login failure/success/outage, logout/replay, private page and server action guards,
+   missing/wrong Bearer cron rejection, ordinary queries and truthful status. Task 24
+   owns staging end-to-end verification; this checklist does not mark it complete.
+   Real sync/repair/cutover needs its own authorization and bounded plan.
+8. **Resume only permitted triggers** when all compatibility and release gates pass.
+   Preserve `0 6 * * *` **UTC**, `GET /api/cron/sync-recent-activity`, exact
+   `Authorization: Bearer <CRON_SECRET>`; no query secret. Observe two real scheduled
+   cycles separately. A page-budget stop is partial work with durable continuation;
+   do not reset it or label it verified historical coverage.
+
+## Server configuration
+
+| Name | Contract |
+| --- | --- |
+| `APP_ACCESS_PASSWORD` | Server login secret; pair an authorized change with incrementing `APP_CREDENTIAL_VERSION`. |
+| `APP_CREDENTIAL_VERSION` | Positive integer, initially `1`; invalidates older database sessions on increment. Never decrease to revive sessions. |
+| `APP_TIMEZONE` | Valid IANA zone, default `Europe/Athens`; generation timezone must match. Changing it requires explicit compatible recomputation planning. |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Server-only target/key; no browser client or public copy. |
+| `MATTER_API_TOKEN`, `CRON_SECRET` | Server-only Matter and exact Bearer cron credentials. |
+| `MATTER_SYNC_ITEMS_LIMIT`, `MATTER_SYNC_SESSIONS_LIMIT` | Strict integer 1–100, default 25; active request contracts retain their pinned limits. |
+| `MATTER_SYNC_STALE_HOURS` | Optional positive elapsed hours, default 36; warning at `>=` threshold. |
+
+Dedicated preview/repair libpq services are separate operator configuration; they
+never fall back to application credentials. Consult [Task 19 preview](task-19-preview.md)
+and [Task 20 operator commands](task-20-operator-guide.md#isolated-operator-commands).
+The repair executable currently permits **isolated synthetic targets only**. Do not
+remove that refusal or relabel a production service as isolated.
+
+## Free-plan backup and restore
+
+Supabase's current [backup guidance](https://supabase.com/docs/guides/platform/backups)
+recommends CLI exports and off-site storage for Free projects. Do not assume paid
+retained backups or PITR exist. Its [manual logical restore guide](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore)
+uses schema, data and role dumps, with migration history exported separately.
+CLI schema-only output is not a data backup. Managed Auth/Storage/extension schemas
+have special exclusions/customization handling, and Storage object bytes are not
+in a database dump. Project/Vercel environment configuration, API credentials,
+custom role passwords and encryption root keys are separate recovery materials.
+Vault/pgsodium use requires a separately approved key-recovery plan; dumps alone
+cannot restore decryptability. None is established by this repository.
+
+For this application, all app tables/RPCs/triggers, opaque-session hashes,
+limiter history, raw reading/library data, provenance, generations/captures,
+checkpoints, leases, quota/retry caches, receipts and status evidence live in
+`public`. Preserve `supabase_migrations` alongside it. The bounded rehearsal below
+covers **these two schemas**, including ACLs/RLS/functions/triggers/sequence state;
+it is not a full Supabase platform clone. Before release, inspect the actual target
+for other schemas, custom roles/extensions, managed-schema changes or Storage use.
+If present, extend the privately reviewed backup scope and rehearsal first.
+
+A separately authorized operator can use the pinned CLI's project-role-aware
+exports below. CLI **2.48.3** filters managed-role defaults and emits compatible
+schema creation commands; unfiltered PostgreSQL clean/ownership commands are not
+this procedure. Verify the actual source server major and the CLI dump image/client
+major first. Use direct/session connections with verified TLS; transaction poolers
+are unsuitable. The separate `psql` restore uses dedicated libpq service/password
+files **outside the checkout**, owner-readable only.
+
+Prepare a private CLI workdir outside the repository, deliberately linked to the
+approved source using the pinned `init`/`link` commands. Review its target identity
+before every export. Supply `SUPABASE_DB_PASSWORD` through a private credential
+manager or hidden CLI prompt, never a connection URL or command-line password.
+No source linking or hosted backup was performed for Task 23. The current app owns
+only `public`; stop and review scope if the actual source has other custom schemas.
+
+```sh
+# PRIVATE_BACKUP_PROJECT is the reviewed, privately linked CLI workdir.
+# BACKUP_DIR and RESTORE_PREFLIGHT are new paths in private encrypted storage.
+umask 077
+supabase --version                 # must report 2.48.3
+psql --version
+supabase --workdir "$PRIVATE_BACKUP_PROJECT" db dump --linked \
+  --keep-comments --file "$BACKUP_DIR/schema.sql"
+supabase --workdir "$PRIVATE_BACKUP_PROJECT" db dump --linked \
+  --schema supabase_migrations --keep-comments --file "$BACKUP_DIR/history-schema.sql"
+supabase --workdir "$PRIVATE_BACKUP_PROJECT" db dump --linked \
+  --schema public,supabase_migrations --data-only --use-copy --file "$BACKUP_DIR/data.sql"
+sha256sum "$BACKUP_DIR/schema.sql" "$BACKUP_DIR/history-schema.sql" \
+  "$BACKUP_DIR/data.sql" > "$BACKUP_DIR/checksums.sha256"
+# Generate the reviewed new-target guard/default-grant preparation, no connection:
+node --input-type=module -e 'import {restoreTargetPreparationSql} from "./scripts/disposable-restore.mjs"; process.stdout.write(restoreTargetPreparationSql)' > "$RESTORE_PREFLIGHT"
+# isolated_restore must be a NEW, dedicated Supabase destination, never the source.
+psql -X --dbname='service=isolated_restore' --single-transaction \
+  --variable ON_ERROR_STOP=1 --file="$RESTORE_PREFLIGHT" \
+  --file="$BACKUP_DIR/schema.sql" --file="$BACKUP_DIR/history-schema.sql" \
+  --file="$BACKUP_DIR/data.sql" --command "NOTIFY pgrst, 'reload schema';"
+```
+
+The destination guard refuses app-owned public objects or migration objects. Do not
+apply app migrations or initialize migration history in that new destination first.
+It retains the platform's `public` schema and limits the restoring role's default
+grants before creating app objects. Source ACLs, RLS and function properties must
+then pass the catalog and real Data API controls. The rehearsal proves the guard
+rejects its populated source. Never use preparation/restoration on the source/live
+database. Retain ACLs; never omit them merely to make restoration succeed.
+
+The native data export establishes `session_replication_role=replica` immediately
+before loading data and resets session settings afterward. This offline restore
+transaction prevents source-maintenance triggers from double-applying generations.
+Normal release/rollback never bypasses these triggers. No RLS policy is disabled.
+
+Quiesce writes for the whole export and record a consistent recovery point. These
+separate exports require a quiescent source throughout; export externally used custom
+roles/configuration separately, without managed-role password/ownership conflicts.
+The repository uses standard Supabase roles; no new custom login is created here.
+The alternative official CLI commands `db dump --role-only`, default schema dump,
+`db dump --data-only --use-copy`, and explicit `--schema supabase_migrations` exports
+are supported by **2.48.3 --help**, but require separate reviewed scope/restore
+handling for managed schemas. Do not paste current-doc flags unavailable in the pin.
+
+Store backups encrypted off-site with restricted access, retention and integrity
+checks. Keep credentials and any encryption keys separately protected; treat
+session hashes, cached responses and source identifiers as private data. Never
+commit/upload backups, dumps, service/password files, `.env` or raw logs as CI evidence.
+Record only backup identity/checksum/size/time/scope and sanitized validation.
+
+Restore verification must compare **all columns/row counts** for every app table,
+raw IDs, durations, UTC timestamps, relationships, provenance and derived generation
+state, as well as checkpoints, lease/cycle generations, quota/backoff/retry state,
+receipts and status evidence. Verify migration history/catalog/RLS/ACL/search paths,
+service allowance, anon/authenticated denial with valid fixtures, then compatible
+application reads. Check pending/frozen work and restore-era leases before any
+resumption; recovering an older generation can invalidate later fences. Keep **all**
+pre-recovery workers dead, not just expired. Document the recovery-point data loss.
+
+### Bounded synthetic rehearsal
 
 ```sh
 npm ci
-npx --no-install next typegen
-npm run typecheck
-npm run lint
-npm run test
-npm run build
-npm run audit:ci
+DISPOSABLE_DB_ACK=yes npm run test:stabilization-db
 ```
 
-Pull requests also run **Fresh and upgrade database verification** on a
-GitHub-hosted Ubuntu runner with Docker. This job checks out the exact PR head,
-uses Node.js 22 and `npm ci`, and executes `DISPOSABLE_DB_ACK=yes npm run test`.
-That explicit acknowledgement adds the existing pinned Supabase CLI 2.48.3
-fresh/upgrade runner after the unit suite; ordinary `npm run test` stays
-database-free. Only runner-owned temporary local stacks and synthetic fixtures
-are permitted, with no application secrets or external database connections.
-Failed or blocked verification fails the job. JSON evidence, including the
-known-field CI outcome, is retained from `artifacts/stabilization-db/` even on
-failure. The existing `test:stabilization-db` entry point remains available.
+After fresh schema/catalog setup, the existing runner seeds a small synthetic
+raw/progress fixture before the longer integration suites and exercises the existing bounded Task 20 generation engine.
+It captures the native CLI schema, migration-history schema and scoped data exports
+from its fresh stack in memory, restores
+into a third, separately owned local **Supabase** stack, compares every app table,
+checks the catalog and reuses the real Auth/Data API permission assertions for every
+restored table plus generation/retry read controls. Full CRUD and limiter concurrency
+checks already ran on both fresh/upgrade sources.
+The restore stack is removed before starting upgrade. Only the owned synthetic
+fresh source is then reset through the existing full migration path before all
+original fresh/upgrade integration suites run. The rehearsal
+uses the pinned CLI's native local export and the matching target psql; neither dumps nor generated
+keys are retained. Snapshot equality precedes any security-fixture mutations.
+This is separate from Task 24's UI flow. Only a completed `backup-restore.json`
+and verified cleanup establish a successful rehearsal. Synthetic success does
+**not** establish that production has a backup, or that a production restore works.
 
-The audit command retains the unmodified full and production JSON reports in
-`audit-results/`. Production must have zero findings. The full graph permits
-only `GHSA-vfj7-8cjw-p6xm` and package entries whose `via` chains resolve
-exclusively to that advisory; it does not waive a package or severity class.
-Reports must contain non-negative, internally consistent severity counters and
-complete vulnerability/advisory/remediation records. Explicit npm errors,
-malformed or incomplete responses, audit transport failures, unresolved or
-cyclic `via` chains, any other advisory, and any production occurrence fail the
-gate. Low and moderate counts are always printed explicitly.
+## Rollback decision and sequence
 
-The exception is limited to development/build glob processing over static,
-repository-controlled patterns. Re-review it whenever the lockfile or
-Tailwind/ESLint dependency graph changes, and remove it as soon as `braces` or
-an upstream dependency publishes a supported fix. A published fix must not be
-left silently excepted. The gate therefore fails with an actionable message
-when npm reports a non-major compatible remediation. A proposal explicitly
-marked by npm as a semver-major migration (including the currently suggested
-`eslint-config-next` downgrade) does not by itself end the exception; malformed
-remediation metadata fails closed and requires review.
+| Recovery | Trigger and prerequisites | Sequence and verification |
+| --- | --- | --- |
+| Compatible application rollback | Application regression; exact reviewed Task 21/22 recovery SHA passes required checks, current schema/generation/auth/environment compatible | Disable all affected ingress, drain/stop current and old instances, record progress/status, restore compatible application code/configuration, verify auth/replay, reads, status and server-role access, then selectively resume. Keep every installed migration and all durable state. |
+| Task 20 derived-generation rollback | Faulty active derived result; maintained immediate predecessor exists; no outstanding repair/barrier; current owner/fence and expected active/epoch reviewed; backup/restore evidence retained | Stop affected readers/writers, inspect status and reconcile prerequisites. Use the existing fenced `repair_transition(..., p_rollback=true)` mechanism via the isolated operator workflow only; production execution remains a separately gated workflow. Verify pointer/epoch, generation-aware readers and preserved raw/progress/status evidence before resuming. Never select a retired/unmaintained generation by direct UPDATE. |
+| Database recovery from backup | Migration/data corruption prevents safe roll-forward; authorized recovery point, verified backup identity/scope and isolated restore exist | Stop **all** readers/writers/previews/jobs; preserve incident evidence and any newer recoverable data. Restore to a separate target, verify schema/security/all raw/progress invariants and compatible application reads, approve documented lost writes and configuration/target switch, release compatible code, then resume permitted triggers. Keep the original target isolated for investigation. |
 
-## W2 dependency baseline update (completed 2026-10-03)
+Task 20 rollback is a **reconciled** rollback: untouched captured session estimates
+restore exactly; subsequent ingestion is retained canonically in the maintained
+pair. After session mutations, baseline reading dates are conservatively canonical,
+not a promise to reactivate stale daily totals. Original captures remain immutable;
+unrelated daily metadata and raw sessions are preserved. See
+[the exact mechanism and limits](task-20-operator-guide.md#cutover-and-rollback).
+Never delete progress, reset a cursor/lease/quota/history generation, clear receipts,
+drop additive tables, disable RLS or restore deterministic cookies as routine rollback.
 
-**Status: complete for applicable critical/high findings.** The registry and
-audit service were reachable. Next.js and `eslint-config-next` remain on the
-reviewed 15.5.27 line. npm regenerated the lock after applying the smallest
-compatible fixes available in the existing major lines. The manifest enforces
-Node.js 20.9.0 or newer because patched sharp 0.35.x requires that runtime.
+[Vercel Instant Rollback](https://vercel.com/docs/instant-rollback) reassigns an
+eligible previous production deployment; it does **not** undo database migrations,
+raw data or derived cutover. It reuses the old build/environment values, not current
+project-setting edits; cron configuration also reverts with the deployment. Hobby
+eligibility is limited to the immediately previous deployment. Verify its exact
+SHA, configuration/auth version, compatible schema and `0 6 * * *` UTC schedule
+before choosing it. Vercel [rollback behavior](https://vercel.com/docs/cli/rollback)
+turns off automatic production-domain assignment until promotion resumes it;
+confirm the actual dashboard state. A rollback does not drain already-running
+functions or protect old deployment URLs. No Vercel CLI is pinned in this repo;
+use a separately reviewed operator tool version/dashboard, not an unverified CLI
+command copied from old notes.
 
-The PostCSS override is intentionally scoped to the package name and references
-the root `postcss` spec (`$postcss`). This replaces Next.js's exact vulnerable
-8.4.31 transitive pin with the same PostCSS 8 API used by the root build tool.
-The sharp override selects 0.35.4, which Next.js 15.5.27 explicitly permits via
-`^0.34.3 || ^0.35.4`. Both overrides were resolved by npm; no lockfile integrity
-value was written manually.
+## Isolated CI and evidence contract
 
-### Advisory disposition
+CI keeps existing action SHAs and Supabase CLI 2.48.3. It uses only runner-owned
+local Docker/Supabase and synthetic data, no hosted/application/Matter credentials.
+`contents: read`, checkout `persist-credentials: false`, no `pull_request_target`.
+Ordinary `npm run test` stays database-free; the database job runs
+`test:stabilization-db` once, compiling integration prerequisites without repeating
+the application tests. Explicit acknowledgement and dedicated `STABILIZATION_TEST_*`
+variables remain required. Child environments strip application secrets and
+unintended database targets; Data API security checks refuse non-loopback URLs.
 
-| Identifier(s) | Dependency path and versions | Affected / patched | Application use and exploit prerequisite | Resolution |
-| --- | --- | --- | --- | --- |
-| [GHSA-f88m-g3jw-g9cj](https://github.com/advisories/GHSA-f88m-g3jw-g9cj), [GHSA-rgj7-g3m4-5g8c](https://github.com/advisories/GHSA-rgj7-g3m4-5g8c) | `next > sharp`, 0.34.5 → 0.35.4 | `<0.35.0` / `0.35.0`; `<0.35.4` / `0.35.4` | Next.js image optimization can decode external image bytes. Exploitation requires a crafted image reaching a vulnerable libvips/libheif decoder; therefore this is runtime-applicable even though sharp is optional. | Fixed at 0.35.4. A native smoke test decodes and resizes a generated PNG. Node `>=20.9.0` is now enforced. |
-| [GHSA-qx2v-qp2m-jg93](https://github.com/advisories/GHSA-qx2v-qp2m-jg93), [GHSA-6g55-p6wh-862q](https://github.com/advisories/GHSA-6g55-p6wh-862q), [GHSA-fxqj-rqcc-2cmp](https://github.com/advisories/GHSA-fxqj-rqcc-2cmp), [GHSA-r28c-9q8g-f849](https://github.com/advisories/GHSA-r28c-9q8g-f849) | `next > postcss` 8.4.31 and root/Tailwind PostCSS 8.5.14 → one overridden 8.5.23 | `<8.5.10` / `8.5.10`; `<=8.5.11` / `8.5.12`; `<=8.5.22` / `8.5.23`; `<=8.5.17` / `8.5.18` | CSS serialization XSS requires unsafe output insertion; file disclosure issues require attacker-controlled CSS/source-map comments during compilation. Application styles are repository-controlled, but the package is used by the production build and was treated as applicable. | Fixed at 8.5.23 across every locked path. The production build and a direct Tailwind compilation validate the override. |
-| [GHSA-28wg-ghj8-5hjv](https://github.com/advisories/GHSA-28wg-ghj8-5hjv), [GHSA-2v37-7h3g-55p8](https://github.com/advisories/GHSA-2v37-7h3g-55p8) | `postcss > nanoid`, 3.3.12 → 3.3.19 | `<3.3.16` / `3.3.16`; `<3.3.18` / `3.3.18` | A denial of service requires passing attacker-controlled negative or zero sizes to Nano ID's non-secure/custom generator. The application does not call Nano ID; PostCSS uses it internally while generating source-map identifiers. | Fixed at 3.3.19 within major 3. |
-| [GHSA-h67p-54hq-rp68](https://github.com/advisories/GHSA-h67p-54hq-rp68), [GHSA-52cp-r559-cp3m](https://github.com/advisories/GHSA-52cp-r559-cp3m), [GHSA-5p4m-2wfm-xmqj](https://github.com/advisories/GHSA-5p4m-2wfm-xmqj), [GHSA-2883-xcg3-v3hh](https://github.com/advisories/GHSA-2883-xcg3-v3hh) | `@eslint/eslintrc > js-yaml`, 4.1.1 → 4.3.2 | `<=4.1.1` / `4.2.0`; `<4.3.0` / `4.3.0`; `<4.3.1` / `4.3.1`; `<4.3.2` / `4.3.2` | CPU denial of service requires parsing malicious YAML aliases, merge chains, or `!!omap` input. ESLint is build-only and this repository's flat config does not parse user-provided YAML. | Fixed at 4.3.2 within major 4. |
-| [GHSA-3jxr-9vmj-r5cp](https://github.com/advisories/GHSA-3jxr-9vmj-r5cp), [GHSA-mh99-v99m-4gvg](https://github.com/advisories/GHSA-mh99-v99m-4gvg), [GHSA-rgw5-rvv9-x895](https://github.com/advisories/GHSA-rgw5-rvv9-x895), [GHSA-q2hr-2g5m-vwhr](https://github.com/advisories/GHSA-q2hr-2g5m-vwhr), [GHSA-qhr7-859c-m2p7](https://github.com/advisories/GHSA-qhr7-859c-m2p7), [GHSA-6j4f-fj2g-mc7p](https://github.com/advisories/GHSA-6j4f-fj2g-mc7p) | `@eslint/eslintrc > minimatch > brace-expansion` 1.1.14 → 1.1.21; `@typescript-eslint/typescript-estree > minimatch > brace-expansion` 5.0.6 → 5.0.12 | npm's audited ranges end at 1.1.20 and 5.0.11; fixed by 1.1.21 and 5.0.12 | Resource exhaustion requires malicious brace patterns. These paths process repository-controlled lint file patterns, not request data. | Fixed on both locked major lines. |
-| [GHSA-w9m9-85wc-3x92](https://github.com/advisories/GHSA-w9m9-85wc-3x92) | `tailwindcss > postcss-selector-parser`, 6.1.2 → 6.1.4 | `>=6.1.0 <6.1.3` / `6.1.3` | Stack exhaustion requires a malicious deeply nested CSS selector during compilation. Styles are repository-controlled, but CSS compilation is a required build path. | Fixed at 6.1.4 within major 6. |
-| [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) | `tailwindcss > chokidar/fast-glob/micromatch > braces`, 3.0.3 | `<=3.0.3`; no patched release exists | Stack exhaustion requires an attacker to supply a deeply nested brace glob. The only Tailwind content globs are three static literals in `tailwind.config.ts`; ESLint likewise uses static repository configuration. No request, Matter, database, or other user-controlled value reaches these build-only glob APIs. | Residual audit finding accepted as **not application-exploitable** pending an upstream patched `braces` release. It is absent from `npm audit --omit=dev`; replacing it currently requires an unsupported/unavailable package change, so no forced downgrade or major upgrade was applied. |
+Fresh runs all migrations. Upgrade begins at **20260519090000** and retains the
+existing intermediate Task 11–15/19–21 preservation comparisons. The same security,
+login concurrency, leases, atomic pages/rollups, canonical word boundaries,
+continuation, quotas, preview, repair/generation rollback and status suites run on
+both. Catalog discovery rejects any non-extension public app relation/view or
+function outside explicit coverage. There are currently **no app views**.
+Service-role TRUNCATE is rejected for all protected additive state, including
+Task 20 generation/capture tables; legacy ALL-grant tables retain their contract. Real
+negative controls add a table/view/function overload inside rollback-only SQL
+transactions and require the exact uncovered-object failure; a temporary service-role
+TRUNCATE grant must also fail the same catalog check. Valid operation
+controls and object-specific `42501` denials remain mandatory; malformed payloads,
+missing RPCs, transport or unrelated SQL errors never count as successful denials.
 
-### Final verification
+`artifacts/stabilization-db/<actual-tested-sha>/` retains sanitized JSON only:
+identity/event/head/event-merge-or-main SHA, dirty-worktree flag, workflow run and
+attempt, actual tool versions, migration inventories, per-phase outcomes and
+suite reports, backup/restore and owned cleanup. Phase counts are **groups**, not
+individual assertions. Passed, failed, skipped, TODO, blocked and not-run are
+separate; an interrupted phase stays `running` and cleanup stays pending/unverified.
+Known infrastructure categories (image pull, disk, timeout, transport) remain
+separate from assertion/suite failures. No automatic fallback or unlimited retry.
+Artifacts are retained for 14 days; inspect/download before expiration. Never add
+raw logs, dumps, generated environments or credentials to the upload allowlist.
 
-- `npm ci`: exit 0; 505 packages installed from the lock.
-- `npm audit --json`: exit 1; 8 high entries, all propagation from the single
-  unpatched build-only `braces` advisory described above.
-- `npm audit --omit=dev --json`: exit 0; 0 vulnerabilities.
-- `npm run typecheck`, `npm run lint`, and `npm run build`: exit 0.
-- `npm run test`: exit 0; 105 total, 98 passed, 0 failed, and 7 pre-existing
-  stabilization TODO tests.
-- Direct sharp PNG decode/resize and direct Tailwind CSS compilation: exit 0.
-- `git diff --check`: exit 0.
+## Historical evidence and remaining external gates
 
-There are no unresolved applicable critical/high findings. The only remaining
-high advisory has no patched release and is isolated to development/build glob
-processing with static, repository-controlled patterns. Re-run both audits when
-`braces` publishes a fix or Tailwind's dependency graph changes.
+Historical results retain their original SHA/date in
+[dependency baseline](history/dependency-baseline-2026-10-03.md),
+[Task 19 validation](task-19-validation.md), [Task 20 validation](task-20-validation.md),
+[Task 21 validation](task-21-validation.md) and [Task 22 QA](task-22-qa.md).
+Task 23's [requirements and actual validation](task-23-validation.md) supersedes old
+release commands; earlier evidence does not certify a new candidate.
 
-## Task 13 sharp advisory follow-up
+Still separate: review/merge approval and final-head required checks; **Task 24
+staging end-to-end verification**; actual production migration/configuration/runtime
+and backup/restore checks; a separately authorized production preview/repair/cutover
+workflow with invalid-data policy and explicit expected epoch/generation approval;
+and **two real scheduled cycles** demonstrating delivery/continuation. Existing
+partial sync may continue under its durable mechanism when authorized. Historical
+Matter coverage and unsupported item attribution remain unverified. Do not reset
+partial state or equate successful imports, reconciled stored data or Git integration
+statuses with verified complete history or production readiness.
 
-Task 13's 2026-10-07 dependency follow-up updates the current sharp override to
-0.35.5 to fix [GHSA-wq5f-xc86-pv6w](https://github.com/advisories/GHSA-wq5f-xc86-pv6w).
-The W2 version/results above are historical. Next.js remains 15.5.27; the existing
-Tailwind selector override and audit policy are unchanged, with no new advisory
-exceptions. npm regenerated the sharp/platform/libvips lock entries, a native
-PNG decode/resize smoke check passed, and production audit reports zero findings.
-See [task-13-validation.md](task-13-validation.md) for actual tested SHAs, full
-CI/disposable results, gateway investigation and cleanup evidence.
+Schema restore explicitly requests a [PostgREST schema cache reload](https://supabase.com/docs/guides/troubleshooting/refresh-postgrest-schema); missing RPCs after restore remain failures.
 
-## Required configuration
-
-- Existing: `APP_ACCESS_PASSWORD`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `MATTER_API_TOKEN`, `CRON_SECRET`.
-- New: `APP_CREDENTIAL_VERSION=1`. Increment it to revoke every existing app session after an access-password rotation. This does not rotate the Matter token.
-- `x-forwarded-for`'s first address is the limiter key because Vercel supplies that boundary. On another proxy, normalize/overwrite it at the trusted edge. Five failed attempts per key in 15 minutes are permitted; state is shared in Supabase. Unknown/missing addresses share the `unknown` bucket.
-
-## Pre-deploy on an isolated Supabase project
-
-1. Prepare both migration paths. For a fresh environment, apply the full migration chain in timestamp order. For an upgrade environment, restore/synthesize the previous schema and apply every outstanding migration in timestamp order. In both cases the required release sequence is `20260929000000_harden_rls_and_auth.sql`, then `20260929010000_atomic_login_limiter.sql`, then application deployment.
-2. From an unlinked checkout with Docker available, set only `DISPOSABLE_DB_ACK=yes` and run `npm run test:stabilization-db`. This is the complete Task 05 entry point; `test:security-db` remains an internal Data API suite invoked by the runner, not a substitute for fresh/upgrade verification. The runner pins Supabase CLI 2.48.3 and creates two uniquely named projects under an OS temporary directory, with separate non-conflicting local ports. It sanitizes child environments, refuses non-temporary cleanup targets, never links a project, and stops only the two project IDs it created. Do not supply the application's normal Supabase or Matter variables and never point this command at a linked, shared, staging, or production project.
-
-   The fresh path applies the complete repository migration chain. The upgrade
-   path first applies migrations through `20260519090000`, inserts synthetic
-   legacy items, sessions, tags, relationships, annotations, daily statistics,
-   sync-run data, and the `sync_state` singleton, then applies every outstanding
-   migration in place. A deterministically ordered before/after JSON snapshot
-   captures every stored column in all eight legacy tables and must preserve
-   identifiers, relationships, values, row counts, total reading duration, and
-   singleton state exactly. Only after that comparison, the runner verifies the
-   singleton's run-specific ownership marker, removes it by key and marker, and
-   confirms absence so the collision-refusing Data API suite can safely run.
-   Unexpected ownership, failed removal, or failed absence verification stops
-   the path without deleting an unrelated singleton. Both paths run the same
-   catalog and real Data API checks.
-
-   Catalog verification invokes container `psql` with startup files disabled,
-   `ON_ERROR_STOP=1`, quiet tuples-only output, and exact comparison of the
-   database's complete ordered migration history with the repository. It checks
-   RLS, exact function signatures and inherited execution, browser-role CRUD
-   absence (including effective SELECT, INSERT, and UPDATE column grants), and
-   service-role SELECT, INSERT, UPDATE, and DELETE individually.
-   Sanitized evidence under `artifacts/stabilization-db/<tested-sha>/` records
-   tooling, migration histories, verification results, and cleanup status. This
-   directory is ignored because evidence is execution-specific. If Docker is
-   unavailable, the runner writes `blocked.json`, exits nonzero, and does not
-   claim that mocked tests establish database behavior.
-
-   The suite creates one uniquely named, constraint-valid fixture for every
-   inventoried table in migration/foreign-key order. It uses the real composite
-   key for `item_tags`, `date` for `daily_stats`, `token_hash` for
-   `app_sessions`, `client_key_hash` for the keyless `app_login_attempts`, and
-   the only valid `sync_state` key, `matter`. Service-role controls must insert
-   and read every row, update an existing row and confirm the changed value,
-   then delete it and confirm absence. Anonymous and signed-in clients issue
-   equivalent valid operations against the seeded rows; their expected outcome
-   is PostgreSQL `insufficient_privilege` (`42501`) whose message identifies
-   `permission denied for table <expected table>`, not merely the shared
-   SQLSTATE. A successful empty RLS result, an RLS `WITH CHECK` violation, a
-   denial naming another table/schema, or an arbitrary error is not evidence
-   that the intended object grant was revoked. Schema-cache/missing-object,
-   payload, constraint, authentication, transport, and server errors fail the
-   run. Service-role readback confirms rejected writes changed nothing.
-
-   The limiter check gives both browser roles valid arguments and requires the
-   same `42501` response naming `permission denied for function
-   record_app_login_attempt`. Its service-role control must return `true` and
-   persist one matching attempt. Two independent 20-call groups must both settle
-   before results are reported or cleanup begins. Each group requires no rejected
-   request or RPC error, only boolean responses, exactly 5 `true` results, exactly
-   15 `false` results, and exactly 5 stored attempts. A `finally` cleanup removes RPC attempts,
-   fixtures in reverse foreign-key order, and the disposable Auth user. Cleanup
-   continues after individual failures and any cleanup failure fails the run;
-   every write is tracked before its request is awaited, so cleanup also
-   reconciles a row that committed before its response was lost. Selectors are
-   run-specific; the fixed-key `sync_state` fixture additionally stores a
-   run-specific ownership marker and is never deleted unless that marker is
-   read back. Uncertain ownership is reported as a cleanup failure rather than
-   risking deletion of unrelated data.
-
-   This distinction follows Supabase's documented Data API model: grants are
-   evaluated before RLS, a missing grant produces a permission error, and a
-   policy matching no rows can instead produce an empty result. PostgreSQL
-   assigns `42501` to the broader `insufficient_privilege` condition, while
-   PostgREST's documented table-grant response includes `permission denied for
-   table <name>`; the suite therefore verifies both the code and expected
-   object-specific message. See
-   [Securing your API](https://supabase.com/docs/guides/api/securing-your-api),
-   [Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security),
-   [PostgreSQL error codes](https://www.postgresql.org/docs/current/errcodes-appendix.html),
-   and the [PostgREST authorization tutorial](https://docs.postgrest.org/en/v11/tutorials/tut0.html).
-3. With the service-role key, create/read/revoke a disposable app session and exercise ordinary application queries. Delete the disposable project/data afterward.
-4. Run `supabase/audit/stabilization-read-only.sql`; retain sanitized table, policy, function-grant and view results. Run all application checks and inspect client chunks for secret values/names. Until both fresh and upgrade runs succeed, W1 is not release-ready.
-
-Do not replace the full entry point with a catalog-only check or a manually
-provisioned database. Both independently configured local stacks and the real
-Data API checks are required for valid Task 05 evidence.
-
-### Merge prerequisites
-
-W1 may merge only after sanitized evidence exists for both migration paths and
-the real Data API suite. W2 may merge only after official advisory review,
-successful `npm audit`, and the smallest supported patched lockfile update (or
-documented proof that the locked versions already satisfy every applicable
-advisory). W3 additionally requires the real 20-request concurrency assertion.
-Passing unit tests alone does not satisfy any of these external gates.
-
-## Controlled deployment (requires separate approval)
-
-With separate production authorization, backup/export affected schema/data and apply all outstanding migrations in timestamp order. Specifically, apply `20260929000000_harden_rls_and_auth.sql`, then `20260929010000_atomic_login_limiter.sql`; only after both succeed, add `APP_CREDENTIAL_VERSION` and deploy the reviewed application commit. Log migration and commit identifiers; sign in, access a dynamic/dotted article path, log out, confirm replay rejection, and test cron with missing/wrong/correct Bearer secret. Run the read-only audit and Supabase Security Advisor. Do not mutate personal production data merely to test RLS.
-
-Existing deterministic cookies become invalid, so one fresh login is expected. Raw reading/library data is unchanged. The new tables contain only hashes and timestamps.
-
-## Rollback
-
-Prefer rolling code forward. Code rollback requires restoring compatibility with the old cookie and should only happen after security review; do not disable RLS as a routine rollback. The additive auth tables may remain unused. Dropping them loses revocation/limiter history and is a separately approved destructive action. Restore from backup only if migration integrity fails.
-
-## Task 12 / E2 / W4 / R4 verification and release gate
-
-Ownership and the complete production mutation inventory are in
-[architecture.md](architecture.md#account-lease-and-fencing-task-12--e2--w4--r4).
-Rollout/rollback must follow [deployment.md](deployment.md#task-12-rollout-and-rollback-compatibility),
-including blocking and draining every old unfenced sync writer. Applying an
-additive lease migration alone does not protect against old table writes.
-
-The full `DISPOSABLE_DB_ACK=yes npm run test:stabilization-db` entry point now
-runs `tests/integration/matter-sync-lease.mjs` on both disposable fresh and upgrade
-stacks, after the existing security suite. It compiles and loads the production
-sync/import/enrichment/recalculation paths. Only Matter HTTP is synthetic; SQL,
-Data API grants, auth-role clients, RPC writes and concurrency are real. It uses
-only local orchestrator-generated URLs/keys and a validated, runner-owned Docker
-project ID, never application credentials or an arbitrary SQL host. Generation
-is never deleted/reset during fixtures or cleanup. All domain fixture collisions
-are rejected, stream seeds are recognized before modification, cleanup releases
-only owned generations, restores seeds under a new valid lease, removes only
-claimed synthetic rows and deletes its disposable Auth user. The entire stacks
-are ultimately stopped by the existing owner-scoped orchestrator.
-
-Required real assertions include:
-
-- 24 parallel Data API acquisitions and 12 parallel SQL transactions each admit
-  exactly one owner; 24 concurrent production manual/scheduled/library contenders
-  behind a paused request make no Matter calls or protected writes.
-- Valid renewal preserves generation; wrong owner/generation, expired renewal,
-  invalid/NULL TTL and stale release fail. Release/expiry recovery increments it.
-- After an application-level lease check, a deterministic SQL expiry fixture lets
-  B acquire a newer generation. Every production mutation RPC rejects A,
-  including item-tag deletion, rollups, both streams, retry state and successful
-  completion, with unchanged database snapshots.
-- A real protected RPC transaction retains the lease row lock through commit;
-  the SQL barrier confirms takeover waits using `pg_stat_activity`, then the old
-  generation cannot write. No Matter request occurs while that fixture holds a
-  SQL transaction.
-- Delayed Matter success and 429 responses after takeover cannot import results,
-  advance state, overwrite cooldown or complete/release the successor's lease.
-  Cancellation runs compare-and-release; crashed fixtures recover via expiry.
-- Both browser roles receive exact `42501` object-specific grant denials for the
-  lease table and all 14 function signatures (including helpers). Real service
-  controls execute each operation. Invalid payload, missing-function/cache,
-  auth and transport errors fail verification; they are never counted as grant
-  denial. Service-role DELETE on the durable lease is deliberately denied.
-- Upgrade first applies Task 11, stores synthetic active contracts with nonzero
-  generations, cursors, watermarks and cooldowns, then applies Task 12 and checks
-  every stream column remains identical. Existing legacy-domain preservation and
-  the Task 11 resume/window/cooldown regressions remain required.
-
-The catalog inventories RLS, effective browser table/column privileges, PUBLIC
-ACLs, service SELECT/UPDATE with no lease INSERT/DELETE/TRUNCATE, exact RPC/helper
-signatures, invoker execution and empty search paths. The read-only audit also
-includes the stream and lease inventories. The table's direct UPDATE permission
-is trusted administrative/service access; production sync writes use the fixed
-RPCs. No SECURITY DEFINER privilege escalation or arbitrary mutation API exists.
-
-Run `npm ci`, route type generation, typecheck, lint, tests, build, audit:ci and
-`git diff --check`. Run both real disposable paths before declaring R4 database
-verification passed or enabling sync in a release. If Docker/CLI/subprocess
-prerequisites are unavailable, record **BLOCKED** with the exact failing layer;
-unit tests and SQL inspection do not substitute for execution evidence. This
-Task 12 implementation adds no full-page commit guarantee (Task 13), continuation,
-backfill/shared quota (Tasks 14–15), production repair, deployment or merge.
-
-Official mechanisms reviewed for this change: [Supabase database functions](https://supabase.com/docs/guides/database/functions),
-[PostgreSQL row locks](https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS),
-[database wall-clock time](https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT),
-[function privileges](https://www.postgresql.org/docs/current/sql-createfunction.html),
-and [PostgREST request transactions](https://docs.postgrest.org/en/stable/references/transactions.html).
-The Supabase changelog index was unavailable; the official changelog page and the
-current functions/grants documentation were inspected instead.
-
-## Task 13 page/recovery verification
-
-The gate additionally runs `tests/integration/matter-page-commit.mjs` after the
-Task 12 concurrency/row-lock suite on both disposable stacks. Only Matter HTTP
-and lost/interrupted response transport are synthetic; the application imports,
-Data API, SQL transactions, rollup calculations and role denials are real.
-Postgres triggers that raise after row writes or at checkpoint/daily persistence
-exist only in runner-owned disposable databases and are dropped in finally.
-No production fault-injection route or delay-based concurrency assertion exists.
-
-`matter_page_receipts` and `matter_dirty_rollups`, plus all four new exact RPC/helper
-signatures, are catalog-inventoried for RLS, effective PUBLIC/browser denial,
-service grants, invoker security and empty search_path. Browser clients perform
-real object-specific 42501 reads/writes/execute checks; service controls verify
-CRUD and intended RPC operation. The upgrade path first verifies Task 12 preserves
-Task 11 state, then seeds an active Task 12 owner/generation/expiry and compares
-its full lease/stream snapshot across Task 13 migration. It releases only that
-synthetic owner and retains its generation for subsequent concurrency tests.
-
-Retain the tested SHA, complete migration histories, sanitized page/lease assertions
-and owned-stack cleanup in `artifacts/stabilization-db/<tested-sha>/results.json`.
-A failed or blocked path cannot establish release readiness. Consult
-[task-13-validation.md](task-13-validation.md) for actual checks and blockers, and
-[deployment.md](deployment.md#task-13-release-order-and-rollback) for stopping old
-writers/previews, migration-before-code order and checkpoint/marker-preserving
-rollback. No merge, deployment, production migration or personal-data mutation is
-authorized by these tests.
-
-## Task 14 continuation/history verification
-
-`matter_sync_continuation` is service-only, RLS enabled, with SELECT/UPDATE and no
-INSERT/DELETE/TRUNCATE for the service role. Its exact signatures (four lease-
-fenced RPCs and one completion trigger function) are inventoried in
-`scripts/matter-continuation-inventory.mjs`. All use SECURITY INVOKER, empty
-search_path and qualified relations. Direct administrative UPDATE is a trusted
-service boundary; application mutations use transactional account fencing. The
-completion trigger belongs to the enclosing already-fenced page transaction.
-
-The disposable fresh AND upgrade gate also executes the production multi-page
-runtime with synthetic Matter only: 5,000 minimal documented sessions across years
-and tied timestamps, an independent SQL raw-data reference, recreated worker
-processes, daily authenticated cron, pending library work, request/time interruption
-inside enrichment, expensive-page admission, terminal receipt replay, cooldowns
-and stale intent/start/scheduling/cooldown mutations. Real signed-in `authenticated`
-and `anon` clients must get exact object-specific 42501 denials for new table CRUD
-and every exposed RPC signature. The trigger-returning function is absent from
-PostgREST RPC discovery; its exact denial uses real SQL SET ROLE, with completion
-verified through the production page transaction. Invalid payload/cache/gateway errors never
-count as denials. Existing auth/cron, Task 12 barriers and Task 13 crash/rollup
-checks remain gates. The upgrade path additionally snapshots receipts and dirty
-revisions across Task 14, preserving prior stream/cooldown/lease/legacy state.
-The owned disposable Kong transport uses verified upstream keepalive pool size
-zero to avoid observed connection resets under the large fixture. Real gateway/
-Data API authentication and all SQL/RLS assertions remain required; failed HTTP
-responses still fail the gate. This setting is not applied to production.
-
-Retain exact tested SHA, results, complete migration histories and owned fixture/
-Auth/stack cleanup. Unavailable or failed execution is BLOCKED/FAILED, never passed.
-See [task-14-validation.md](task-14-validation.md). No production migration, sync,
-deployment, merge or personal-data operation is authorized by the test runner.
-
-## Task 15 shared quota/backoff release gate
-
-Task 15 adds `20261008095102_matter_shared_quota_retry_preparation.sql` after
-Tasks 12–14. Its two fixed server-only state tables enable RLS and grant service
-SELECT/UPDATE only; PUBLIC/anon/authenticated and service INSERT/DELETE/TRUNCATE
-are denied. Six invoker functions with empty search_path and the stream trigger
-are inventoried in `scripts/matter-request-inventory.mjs`. No raw Matter token is
-stored; the existing single-account scope covers bootstrap and all trigger/stream
-combinations. Preparation/cache/retry writes owned by sync assert Task 12 fencing.
-Account feedback may only tighten quota/cooldown, even after lease loss.
-
-Before an approved rollout, disable/drain all old writers/previews, back up, apply
-the additive migration before code, and require exact final-head fresh/upgrade
-catalog/Data API/browser denial/service control/concurrency/cleanup evidence.
-Deploy only compatible code, verify existing ingress limits and authentication,
-then re-enable the unchanged daily/manual triggers. Rollback repeats disable/drain
-and retains all quota/backoff/preparation/progress/receipts/dirty/generation state;
-older sync writers remain disabled. No destructive reset is a rollback procedure.
-See [Task 15 validation](task-15-validation.md) for current blocked/passed gates,
-exact retry policy and external consumers. This PR authorizes no production SQL,
-real sync, repair, token rotation, merge or deployment.
-
-## Task 19 provenance and preservation gate
-
-The additive columns inherit existing server-only RLS/table grants. Replaced RPC/helper signatures remain in the exact inventories with invoker/empty-search-path and explicit server execute ACLs. Both fresh/upgrade paths now run the historical preview suite, compare independent whole-database before/after fingerprints, exercise concurrent source changes and test writer metadata. Upgrade separately confirms legacy metadata stays NULL. No production read role or permissive policy is installed here; a dedicated SELECT-only server reader is an explicit later provisioning gate. See [Task 19 operator/security guide](task-19-preview.md) and [validation](task-19-validation.md).
-
-
-Task 20's [operator guide](task-20-operator-guide.md) adds seven RLS-protected server-only
-tables and fourteen exact-signature invoker functions with empty search paths, inventoried in
-`scripts/reading-generation-inventory.mjs`. Browser table/RPC denials and production-used
-page/rollup/read behavior join both full fresh and upgrade gates. No service-role TRUNCATE
-is granted; immutable capture allows SELECT/INSERT only and the singleton SELECT/UPDATE
-only. Privileged direct administrative writes remain a trusted boundary. Draining older
-reader/writer deployments, backup/export and tested isolated restore precede any separately
-authorized production run; Task 20 performs none of those production operations.
+Official sources checked 2026-10-20: Supabase [backups](https://supabase.com/docs/guides/platform/backups),
+[logical restore](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore),
+[CLI dump](https://supabase.com/docs/reference/cli/supabase-db-dump),
+[Data API security](https://supabase.com/docs/guides/api/securing-your-api);
+GitHub [event SHAs](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows),
+[checkout v4.2.2](https://github.com/actions/checkout/tree/v4.2.2);
+Vercel [Instant Rollback](https://vercel.com/docs/instant-rollback),
+[rollback](https://vercel.com/docs/cli/rollback). [Pinned CLI schema/data export filters](https://github.com/supabase/cli/tree/v2.48.3/pkg/migration/scripts)
+were reviewed for project-role compatibility. PostgreSQL dump/restore behavior was also checked against the official
+[PostgreSQL 17 source](https://github.com/postgres/postgres/tree/REL_17_STABLE/src/bin/pg_dump).
+CLI flags were checked with the
+actual 2.48.3 `--help`; no pin, dependency or audit policy was upgraded.

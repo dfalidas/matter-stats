@@ -82,16 +82,16 @@ test("catalog SQL requires every service_role CRUD privilege individually", () =
     assert.match(sql, new RegExp(`lacks % on public\\.%`));
     assert.ok(sql.includes(privilege));
   }
-  assert.match(sql, /has_table_privilege\('anon'.*'SELECT,INSERT,UPDATE,DELETE'\)/);
+  assert.match(sql, /has_table_privilege\('anon'.*'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'\)/);
 });
 
 test("catalog SQL rejects effective browser table and column privileges for both roles", () => {
   const sql = catalogSql(["sample"]);
   assert.match(sql, /ARRAY\['anon', 'authenticated'\]/);
-  assert.match(sql, /ARRAY\['SELECT', 'INSERT', 'UPDATE'\]/);
+  assert.match(sql, /ARRAY\['SELECT', 'INSERT', 'UPDATE', 'REFERENCES'\]/);
   assert.match(sql, /has_any_column_privilege\(browser_role,.*privilege_name\)/);
-  assert.match(sql, /has_table_privilege\('anon'.*'SELECT,INSERT,UPDATE,DELETE'\)/);
-  assert.match(sql, /has_table_privilege\('authenticated'.*'SELECT,INSERT,UPDATE,DELETE'\)/);
+  assert.match(sql, /has_table_privilege\('anon'.*'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'\)/);
+  assert.match(sql, /has_table_privilege\('authenticated'.*'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'\)/);
 });
 
  test("Task 15 catalog inventories every quota/preparation object and singleton reset denial",()=>{
@@ -99,3 +99,25 @@ test("catalog SQL rejects effective browser table and column privileges for both
   for(const signature of REQUEST_FUNCTION_SIGNATURES)assert.ok(sql.includes(`public.${signature}`));
   assert.match(sql,/request state can be truncated/);
  });
+
+
+test("closed catalog inventory detects new tables, views and exact function overloads, excluding extension members", () => {
+  const sql = catalogSql();
+  assert.match(sql, /uncovered app relation\/view/);
+  assert.match(sql, /uncovered app function/);
+  assert.match(sql, /c.relkind IN \('r','p','v','m','f'\)/);
+  assert.match(sql, /d.deptype='e'/);
+  assert.match(sql, /p.oid=ANY/);
+  assert.match(sql, /invalid limiter definer\/owner\/search_path/);
+  assert.match(sql, /invalid legacy trigger security properties/);
+});
+
+
+test("catalog rejects service-role truncation of generations and other protected state, with a real SQL negative control", async () => {
+  const { GENERATION_TABLES } = await import("../scripts/reading-generation-inventory.mjs");
+  const { catalogCoverageProbesSql } = await import("../scripts/stabilization-db-runner.mjs");
+  const sql = catalogSql();
+  for (const table of GENERATION_TABLES) assert.ok(sql.includes(`'${table}'`));
+  assert.match(sql, /service_role can truncate protected state/);
+  assert.match(catalogCoverageProbesSql(), /grant truncate on public.reading_generations to service_role/);
+});
