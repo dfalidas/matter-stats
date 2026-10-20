@@ -67,6 +67,8 @@ const { DashboardOverview } = require(
 const { ReportsOverview } = require(
   path.join(root, "app/reports/reports-overview.js"),
 );
+const reportsPage = require(path.join(root, "app/reports/page.js")).default;
+const { formatReportCsv } = require(path.join(root, "lib/report-csv.js"));
 const { AppNavigation } = require(
   path.join(root, "app/_components/app-navigation.js"),
 );
@@ -113,6 +115,7 @@ test("report frequency conversions retain the selected calendar year and unrelat
   params = new URLSearchParams("period=yearly&date=2025&context=keep");
   const view = ReportsOverview({
     period: "yearly",
+    reference: "2025",
     reportsResult: { ok: false, message: "Unavailable" },
   });
   button(view, "Month").props.onClick();
@@ -340,5 +343,193 @@ test("Library search submits draft text, author and content type together withou
     assert.equal(next.searchParams.has("page"), false);
   } finally {
     stateOverrides = undefined;
+  }
+});
+
+// Exercise the real page validation, report service, calendar ranges and bounded
+// client payload with successful synthetic Data API responses, then UI handlers.
+const boundarySessions = [
+  ["previous", "2024-12-23T12:00:00Z", 60],
+  ["week-start", "2024-12-29T22:00:00Z", 1],
+  ["january", "2025-01-01T22:30:00Z", 600],
+  ["week-end", "2025-01-05T22:00:00Z", 120],
+  ["february", "2025-02-23T22:00:00Z", 61],
+  ["march", "2025-03-01T12:00:00Z", 1],
+  ["march-week-end", "2025-03-02T22:00:00Z", 120],
+  ["leap", "2024-02-29T12:00:00Z", 60],
+].map(([id, started_at, duration_seconds]) => ({
+  id,
+  started_at,
+  duration_seconds,
+  item_id: null,
+  ended_at: null,
+  words_estimated: 999999,
+  matter_items: null,
+}));
+async function reportView(query, unavailable = false) {
+  pathname = "/reports";
+  params = new URLSearchParams(query);
+  const search = {};
+  for (const key of new Set(params.keys())) {
+    const values = params.getAll(key);
+    search[key] = values.length === 1 ? values[0] : values;
+  }
+  client = cappedPostgrest(
+    { reading_sessions: boundarySessions },
+    unavailable
+      ? {
+          respond: ({ table }) =>
+            table === "reading_sessions"
+              ? Response.json({ message: "synthetic outage" }, { status: 500 })
+              : undefined,
+        }
+      : {},
+  ).client;
+  const page = await reportsPage({ searchParams: Promise.resolve(search) });
+  const props = all(page, (node) => node.type === ReportsOverview)[0].props;
+  assert.equal(props.reportsResult.ok, !unavailable);
+  return { view: ReportsOverview(props), ...props };
+}
+const referenceInput = (view) =>
+  all(view, (n) => n.props?.name === "reference")[0];
+const recap = (view) =>
+  all(view, (n) => n.props?.href?.startsWith("/year-in-reading?"))[0];
+function followReport(view, label) {
+  button(view, label).props.onClick();
+  return new URL(pushed, "https://synthetic.invalid").search.slice(1);
+}
+function textContent(node) {
+  if (Array.isArray(node)) return node.map(textContent).join("");
+  return node && typeof node === "object"
+    ? textContent(node.props?.children)
+    : String(node ?? "");
+}
+test("successful year to week to year retains calendar selection and recap while weekly ranges, comparisons and CSV stay canonical", async () => {
+  const annual = await reportView(
+    "period=yearly&date=2025&context=keep&context=again",
+  );
+  const weekly = await reportView(followReport(annual.view, "Week"));
+  assert.equal(referenceInput(weekly.view).props.defaultValue, "2025-01-01");
+  assert.equal(recap(weekly.view).props.href, "/year-in-reading?year=2025");
+  const m = weekly.reportsResult.report.metrics;
+  assert.equal(m.range.startDate, "2024-12-30");
+  assert.equal(m.range.endDate, "2025-01-06");
+  assert.equal(m.range.start.toISOString(), "2024-12-29T22:00:00.000Z");
+  assert.equal(m.range.end.toISOString(), "2025-01-05T22:00:00.000Z");
+  assert.equal(m.comparison.range.startDate, "2024-12-23");
+  assert.equal(m.comparison.range.endDate, "2024-12-30");
+  assert.equal(m.comparison.totals.totalReadingTimeSeconds, 60);
+  assert.equal(m.totals.totalReadingTimeSeconds, 601);
+  assert.equal(m.totals.wordsRead, 2254);
+  assert.equal(m.totals.sessionsCount, 2);
+  assert.match(
+    textContent(weekly.view),
+    /Previous week: 2024-12-23 – 2024-12-29/,
+  );
+  const csv = formatReportCsv(m.heatmap);
+  assert.match(csv, /2024-12-30,1,4,1/);
+  assert.match(csv, /2025-01-02,600,2250,1/);
+  assert.equal(csv.split("\n").length, 8);
+  assert.equal(csv.split("\n").at(-1), "2025-01-05,0,0,0");
+  const query = followReport(weekly.view, "Year");
+  assert.deepEqual(new URLSearchParams(query).getAll("context"), [
+    "keep",
+    "again",
+  ]);
+  const back = await reportView(query);
+  assert.equal(referenceInput(back.view).props.defaultValue, "2025");
+  assert.equal(recap(back.view).props.href, "/year-in-reading?year=2025");
+});
+test("successful March to week to month retains March across February and leap-day boundaries", async () => {
+  for (const [year, monday, end, seconds, words] of [
+    ["2025", "2025-02-24", "2025-03-03", 62, 233],
+    ["2024", "2024-02-26", "2024-03-04", 60, 225],
+  ]) {
+    const monthly = await reportView(`period=monthly&date=${year}-03`);
+    const weekly = await reportView(followReport(monthly.view, "Week"));
+    assert.equal(
+      referenceInput(weekly.view).props.defaultValue,
+      `${year}-03-01`,
+    );
+    const m = weekly.reportsResult.report.metrics;
+    assert.equal(m.range.startDate, monday);
+    assert.equal(m.range.endDate, end);
+    assert.equal(m.totals.totalReadingTimeSeconds, seconds);
+    assert.equal(m.totals.wordsRead, words);
+    if (year === "2024")
+      assert.match(formatReportCsv(m.heatmap), /2024-02-29,60,225,1/);
+    const back = await reportView(followReport(weekly.view, "Month"));
+    assert.equal(referenceInput(back.view).props.defaultValue, `${year}-03`);
+  }
+});
+test("explicit Apply replaces the retained calendar reference after a frequency switch", async () => {
+  const annual = await reportView(
+    "period=yearly&date=2025&context=a&context=b",
+  );
+  const weekly = await reportView(followReport(annual.view, "Week"));
+  const originalFormData = globalThis.FormData;
+  globalThis.FormData = class {
+    get() {
+      return "2024-02-29";
+    }
+  };
+  try {
+    all(weekly.view, (node) => node.type === "form")[0].props.onSubmit({
+      preventDefault() {},
+      currentTarget: {},
+    });
+  } finally {
+    globalThis.FormData = originalFormData;
+  }
+  const changed = await reportView(
+    new URL(pushed, "https://synthetic.invalid").search.slice(1),
+  );
+  assert.equal(referenceInput(changed.view).props.defaultValue, "2024-02-29");
+  assert.equal(recap(changed.view).props.href, "/year-in-reading?year=2024");
+  assert.equal(
+    changed.reportsResult.report.metrics.range.startDate,
+    "2024-02-26",
+  );
+  const monthly = await reportView(followReport(changed.view, "Month"));
+  assert.equal(referenceInput(monthly.view).props.defaultValue, "2024-02");
+  assert.deepEqual(params.getAll("context"), ["a", "b"]);
+});
+test("missing and invalid references use local today consistently; legacy and repeated references use existing first-value validation even during outage", async (t) => {
+  t.mock.timers.enable({
+    apis: ["Date"],
+    now: new Date("2025-03-01T00:30:00Z"),
+  });
+  try {
+    for (const query of [
+      "period=weekly",
+      "period=weekly&date=2025-02-29",
+      "period=weekly&date=bad&weekStart=2024-01-01",
+    ]) {
+      for (const unavailable of [false, true]) {
+        const result = await reportView(query, unavailable);
+        assert.equal(result.reference, "2025-03-01");
+        assert.equal(
+          new URLSearchParams(followReport(result.view, "Month")).get("date"),
+          "2025-03",
+        );
+      }
+    }
+    for (const unavailable of [false, true]) {
+      const legacy = await reportView(
+        "period=weekly&weekStart=2025-01-02&context=a&context=b",
+        unavailable,
+      );
+      assert.equal(legacy.reference, "2025-01-02");
+      const next = new URLSearchParams(followReport(legacy.view, "Year"));
+      assert.equal(next.get("date"), "2025");
+      assert.equal(next.has("weekStart"), false);
+      assert.deepEqual(next.getAll("context"), ["a", "b"]);
+    }
+    const repeated = await reportView(
+      "period=weekly&date=2025-01-01&date=2024-01-01",
+    );
+    assert.equal(repeated.reference, "2025-01-01");
+  } finally {
+    t.mock.timers.reset();
   }
 });

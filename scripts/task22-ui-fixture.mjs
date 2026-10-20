@@ -15,6 +15,7 @@ export const token = "task21-synthetic-session-cookie-only";
 let scenario = "normal";
 const scenarios = [
   "normal",
+  "report-boundaries",
   "partial",
   "stale",
   "unavailable",
@@ -181,6 +182,21 @@ const tables = () => {
               duration_seconds: 600,
               item_id: null,
             },
+            ...(scenario === "report-boundaries"
+              ? [
+                  ["previous-week", "2024-12-23T12:00:00Z", 60],
+                  ["week-start", "2024-12-29T22:00:00Z", 1],
+                  ["week-end", "2025-01-05T22:00:00Z", 120],
+                  ["february", "2025-02-23T22:00:00Z", 61],
+                  ["march", "2025-03-01T12:00:00Z", 1],
+                  ["leap", "2024-02-29T12:00:00Z", 60],
+                ].map(([id, started_at, duration_seconds]) => ({
+                  id,
+                  started_at,
+                  duration_seconds,
+                  item_id: null,
+                }))
+              : []),
           ],
     daily_stats: [],
     annotations: [],

@@ -20,7 +20,7 @@ const testedSourceSha = execFileSync("git", ["rev-parse", "HEAD"], {
 const phase =
   process.env.TASK22_PHASE ??
   (process.env.TASK22_BEHAVIORS_ONLY ? "flows" : "all");
-assert.ok(["all", "layout", "flows", "states"].includes(phase));
+assert.ok(["all", "layout", "flows", "states", "reports"].includes(phase));
 const layoutWidth = process.env.TASK22_WIDTH;
 assert.ok(
   !layoutWidth ||
@@ -270,8 +270,11 @@ try {
       width,
       theme,
       height: page.viewportSize().height,
-      input:
-        scenario === "table-keyboard"
+      input: scenario.startsWith("retained-")
+        ? width === 390
+          ? "touch / forms / history / reload"
+          : "keyboard / forms / history / reload"
+        : scenario === "table-keyboard"
           ? "keyboard"
           : ["selected-day", "presets", "invalid-password"].includes(scenario)
             ? "browser forms / pointer / keyboard"
@@ -594,7 +597,201 @@ try {
         });
         await ui.context.close();
       }
-  if (phase !== "layout") {
+  if (phase === "all" || phase === "reports") {
+    await scenario("report-boundaries");
+    for (const [width, theme] of [
+      [390, "light"],
+      [768, "light"],
+      [1440, "dark"],
+    ]) {
+      const ui = await attach(width, theme),
+        { page } = ui;
+      const input = page.getByLabel("Specific report period");
+      const recap = page.getByRole("link", {
+        name: /Explore your .* annual recap/,
+      });
+      const expectReference = async (reference) => {
+        await page.waitForFunction(
+          (value) =>
+            document.querySelector('input[name="reference"]')?.value === value,
+          reference,
+        );
+        assert.equal(await input.inputValue(), reference);
+        assert.equal(
+          await recap.getAttribute("href"),
+          `/year-in-reading?year=${reference.slice(0, 4)}`,
+        );
+      };
+      const choose = async (label, period, reference) => {
+        // Keyboard activation at desktop/tablet and touch at phone width.
+        const control = page.getByRole("button", { name: label, exact: true });
+        if (width === 390) await control.tap();
+        else {
+          await control.focus();
+          await page.keyboard.press("Enter");
+        }
+        await page.waitForURL(
+          (url) =>
+            url.searchParams.get("period") === period &&
+            url.searchParams.get("date") === reference,
+        );
+        await expectReference(reference);
+        assert.deepEqual(new URL(page.url()).searchParams.getAll("context"), [
+          "keep",
+          "again",
+        ]);
+      };
+      const exportRows = async (filename, first, last, totals) => {
+        const promised = page.waitForEvent("download");
+        await page.getByRole("button", { name: "Export CSV" }).click();
+        const download = await promised;
+        assert.equal(download.suggestedFilename(), filename);
+        const rows = (await readFile(await download.path(), "utf8")).split(
+          "\n",
+        );
+        assert.equal(
+          rows[0],
+          "date,reading_time_seconds,estimated_words,sessions",
+        );
+        assert.ok(rows[1].startsWith(`${first},`));
+        assert.ok(rows.at(-1).startsWith(`${last},`));
+        assert.deepEqual(
+          rows.slice(1).reduce(
+            (sum, row) =>
+              row
+                .split(",")
+                .slice(1)
+                .map((value, i) => sum[i] + Number(value)),
+            [0, 0, 0],
+          ),
+          totals,
+        );
+      };
+      await ui.goto(
+        "/reports?period=yearly&date=2025&context=keep&context=again",
+      );
+      await choose("Week", "weekly", "2025-01-01");
+      assert.match(
+        await page.locator("main").innerText(),
+        /2024-12-30 – 2025-01-05 · Europe\/Athens/,
+      );
+      assert.match(
+        await page.locator("main").innerText(),
+        /Previous week: 2024-12-23 – 2024-12-29/,
+      );
+      await exportRows(
+        "matter-stats-weekly-2024-12-30.csv",
+        "2024-12-30",
+        "2025-01-05",
+        [601, 2254, 2],
+      );
+      await capture(
+        ui,
+        new URL(page.url()).pathname + new URL(page.url()).search,
+        "retained-year-week",
+        true,
+      );
+      await page.reload();
+      await expectReference("2025-01-01");
+      await choose("Year", "yearly", "2025");
+      assert.match(
+        await page.locator("main").innerText(),
+        /Previous year: 2024-01-01 – 2024-12-31/,
+      );
+      await page.goBack();
+      await expectReference("2025-01-01");
+      await page.goForward();
+      await expectReference("2025");
+      await page.reload();
+      await expectReference("2025");
+      await capture(
+        ui,
+        new URL(page.url()).pathname + new URL(page.url()).search,
+        "retained-year-return",
+        width === 390,
+      );
+      await recap.click();
+      await page.waitForURL("**year-in-reading?year=2025");
+      await page
+        .getByRole("link", { name: "View 2025 report and CSV →" })
+        .click();
+      await expectReference("2025");
+      for (const [year, start, end, totals] of [
+        ["2025", "2025-02-24", "2025-03-02", [62, 233, 2]],
+        ["2024", "2024-02-26", "2024-03-03", [60, 225, 1]],
+      ]) {
+        await ui.goto(
+          `/reports?period=monthly&date=${year}-03&context=keep&context=again`,
+        );
+        await choose("Week", "weekly", `${year}-03-01`);
+        assert.match(
+          await page.locator("main").innerText(),
+          new RegExp(`${start} – ${end}`),
+        );
+        await exportRows(
+          `matter-stats-weekly-${start}.csv`,
+          start,
+          end,
+          totals,
+        );
+        await capture(
+          ui,
+          new URL(page.url()).pathname + new URL(page.url()).search,
+          `retained-march-${year}-week`,
+          width !== 390,
+        );
+        await page.reload();
+        await expectReference(`${year}-03-01`);
+        await choose("Month", "monthly", `${year}-03`);
+        await page.goBack();
+        await expectReference(`${year}-03-01`);
+        await page.goForward();
+        await expectReference(`${year}-03`);
+        await page.reload();
+        await expectReference(`${year}-03`);
+      }
+      await choose("Week", "weekly", "2024-03-01");
+      await input.fill("2025-01-02");
+      await page.getByRole("button", { name: "Apply period" }).click();
+      await page.waitForURL("**date=2025-01-02**");
+      await expectReference("2025-01-02");
+      await choose("Year", "yearly", "2025");
+      await ui.goto(
+        "/reports?period=weekly&weekStart=2025-01-02&context=keep&context=again",
+      );
+      await expectReference("2025-01-02");
+      await choose("Year", "yearly", "2025");
+      assert.equal(new URL(page.url()).searchParams.has("weekStart"), false);
+      for (const query of [
+        "period=weekly",
+        "period=weekly&date=invalid",
+        "period=weekly&date=2025-02-29&weekStart=2024-01-01",
+      ]) {
+        await ui.goto(`/reports?${query}`);
+        await expectReference(today);
+      }
+      await scenario("unavailable");
+      await ui.goto(
+        "/reports?period=yearly&date=2025&context=keep&context=again",
+      );
+      assert.match(
+        await page.locator("main").innerText(),
+        /Reading report unavailable/,
+      );
+      await page.getByRole("button", { name: "Week", exact: true }).click();
+      await page.waitForURL("**date=2025-01-01**");
+      await page.getByRole("button", { name: "Year", exact: true }).click();
+      await page.waitForURL("**date=2025&**");
+      await scenario("report-boundaries");
+      check(
+        "Reports retained calendar selection: successful year/month/leap round trips, recap, explicit Apply, history/reload, legacy/invalid/default, unavailable and canonical weekly CSV",
+        { width, theme },
+      );
+      await ui.context.close();
+    }
+    await scenario("normal");
+  }
+  if (phase !== "layout" && phase !== "reports") {
     // Behavioral URL, forms, history, session pagination and downloaded CSV.
     const ui = await attach(390, "light"),
       { page } = ui;
@@ -773,7 +970,7 @@ try {
       await ui.goto("/reports?period=weekly&weekStart=2025-01-02");
       assert.equal(
         await page.getByLabel("Specific report period").inputValue(),
-        "2024-12-30",
+        "2025-01-02",
       );
       await ui.goto("/reports?period=daily&date=2025-01-02");
       assert.equal(

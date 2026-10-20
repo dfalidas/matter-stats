@@ -28,18 +28,17 @@ const periods = [
 ] as const;
 export function ReportsOverview({
   period,
+  reference,
   reportsResult,
 }: {
   period: ReportPeriod;
+  reference: string;
   reportsResult: Result;
 }) {
   const router = useRouter(),
     path = usePathname(),
     params = useSearchParams();
   const [pending, start] = useTransition();
-  const reference = reportsResult.ok
-    ? reportReference(reportsResult.report.metrics, period)
-    : (params.get("date") ?? params.get("weekStart") ?? "");
   function change(value: ReportPeriod) {
     const next = new URLSearchParams(params);
     next.set("period", value);
@@ -110,7 +109,9 @@ export function ReportsOverview({
     const blob = new Blob([formatReportCsv(m.heatmap)], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `matter-stats-${period}-${reference}.csv`;
+    // CSV identity describes the actual aggregation range, which can start
+    // before the retained calendar selection when a week crosses a boundary.
+    a.download = `matter-stats-${period}-${reportRangeReference(m, period)}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -346,7 +347,7 @@ function dur(s: number) {
   return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`;
 }
 
-function reportReference(
+function reportRangeReference(
   metrics: ReportsClientPayload["metrics"],
   period: ReportPeriod,
 ) {
