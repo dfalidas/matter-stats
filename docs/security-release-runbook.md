@@ -151,48 +151,59 @@ it is not a full Supabase platform clone. Before release, inspect the actual tar
 for other schemas, custom roles/extensions, managed-schema changes or Storage use.
 If present, extend the privately reviewed backup scope and rehearsal first.
 
-A separately authorized operator can use this app-scoped `pg_dump` procedure,
-which is also the underlying PostgreSQL mechanism used by the Supabase CLI. Use a
-Postgres client matching the source server major (never an older pg_dump), direct
-connection or session pooler, TLS with verified trust, and dedicated libpq service
-and password files **outside the checkout**, owner-readable only. Source and
-restore services must identify different targets. Do not put passwords/connection
-URLs in shell history, command arguments, PRs, logs or environment artifacts.
+A separately authorized operator can use the pinned CLI's project-role-aware
+exports below. CLI **2.48.3** filters managed-role defaults and emits compatible
+schema creation commands; unfiltered PostgreSQL clean/ownership commands are not
+this procedure. Verify the actual source server major and the CLI dump image/client
+major first. Use direct/session connections with verified TLS; transaction poolers
+are unsuitable. The separate `psql` restore uses dedicated libpq service/password
+files **outside the checkout**, owner-readable only.
+
+Prepare a private CLI workdir outside the repository, deliberately linked to the
+approved source using the pinned `init`/`link` commands. Review its target identity
+before every export. Supply `SUPABASE_DB_PASSWORD` through a private credential
+manager or hidden CLI prompt, never a connection URL or command-line password.
+No source linking or hosted backup was performed for Task 23. The current app owns
+only `public`; stop and review scope if the actual source has other custom schemas.
 
 ```sh
-# PGSERVICEFILE and PGPASSFILE refer to private files prepared outside the repo.
-# release_source / isolated_restore are reviewed service names, not URLs.
+# PRIVATE_BACKUP_PROJECT is the reviewed, privately linked CLI workdir.
+# BACKUP_DIR and RESTORE_PREFLIGHT are new paths in private encrypted storage.
 umask 077
-pg_dump --version
+supabase --version                 # must report 2.48.3
 psql --version
-# BACKUP_FILE is a new absolute path in private encrypted operator storage.
-pg_dump --dbname='service=release_source' --schema=public \
-  --schema=supabase_migrations --no-owner \
-  --file="$BACKUP_FILE"
-sha256sum "$BACKUP_FILE" > "$BACKUP_FILE.sha256"
-# RESTORE_PREFLIGHT is another private absolute path, outside the checkout.
-# Generate the reviewed empty-target guard and schema preparation (no connection):
+supabase --workdir "$PRIVATE_BACKUP_PROJECT" db dump --linked \
+  --keep-comments --file "$BACKUP_DIR/schema.sql"
+supabase --workdir "$PRIVATE_BACKUP_PROJECT" db dump --linked \
+  --schema supabase_migrations --keep-comments --file "$BACKUP_DIR/history-schema.sql"
+supabase --workdir "$PRIVATE_BACKUP_PROJECT" db dump --linked \
+  --schema public,supabase_migrations --data-only --use-copy --file "$BACKUP_DIR/data.sql"
+sha256sum "$BACKUP_DIR/schema.sql" "$BACKUP_DIR/history-schema.sql" \
+  "$BACKUP_DIR/data.sql" > "$BACKUP_DIR/checksums.sha256"
+# Generate the reviewed new-target guard/default-grant preparation, no connection:
 node --input-type=module -e 'import {restoreTargetPreparationSql} from "./scripts/disposable-restore.mjs"; process.stdout.write(restoreTargetPreparationSql)' > "$RESTORE_PREFLIGHT"
-# Into a NEW, dedicated Supabase target with compatible managed prerequisites:
+# isolated_restore must be a NEW, dedicated Supabase destination, never the source.
 psql -X --dbname='service=isolated_restore' --single-transaction \
   --variable ON_ERROR_STOP=1 --file="$RESTORE_PREFLIGHT" \
-  --command 'SET LOCAL session_replication_role=replica' \
-  --file="$BACKUP_FILE" --command "NOTIFY pgrst, 'reload schema';"
+  --file="$BACKUP_DIR/schema.sql" --file="$BACKUP_DIR/history-schema.sql" \
+  --file="$BACKUP_DIR/data.sql" --command "NOTIFY pgrst, 'reload schema';"
 ```
 
-The destination preparation refuses app-owned public objects and nonempty migration
-history, then replaces only that new target's initial schemas. Explicit schema
-selection makes the dump recreate both schemas. The source is never a restore
-destination; the rehearsal verifies that the guard rejects its populated source.
-Never run destination preparation or the restore against the source/live database.
-Retain grants (do not add `--no-acl`). Supabase default grants
-in a new target can differ; verify effective privileges after restore. `replica`
-is restricted to the offline restore transaction to prevent source-maintenance
-triggers from double-applying generation changes. Normal release/rollback never
-bypasses these triggers. It is not an RLS bypass procedure.
+The destination guard refuses app-owned public objects or migration objects. Do not
+apply app migrations or initialize migration history in that new destination first.
+It retains the platform's `public` schema and limits the restoring role's default
+grants before creating app objects. Source ACLs, RLS and function properties must
+then pass the catalog and real Data API controls. The rehearsal proves the guard
+rejects its populated source. Never use preparation/restoration on the source/live
+database. Retain ACLs; never omit them merely to make restoration succeed.
 
-Quiesce writes for the whole export and record a consistent recovery point. This
-logical dump captures schema and data together; export externally used custom
+The native data export establishes `session_replication_role=replica` immediately
+before loading data and resets session settings afterward. This offline restore
+transaction prevents source-maintenance triggers from double-applying generations.
+Normal release/rollback never bypasses these triggers. No RLS policy is disabled.
+
+Quiesce writes for the whole export and record a consistent recovery point. These
+separate exports require a quiescent source throughout; export externally used custom
 roles/configuration separately, without managed-role password/ownership conflicts.
 The repository uses standard Supabase roles; no new custom login is created here.
 The alternative official CLI commands `db dump --role-only`, default schema dump,
@@ -224,7 +235,8 @@ DISPOSABLE_DB_ACK=yes npm run test:stabilization-db
 
 After fresh schema/catalog setup, the existing runner seeds a small synthetic
 raw/progress fixture before the longer integration suites and exercises the existing bounded Task 20 generation engine.
-It dumps `public` + `supabase_migrations` from its fresh stack in memory, restores
+It captures the native CLI schema, migration-history schema and scoped data exports
+from its fresh stack in memory, restores
 into a third, separately owned local **Supabase** stack, compares every app table,
 checks the catalog and reuses the real Auth/Data API permission assertions for every
 restored table plus generation/retry read controls. Full CRUD and limiter concurrency
@@ -232,7 +244,7 @@ checks already ran on both fresh/upgrade sources.
 The restore stack is removed before starting upgrade. Only the owned synthetic
 fresh source is then reset through the existing full migration path before all
 original fresh/upgrade integration suites run. The rehearsal
-uses the source container's matching pg_dump/psql; neither dumps nor generated
+uses the pinned CLI's native local export and the matching target psql; neither dumps nor generated
 keys are retained. Snapshot equality precedes any security-fixture mutations.
 This is separate from Task 24's UI flow. Only a completed `backup-restore.json`
 and verified cleanup establish a successful rehearsal. Synthetic success does
@@ -332,7 +344,8 @@ Official sources checked 2026-10-20: Supabase [backups](https://supabase.com/doc
 GitHub [event SHAs](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows),
 [checkout v4.2.2](https://github.com/actions/checkout/tree/v4.2.2);
 Vercel [Instant Rollback](https://vercel.com/docs/instant-rollback),
-[rollback](https://vercel.com/docs/cli/rollback). PostgreSQL dump/restore behavior was also checked against the official
+[rollback](https://vercel.com/docs/cli/rollback). [Pinned CLI schema/data export filters](https://github.com/supabase/cli/tree/v2.48.3/pkg/migration/scripts)
+were reviewed for project-role compatibility. PostgreSQL dump/restore behavior was also checked against the official
 [PostgreSQL 17 source](https://github.com/postgres/postgres/tree/REL_17_STABLE/src/bin/pg_dump).
 CLI flags were checked with the
 actual 2.48.3 `--help`; no pin, dependency or audit policy was upgraded.

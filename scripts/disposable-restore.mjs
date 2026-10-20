@@ -12,7 +12,6 @@ export const restoreSnapshotSql = INVENTORIED_TABLES.map(table =>
 // dedicated Supabase destination; explicit schema dumps recreate both schemas.
 export const restoreTargetGuardSql = String.raw`
 DO $empty_target$
-declare applied bigint;
 begin
   if exists(select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
     where n.nspname='public' and c.relkind in ('r','p','v','m','f')
@@ -21,15 +20,17 @@ begin
     where n.nspname='public' and not exists(select 1 from pg_depend d where d.classid='pg_proc'::regclass and d.objid=p.oid and d.deptype='e')) then
     raise exception 'Restore requires a new target with no app-owned public objects';
   end if;
-  if to_regclass('supabase_migrations.schema_migrations') is not null then
-    execute 'select count(*) from supabase_migrations.schema_migrations' into applied;
-    if applied <> 0 then raise exception 'Restore target has applied migrations'; end if;
+  if exists(select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='supabase_migrations' and c.relkind in ('r','p','v','m','f')) then
+    raise exception 'Restore target has migration objects';
   end if;
 end $empty_target$;
 `;
 export const restoreTargetPreparationSql = restoreTargetGuardSql + String.raw`
-drop schema public cascade;
-drop schema if exists supabase_migrations cascade;
+-- Only the destination role's future public objects are affected. Existing
+-- platform schema ownership/objects are retained. Dump ACLs restore app grants.
+alter default privileges in schema public revoke all on tables from public,anon,authenticated,service_role;
+alter default privileges in schema public revoke all on functions from public,anon,authenticated,service_role;
 `;
 export const restoreSourceRefusalSql = `DO $refusal$ begin
   begin

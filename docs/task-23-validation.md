@@ -185,6 +185,25 @@ The single local-socket probe now allows a bounded thirty seconds and records a
 specific timeout reason. No retry loop, alternate database or assertion fallback
 is introduced. The empty-target protocol still requires actual successful execution.
 
+## Project-role restore correction
+
+[Run 39435890484](https://github.com/dfalidas/matter-stats/actions/runs/39435890484)
+at `6d87aa196a388f01da891f6c4d92c25e0f8e2503` retained SQLSTATE 42501 and safe
+catalog metadata: role/database owner `postgres`, standard public schema owner
+`pg_database_owner`. Its [artifact](https://github.com/dfalidas/matter-stats/actions/runs/39435890484/artifacts/12271561113)
+was downloaded and inspected; target guard/seed/snapshot/dump passed, restore failed,
+and downstream restore checks did not run. Cleanup passed. No privileged bypass is
+introduced to turn that failure green.
+
+The current procedure uses the exact CLI 2.48.3 native schema/data export filters,
+retains the platform public schema, refuses any destination migration object,
+and restricts the restoring role's default grants before loading source ACLs.
+Migration history is exported explicitly; the data export handles replica mode
+and reset. Every app field, catalog property, actual Data API denial/allowance,
+source rejection and owned cleanup still must pass. Exports remain in memory in
+CI; the Free-plan operator procedure uses private files with a quiescent source.
+Current-head acceptance evidence remains linked in PR #86.
+
 ## Evidence, impact and rollback
 
 The obsolete initial run is superseded by the corrected head; a cancelled/incomplete

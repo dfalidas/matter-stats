@@ -505,10 +505,19 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
       const restoreEvidence = await rehearseRestore({
         source: stacks[0].projectId, target: restoreStack.projectId, progress:restoreProgress,
         sql: containerPsql,
-        dump: project => command('docker', ['exec', `supabase_db_${project}`, 'pg_dump', '-U','postgres','-d','postgres', '--schema=public','--schema=supabase_migrations','--no-owner']),
+        dump: project => {
+          assert.equal(project, stacks[0].projectId);
+          const local = ['--local','--workdir',stacks[0].workdir];
+          // Use the reviewed CLI's native project-role filters. The default
+          // schema export excludes managed schemas; this app owns public only.
+          const schema = cli(['db','dump',...local,'--keep-comments']);
+          const historySchema = cli(['db','dump',...local,'--schema','supabase_migrations','--keep-comments']);
+          const data = cli(['db','dump',...local,'--schema','public,supabase_migrations','--data-only','--use-copy']);
+          return `${schema}\n${historySchema}\n${data}`;
+        },
         restore: (project, backup) => {
           assert.equal(project, restoreStack.projectId, 'refusing an unowned restore target');
-          return containerPsql(project, `begin;\n${restoreTargetPreparationSql}\nset local session_replication_role=replica;\n${backup}\ncommit;\nnotify pgrst, 'reload schema';`);
+          return containerPsql(project, `begin;\n${restoreTargetPreparationSql}\n${backup}\ncommit;\nnotify pgrst, 'reload schema';`);
         },
         verifyCatalog: project => catalog(project, migrationsSource),
         verifyDataApi: project => {
