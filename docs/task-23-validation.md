@@ -48,7 +48,10 @@ after read-only Data API probes. Only owned Auth users are created/deleted there
 
 ## Local commands (2026-10-20)
 
-Node **22.23.3**, npm **10.9.8**, Next **15.5.27**, existing unchanged lockfile.
+Final local toolchain matches observed CI: Node **22.23.3**, npm **10.9.9**,
+Next **15.5.27**, unchanged lockfile. The initial pass used npm 10.9.8; all required
+application commands were then rerun successfully on 10.9.9.
+[Sanitized local command results](evidence/task23/local-validation.json).
 The local command runner strips inherited application secrets and uses synthetic
 build configuration. During implementation the checkout was dirty at base SHA;
 committed exact-head verification is reported separately.
@@ -64,7 +67,7 @@ committed exact-head verification is reported separately.
 | `npm run build` | Passed; synthetic configuration, no live database/Matter access |
 | `npm run audit:ci`, first attempt | Failed before audit, **ENOSPC** creating audit-results while Docker image extraction consumed disk; no advisory result from this attempt |
 | `npm run audit:ci`, supported-toolchain rerun | Passed, unchanged policy: **8 high full-graph entries; low/moderate/critical 0; production 0**. No exception expanded or finding suppressed |
-| `DISPOSABLE_DB_ACK=yes npm run test:stabilization-db` | Local attempt pending at initial PR preparation; actual final outcome will be recorded in the PR/updated evidence. No assertions or restore pass inferred from setup |
+| `DISPOSABLE_DB_ACK=yes npm run test:stabilization-db` | Interrupted during image setup by the execution environment after recurring disk pressure; no stacks/assertions or restore completed. Automatic cleanup remained pending/unverified. A separate owned cleanup found no containers/volumes/networks, stopped the owned project and removed its exact temporary directory |
 | Synthetic backup→restore | Included as required final phase of full runner; not counted passed unless executed/completed |
 | `git diff --check` | Passed during implementation; repeat at final head |
 
@@ -82,7 +85,22 @@ policy failure remains historical evidence at its original SHAs/dates. Node 22/n
 reason to weaken audit policy. Registry metadata is time-dependent; exact-head CI
 must run the unchanged policy again.
 
+## Initial CI correction (historical)
+
+[Run 39423982024](https://github.com/dfalidas/matter-stats/actions/runs/39423982024)
+at implementation `ce7bb844513d1c0710e022fd6481bcac692bc954` checked application
+merge **`69a85a8581e4b6617d56cdf8068c56d95ce86036`**. Its unit suite failed the
+Docker-unavailable fixture because it inherited the PR environment and attempted
+the real DB-head identity check on that merge commit. The test now injects its own
+explicit synthetic identity; the production runner still checks the actual event
+commit. The focused suite passes under simulated PR environment variables. No real
+identity assertion was weakened. The initial database job's separate result is
+retained in the PR; final-head CI must rerun both jobs after this correction.
+
 ## Evidence, impact and rollback
+
+The obsolete initial run is superseded by the corrected head; a cancelled/incomplete
+database job is never counted as passed.
 
 CI artifact: `stabilization-db-<PR-head-or-main-sha>-<attempt>`, retained 14 days.
 Inspect `identity.json`, `ci.json`, `toolchain.json`, per-path migration/suite files,

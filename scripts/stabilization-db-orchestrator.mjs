@@ -10,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { STATUS_TABLES } from "./matter-status-inventory.mjs";
 import { GENERATION_TABLES } from "./reading-generation-inventory.mjs";
-import { catalogCoverageProbesSql, verifyCatalog, INVENTORIED_TABLES } from "./stabilization-db-runner.mjs";
+import { catalogCoverageProbesSql, repositoryMigrationVersions, verifyCatalog, INVENTORIED_FUNCTIONS, INVENTORIED_TABLES } from "./stabilization-db-runner.mjs";
 
 export const SUPABASE_CLI_VERSION = "2.48.3";
 export const UPGRADE_BASELINE = "20260519090000";
@@ -41,14 +41,14 @@ export function commandFailureCategory(stderr = '') {
   if (/failed to (?:pull|register layer)|pull.*(?:failed|denied)|toomanyrequests.*registry/i.test(stderr)) return 'image-pull';
   if (/timed? ?out|ETIMEDOUT|504 Gateway/i.test(stderr)) return 'timeout';
   if (/ECONNRESET|ECONNREFUSED|fetch failed|502 Bad Gateway/i.test(stderr)) return 'transport';
-  if (/not found|ENOENT|npm ERR!|npm error/i.test(stderr)) return 'command-unavailable';
+  if (/command not found|executable.*not found|ENOENT|npm ERR!|npm error/i.test(stderr)) return 'command-unavailable';
   return /AssertionError|ERR_ASSERTION/i.test(stderr) ? 'assertion' : 'execution';
 }
 
 function command(binary, args, { cwd = repoRoot, env = sanitizedEnvironment(), input } = {}) {
   if (binary === "docker") args = ["--host=unix:///var/run/docker.sock", ...args];
   const result = spawnSync(binary, args, { cwd, env, input, encoding: "utf8", timeout: 20 * 60 * 1000, maxBuffer: 32 * 1024 * 1024 });
-  if (result.error) throw Object.assign(new Error("Disposable command unavailable or timed out"), { failureKind: "infrastructure" });
+  if (result.error) throw Object.assign(new Error(`Disposable command unavailable or timed out (${result.error.code ?? 'unknown'}).`), { failureKind: "infrastructure", category:result.error.code === 'ETIMEDOUT' ? 'timeout' : 'command-unavailable' });
   if (result.status !== 0) {
     const category = commandFailureCategory(result.stderr);
     throw Object.assign(new Error(`Disposable ${path.basename(binary)} failed (exit ${result.status}; ${category}). Raw output withheld.`), { failureKind: ['disk-capacity','image-pull','timeout','transport','command-unavailable'].includes(category) ? 'infrastructure' : 'assertion-or-suite', category });
@@ -207,7 +207,6 @@ function configureDisposableGateway(projectId) {
 export const DATABASE_PHASES = ['migrations-preservation', 'gateway', 'catalog', 'security', 'lease', 'page', 'word-method', 'continuation', 'requests', 'preview', 'status', 'repair'];
 
 async function verifyPath({ name, workdir, projectId, upgrade, phases, evidenceDir }) {
-  phases.begin(`${name}:migrations-preservation`);
   if (upgrade) await copyMigrations(workdir, (filename) => filename.slice(0, 14) <= UPGRADE_BASELINE);
   else await copyMigrations(workdir);
   cli(["start", "--workdir", workdir], { env: sanitizedEnvironment() });
@@ -421,14 +420,22 @@ async function verifyPath({ name, workdir, projectId, upgrade, phases, evidenceD
   return { name, catalog: "passed", dataApi: "passed", gatewayTransport, accountLeaseSqlAndRuntime: "passed", leaseEvidence, atomicPageAndRollupRecovery: "passed", pageEvidence, boundedContinuationAndHistory: "passed", continuationEvidence, sharedQuotaAndRetries:"passed", requestEvidence, historicalPreview:"passed", previewEvidence, sessionWordMethod:"passed", wordMethodEvidence, historicalRepair:"passed", repairEvidence, truthfulStatus:"passed", statusEvidence, statusPreservation, generationPreservation, requestPreservation, preservation, streamPreservation, leasePreservation, pagePreservation, migrationHistory: versions };
 }
 
-export async function runStabilizationDatabases({ evidenceRoot = path.join(repoRoot, "artifacts/stabilization-db"), hasDocker = dockerAvailable } = {}) {
+export async function runStabilizationDatabases({ evidenceRoot = path.join(repoRoot, "artifacts/stabilization-db"), hasDocker = dockerAvailable, getIdentity = executionIdentity } = {}) {
   if (process.env.DISPOSABLE_DB_ACK !== "yes") throw new Error("Refusing to run without DISPOSABLE_DB_ACK=yes.");
-  const identity = executionIdentity();
+  const identity = getIdentity();
   const sha = identity.testedSha;
   const evidenceDir = path.join(evidenceRoot, sha);
   await mkdir(evidenceDir, { recursive: true });
-  const phaseNames = ['toolchain', 'compilation', 'configuration', ...['fresh', 'upgrade'].flatMap(name => DATABASE_PHASES.map(phase => `${name}:${phase}`)), 'backup-restore'];
-  const phases = phaseRecorder(phaseNames, data => writeFileSync(path.join(evidenceDir, 'outcomes.json'), JSON.stringify({ ...identity, ...data }, null, 2) + '\n'));
+  await writeFile(path.join(evidenceDir, 'repository-inventory.json'), JSON.stringify({
+    migrationVersions:await repositoryMigrationVersions(migrationsSource), tables:INVENTORIED_TABLES, views:[], functions:INVENTORIED_FUNCTIONS,
+  },null,2)+'\n');
+  const phaseNames = ['toolchain', 'compilation', 'configuration', ...['fresh', 'upgrade'].flatMap(name => DATABASE_PHASES.map(phase => `${name}:${phase}`)), 'backup-restore', 'cleanup'];
+  let announcedPhase;
+  const phases = phaseRecorder(phaseNames, data => {
+    writeFileSync(path.join(evidenceDir, 'outcomes.json'), JSON.stringify({ ...identity, ...data }, null, 2) + '\n');
+    const running = data.steps.find(step => step.status === 'running')?.name;
+    if (running && running !== announcedPhase) { console.log(`Disposable verification phase: ${running}`); announcedPhase = running; }
+  });
   await writeFile(path.join(evidenceDir, 'identity.json'), JSON.stringify(identity, null, 2) + '\n');
   phases.begin('toolchain');
   if (!hasDocker()) {
@@ -453,7 +460,7 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
     assert.equal(command('docker',['ps','-a','--filter',`name=_${stack.projectId}$`,'--format','{{.Names}}']).trim(), '', 'refusing existing stack containers');
     assert.equal(command('docker',['volume','ls','--filter',`name=_${stack.projectId}$`,'--format','{{.Name}}']).trim(), '', 'refusing existing stack volumes');
     started.push(stack); cleanup.push({path:stack.name,status:'pending'}); persistCleanup(false); };
-  const stopStack = stack => {
+  const stopStack = (stack, record = true) => {
     assertDisposableDirectory(stack.workdir);
     cli(['stop','--workdir',stack.workdir,'--no-backup']);
     for (const [resource, args] of [['containers',['ps','-a']],['volumes',['volume','ls']],['networks',['network','ls']]]) {
@@ -461,10 +468,11 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
     }
     stack.stopped = true;
     cleanup.find(row => row.path===stack.name).status='verified-removed';
-    persistCleanup(false);
+    if (record) persistCleanup(false);
   };
   let activePath = "configuration";
   let evidence;
+  let failureEvidence;
   try {
     const actualCli = cli(['--version']).trim();
     assert.equal(actualCli, SUPABASE_CLI_VERSION, 'unexpected Supabase CLI version');
@@ -478,6 +486,7 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
     phases.end();
     for (const stack of stacks) {
       activePath = stack.name;
+      phases.begin(`${stack.name}:migrations-preservation`);
       registerStack(stack);
       results.push(await verifyPath({ ...stack, upgrade: stack.name === "upgrade", phases, evidenceDir }));
     }
@@ -513,34 +522,52 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
     return evidence;
   } catch (error) {
     phases.fail(error.failureKind);
-    await writeFile(path.join(evidenceDir, "failure.json"), `${JSON.stringify({
+    failureEvidence = {
       status: "failed",
       gitSha: sha,
       failedPath: activePath,
       failureKind: error.failureKind ?? "assertion-or-suite",
       category: error.category ?? "assertion-or-execution",
       paths: results,
-      // Subprocess stderr can contain generated local credentials. Keep it in
-      // the job diagnostic, never copy arbitrary error text into an artifact.
+      // Subprocess stderr can contain generated local credentials. Raw child
+      // output is withheld; retain only known classifications and phase results.
       message: "Disposable verification failed; consult phase outcomes and sanitized diagnostics.",
       disposableDiagnostics: started.length ? disposableDiagnostics(started.at(-1).projectId) : [],
       cleanup: "pending",
-    }, null, 2)}\n`);
+    };
+    await writeFile(path.join(evidenceDir, "failure.json"), `${JSON.stringify(failureEvidence, null, 2)}\n`);
     throw error;
   } finally {
+    // Evidence I/O (including ENOSPC) must never prevent owned cleanup.
+    let cleanupEvidenceFailed = false;
+    try { phases.begin('cleanup'); } catch { cleanupEvidenceFailed = true; }
     for (const stack of [...started].reverse().filter(stack => !stack.stopped)) {
       try {
-        stopStack(stack);
+        stopStack(stack, false);
       } catch {
         cleanup.find(row => row.path===stack.name).status="failed";
-        persistCleanup(false);
       }
     }
     let temporaryDirectoryRemoved = false;
     try { if (!cleanup.some(row => row.status === "failed")) { await rm(root, { recursive: true, force: true }); temporaryDirectoryRemoved = true; } }
     catch { cleanup.push({ path:'temporary-directory', status:'failed' }); }
-    await writeFile(path.join(evidenceDir, "cleanup.json"), `${JSON.stringify({ gitSha: sha, resources: cleanup, temporaryDirectoryRemoved }, null, 2)}\n`);
-    if (cleanup.some(({ status }) => status === "failed")) throw new Error("One or more disposable stacks failed cleanup; see sanitized cleanup evidence.");
+    try {
+      await writeFile(path.join(evidenceDir, "cleanup.json"), `${JSON.stringify({ gitSha: sha, resources: cleanup, temporaryDirectoryRemoved }, null, 2)}\n`);
+    } catch { cleanupEvidenceFailed = true; }
+    const cleanupFailed = cleanup.some(({ status }) => status === "failed");
+    if (failureEvidence) {
+      failureEvidence.cleanup = cleanupFailed ? 'failed' : 'passed';
+      try { await writeFile(path.join(evidenceDir, 'failure.json'), JSON.stringify(failureEvidence,null,2)+'\n'); } catch { cleanupEvidenceFailed = true; }
+    }
+    if (cleanupFailed || cleanupEvidenceFailed) {
+      try { phases.fail('infrastructure'); } catch { /* disk unavailable; cleanup was still attempted */ }
+      if (evidence) {
+        evidence.status='failed'; evidence.cleanup='failed';
+        try { await writeFile(path.join(evidenceDir,'results.json'), JSON.stringify(evidence,null,2)+'\n'); } catch { /* evidence remains unverified */ }
+      }
+      throw new Error('Owned cleanup or retention of its evidence failed; do not infer successful cleanup.');
+    }
+    phases.end();
     if (evidence) {
       evidence.cleanup = "passed";
       await writeFile(path.join(evidenceDir, "results.json"), `${JSON.stringify(evidence, null, 2)}\n`);

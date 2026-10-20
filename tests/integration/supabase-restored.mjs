@@ -25,14 +25,22 @@ try {
       assertGrantDenied(await client.from(table).select('*').limit(1),{role,operation:'SELECT',kind:'table',name:table});
     }
   }
+  const generation = await service.rpc('read_matter_generation_status');
+  assertSuccessful(generation,'restored generation pointer');
+  assert.ok(generation.data?.activeId, 'restored active generation missing');
   const controls = [
     ['read_matter_generation_status',{}],
     ['read_matter_retry_status',{p_now:'2026-10-01T00:00:00Z'}],
-    ['read_generation_days',{p_generation:null,p_after:null,p_since:null,p_limit:1}],
+    ['read_generation_days',{p_generation:generation.data.activeId,p_after:null,p_since:null,p_limit:1}],
+    ['read_generation_estimates',{p_generation:generation.data.activeId,p_ids:['restore-session']}],
   ];
   for (const [name,args] of controls) {
     const result = await service.rpc(name,args);assertSuccessful(result,`restored service ${name}`);
     assert.ok(result.data != null, `restored ${name} missing result`);
+    if (name === 'read_generation_estimates') {
+      assert.equal(result.data.length,1);
+      assert.equal(result.data[0].words_estimated,Math.round(754 / 60 * 225));
+    }
     for (const [role,client] of [['anon',anon],['authenticated',authenticated]]) {
       assertGrantDenied(await client.rpc(name,args),{role,operation:'EXECUTE',kind:'function',name});
     }
@@ -40,4 +48,4 @@ try {
 } finally {
   if (user) assertSuccessful(await service.auth.admin.deleteUser(user),'restore Auth cleanup');
 }
-console.log(JSON.stringify({status:'passed',tables:INVENTORIED_TABLES.length,rpcControls:3,cleanup:'passed'}));
+console.log(JSON.stringify({status:'passed',tables:INVENTORIED_TABLES.length,rpcControls:4,cleanup:'passed'}));

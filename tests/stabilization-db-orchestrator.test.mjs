@@ -25,7 +25,7 @@ test("Docker-unavailable path writes honest sanitized blocked evidence without p
   const previous = process.env.DISPOSABLE_DB_ACK;
   process.env.DISPOSABLE_DB_ACK = "yes";
   t.after(() => { if (previous === undefined) delete process.env.DISPOSABLE_DB_ACK; else process.env.DISPOSABLE_DB_ACK = previous; });
-  const result = await runStabilizationDatabases({ evidenceRoot: root, hasDocker: () => false });
+  const result = await runStabilizationDatabases({ evidenceRoot: root, hasDocker: () => false, getIdentity: () => ({testedSha:"a".repeat(40),event:"unit-test"}) });
   assert.equal(result.status, "blocked");
   assert.equal(result.realDatabaseVerification, false);
   const stored = JSON.parse(await readFile(path.join(root, result.gitSha, "blocked.json"), "utf8"));

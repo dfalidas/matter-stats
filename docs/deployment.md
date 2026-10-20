@@ -44,3 +44,10 @@ part of release. Task 24 owns separate staging end-to-end verification. Producti
 schema/configuration/backup state, authorized repair/cutover and two real scheduled
 cycles remain external gates. No deployment, production SQL, real sync or merge is
 performed by these instructions alone.
+
+<a id="task-13-release-order-and-rollback"></a>
+
+Historical links to the Task 13 sequence now resolve here. Use the consolidated
+[release order](security-release-runbook.md#release-order) and
+[rollback decision](security-release-runbook.md#rollback-decision-and-sequence),
+which include all later quota, provenance, generation and status requirements.

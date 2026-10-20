@@ -1,0 +1,81 @@
+{
+  "date": "2026-10-20",
+  "baseSha": "323b2d5d956312b7973484b5e5c3f37c14afb9be",
+  "worktreeDirty": true,
+  "scope": "local implementation work; not exact committed-head certification",
+  "node": "22.23.3",
+  "npm": "10.9.9",
+  "commands": [
+    {
+      "name": "route-types",
+      "exit": 0,
+      "signal": null,
+      "milliseconds": 872
+    },
+    {
+      "name": "typecheck",
+      "exit": 0,
+      "signal": null,
+      "milliseconds": 2416
+    },
+    {
+      "name": "lint",
+      "exit": 0,
+      "signal": null,
+      "milliseconds": 5860
+    },
+    {
+      "name": "test",
+      "exit": 0,
+      "signal": null,
+      "milliseconds": 104452
+    },
+    {
+      "name": "build",
+      "exit": 0,
+      "signal": null,
+      "milliseconds": 29443
+    },
+    {
+      "name": "audit",
+      "exit": 0,
+      "signal": null,
+      "milliseconds": 2465
+    }
+  ],
+  "fullTests": {
+    "passed": 395,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "focusedTests": {
+    "passed": 24,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "databaseAttempt": {
+    "status": "interrupted",
+    "databaseAssertionsExecuted": false,
+    "restoreExecuted": false,
+    "automaticCleanup": "unverified",
+    "supplementalCleanup": [
+      {
+        "path": "fresh",
+        "stopExit": 0,
+        "resourcesAbsent": true,
+        "temporaryDirectoryRemoved": true
+      }
+    ]
+  },
+  "historicalAudit": {
+    "toolchain": "Node 22.23.3 / npm 10.9.8",
+    "firstAttempt": "failed ENOSPC before audit",
+    "rerun": "passed unchanged policy",
+    "highDevelopmentEntries": 8,
+    "productionVulnerabilities": 0
+  }
+}

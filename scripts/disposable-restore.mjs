@@ -37,12 +37,12 @@ begin
  select * into strict c from public.reading_generation_control where singleton;
  perform public.repair_transition(candidate,owner_id,1,c.active,c.epoch,false);
 end; $fixture$;
-update public.matter_sync_leases set generation=generation+23 where account_scope='matter';
+update public.matter_sync_leases set generation=generation+23,owner='00000000-0000-4000-8000-000000000523',expires_at='2099-01-01T00:00:00Z' where account_scope='matter';
 update public.matter_sync_streams set cycle_active=true,cursor='synthetic-next',cycle_started_at='2026-10-01T00:00:00Z',
  cycle_generation=cycle_generation+23,page_limit=17,completed_watermark='2026-09-01T00:00:00Z',retry_at='2099-01-01T00:00:00Z'
  where stream='recent_sessions';
 update public.matter_sync_continuation set history_status='pending',requested_at='2026-10-01T00:00:00Z' where account_scope='matter';
-update public.matter_quota set sequence=sequence+23,not_before='2099-01-01T00:00:00Z' where account_scope='matter';
+update public.matter_quota set sequence=sequence+23,not_before='2099-01-01T00:00:00Z',read_starts=array['2026-10-01T00:00:00Z'::timestamptz],burst_starts=array['2026-10-01T00:00:00Z'::timestamptz],feedback_until='2099-01-01T00:00:00Z',feedback_remaining=0 where account_scope='matter';
 update public.matter_request_work set requests='{"synthetic":{"attempts":3,"pending":true,"next_at":"2099-01-01T00:00:00Z"}}' where slot='bootstrap';
 insert into public.matter_page_receipts(stream,receipt_id,fingerprint) values('recent_sessions','00000000-0000-4000-8000-000000000223','synthetic-restore');
 insert into public.matter_dirty_rollups(date,revision,timezone) values('2026-05-19','00000000-0000-4000-8000-000000000323','Europe/Athens');
