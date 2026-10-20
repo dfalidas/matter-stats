@@ -617,6 +617,18 @@ try {
           reference,
         );
         assert.equal(await input.inputValue(), reference);
+        // The existing theme is a root class, so restore the synthetic theme
+        // after a full browser reload before inspecting the rendered frame.
+        await page.evaluate(
+          (dark) => document.documentElement.classList.toggle("dark", dark),
+          theme === "dark",
+        );
+        assert.equal(
+          await page.evaluate(
+            () => getComputedStyle(document.documentElement).colorScheme,
+          ),
+          theme,
+        );
         assert.equal(
           await recap.getAttribute("href"),
           `/year-in-reading?year=${reference.slice(0, 4)}`,
