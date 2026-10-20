@@ -1,0 +1,109 @@
+{
+  "testedSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c",
+  "node": "v24.19.0",
+  "syntheticConfiguration": true,
+  "results": [
+    {
+      "name": "install",
+      "command": "npm ci --cache work/npm-cache",
+      "startedAt": "2026-10-20T07:41:11.380Z",
+      "finishedAt": "2026-10-20T07:42:53.953Z",
+      "exitCode": 0,
+      "status": "passed",
+      "testedSourceSha": "22f639a475e73f911b2c6e41f3e662dceceb1547"
+    },
+    {
+      "name": "route-types",
+      "command": "npx --no-install next typegen",
+      "startedAt": "2026-10-20T07:42:53.964Z",
+      "finishedAt": "2026-10-20T07:43:01.681Z",
+      "exitCode": 0,
+      "status": "passed",
+      "testedSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c"
+    },
+    {
+      "name": "typecheck",
+      "command": "npm run typecheck",
+      "startedAt": "2026-10-20T07:43:01.685Z",
+      "finishedAt": "2026-10-20T07:43:33.549Z",
+      "exitCode": 0,
+      "status": "passed",
+      "testedSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c"
+    },
+    {
+      "name": "lint",
+      "command": "npm run lint",
+      "startedAt": "2026-10-20T07:43:33.556Z",
+      "finishedAt": "2026-10-20T07:44:21.823Z",
+      "exitCode": 0,
+      "status": "passed",
+      "testedSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c"
+    },
+    {
+      "name": "test-compile",
+      "command": "npx --no-install tsc -p tests/tsconfig.json",
+      "startedAt": "2026-10-20T07:44:21.827Z",
+      "finishedAt": "2026-10-20T07:45:02.981Z",
+      "exitCode": 0,
+      "status": "passed",
+      "testedSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c"
+    },
+    {
+      "name": "focused-tests",
+      "command": "node --test .test-build/tests/reports-service.test.js .test-build/tests/report-csv.test.js tests/ui-presentation.test.mjs tests/analytics-client-payload.test.mjs",
+      "startedAt": "2026-10-20T07:45:02.985Z",
+      "finishedAt": "2026-10-20T07:47:08.776Z",
+      "exitCode": 0,
+      "status": "passed",
+      "testedSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c"
+    },
+    {
+      "name": "full-tests",
+      "command": "npm run test",
+      "startedAt": "2026-10-20T07:47:08.779Z",
+      "finishedAt": "2026-10-20T07:59:38.311Z",
+      "exitCode": 0,
+      "status": "passed",
+      "testedSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c"
+    },
+    {
+      "name": "production-build",
+      "command": "npm run build",
+      "startedAt": "2026-10-20T07:59:38.333Z",
+      "finishedAt": "2026-10-20T08:03:25.446Z",
+      "exitCode": 0,
+      "status": "passed",
+      "testedSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c"
+    },
+    {
+      "name": "audit",
+      "command": "npm run audit:ci",
+      "startedAt": "2026-10-20T08:03:25.453Z",
+      "finishedAt": "2026-10-20T08:03:31.770Z",
+      "exitCode": 1,
+      "status": "failed",
+      "testedSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c"
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "startedAt": "2026-10-20T08:03:31.772Z",
+      "finishedAt": "2026-10-20T08:03:31.795Z",
+      "exitCode": 0,
+      "status": "passed",
+      "testedSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c"
+    },
+    {
+      "name": "boundary-check",
+      "command": "git diff --exit-code 880fafb4db67b0a08c0f8ff2e717f1d88786c8ba -- supabase .github vercel.json package.json package-lock.json lib app/_components app/dashboard app/activity app/articles app/settings app/year-in-reading components tailwind.config.ts",
+      "startedAt": "2026-10-20T08:03:31.798Z",
+      "finishedAt": "2026-10-20T08:03:31.810Z",
+      "exitCode": 0,
+      "status": "passed",
+      "testedSourceSha": "3c54ea8511d90538074a9c9d328eb067a917229c"
+    }
+  ],
+  "invocationSourceSha": "22f639a475e73f911b2c6e41f3e662dceceb1547",
+  "applicationChangeSourceSha": "22f639a475e73f911b2c6e41f3e662dceceb1547",
+  "sourceNote": "Driver started at 22f639a. Browser-only theme restoration committed at 07:42:37Z, before install completed at 07:42:53Z and before every other check. Application, tests and dependency trees are identical between both commits."
+}

@@ -1,0 +1,4 @@
+PASS Reports retained calendar selection: successful year/month/leap round trips, recap, explicit Apply, history/reload, legacy/invalid/default, unavailable and canonical weekly CSV
+PASS Reports retained calendar selection: successful year/month/leap round trips, recap, explicit Apply, history/reload, legacy/invalid/default, unavailable and canonical weekly CSV
+PASS Reports retained calendar selection: successful year/month/leap round trips, recap, explicit Apply, history/reload, legacy/invalid/default, unavailable and canonical weekly CSV
+Verified 12 rendered route/state/viewport/theme combinations and 3 behavioral groups at 8192206bb1995440248110e117776a1296108f36.

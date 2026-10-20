@@ -1,8 +1,10 @@
 # Task 22 synthetic UI evidence
 
-Application/build source: `877fae00126141b60fc7a60f6690c8f02a9cab22`.
+**Latest:** [Reports calendar-reference correction](reports-reference/README.md) records fresh successful-data boundary tests and inspected browser evidence. The earlier gallery and counts below are historical; they missed the successful cross-year/week round trip.
+
+Original application/build source: `877fae00126141b60fc7a60f6690c8f02a9cab22`.
 Browser verifier source: `9097b2298f3a4641b97a2d81bcae3e644e76fc64`.
-The verifier checks that application, component, library, dependency and theme files are identical between those sources. Final evidence/documentation changes preserve that tree. Every screenshot is an actual Chromium render against an isolated production Next server and loopback synthetic Data API; browser timezone is America/New_York and APP_TIMEZONE is Europe/Athens. No production synchronization or scheduled execution is certified.
+The verifier checks that application, component, library, dependency and theme files are identical between those sources. Evidence/documentation commits through reviewed head `880fafb` preserve that tree; the linked Reports correction records its changed application source separately. Every screenshot is an actual Chromium render against an isolated production Next server and loopback synthetic Data API; browser timezone is America/New_York and APP_TIMEZONE is Europe/Athens. No production synchronization or scheduled execution is certified.
 
 **Result:** 159 page/state checks, 21 behavioral groups, 66 scroll records and 30 measured contrast checks (minimum 5.4:1) passed. Thirty phase screenshots and two supplemental views were captured; representative frames below were visually inspected.
 
