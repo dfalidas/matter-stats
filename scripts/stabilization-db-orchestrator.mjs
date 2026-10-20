@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { writeFileSync } from "node:fs";
+import { executionIdentity, phaseRecorder } from "./database-evidence.mjs";
+import { rehearseRestore, restoreSnapshotSql } from "./disposable-restore.mjs";
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -7,7 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { STATUS_TABLES } from "./matter-status-inventory.mjs";
 import { GENERATION_TABLES } from "./reading-generation-inventory.mjs";
-import { verifyCatalog, INVENTORIED_TABLES } from "./stabilization-db-runner.mjs";
+import { catalogCoverageProbesSql, verifyCatalog, INVENTORIED_TABLES } from "./stabilization-db-runner.mjs";
 
 export const SUPABASE_CLI_VERSION = "2.48.3";
 export const UPGRADE_BASELINE = "20260519090000";
@@ -33,10 +36,23 @@ export function assertDisposableDirectory(directory) {
   assert.notEqual(resolved, repoRoot, "refusing to operate on the repository Supabase directory");
 }
 
+export function commandFailureCategory(stderr = '') {
+  if (/no space left on device/i.test(stderr)) return 'disk-capacity';
+  if (/failed to (?:pull|register layer)|pull.*(?:failed|denied)|toomanyrequests.*registry/i.test(stderr)) return 'image-pull';
+  if (/timed? ?out|ETIMEDOUT|504 Gateway/i.test(stderr)) return 'timeout';
+  if (/ECONNRESET|ECONNREFUSED|fetch failed|502 Bad Gateway/i.test(stderr)) return 'transport';
+  if (/not found|ENOENT|npm ERR!|npm error/i.test(stderr)) return 'command-unavailable';
+  return /AssertionError|ERR_ASSERTION/i.test(stderr) ? 'assertion' : 'execution';
+}
+
 function command(binary, args, { cwd = repoRoot, env = sanitizedEnvironment(), input } = {}) {
-  const result = spawnSync(binary, args, { cwd, env, input, encoding: "utf8" });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`${binary} ${args.join(" ")} failed (${result.status}): ${result.stderr.trim()}`);
+  if (binary === "docker") args = ["--host=unix:///var/run/docker.sock", ...args];
+  const result = spawnSync(binary, args, { cwd, env, input, encoding: "utf8", timeout: 20 * 60 * 1000, maxBuffer: 32 * 1024 * 1024 });
+  if (result.error) throw Object.assign(new Error("Disposable command unavailable or timed out"), { failureKind: "infrastructure" });
+  if (result.status !== 0) {
+    const category = commandFailureCategory(result.stderr);
+    throw Object.assign(new Error(`Disposable ${path.basename(binary)} failed (exit ${result.status}; ${category}). Raw output withheld.`), { failureKind: ['disk-capacity','image-pull','timeout','transport','command-unavailable'].includes(category) ? 'infrastructure' : 'assertion-or-suite', category });
+  }
   return result.stdout;
 }
 
@@ -46,7 +62,7 @@ function cli(args, options) {
 
 function dockerAvailable() {
   const executable = process.platform === "win32" ? "docker.exe" : "docker";
-  const result = spawnSync(executable, ["info"], { encoding: "utf8", env: sanitizedEnvironment() });
+  const result = spawnSync(executable, ["--host=unix:///var/run/docker.sock", "info"], { timeout:10000, encoding: "utf8", env: sanitizedEnvironment() });
   return !result.error && result.status === 0;
 }
 
@@ -56,10 +72,10 @@ function disposableDiagnostics(projectId) {
   return ["kong", "rest", "db"].map((component) => {
     const container = `supabase_${component}_${projectId}`;
     const options = { encoding:"utf8", env:sanitizedEnvironment(), timeout:5000, maxBuffer:1024*1024 };
-    const inspected = spawnSync("docker",["inspect","--format","{{json .State}}",container],options);
+    const inspected = spawnSync("docker",["--host=unix:///var/run/docker.sock","inspect","--format","{{json .State}}",container],options);
     let state;
     try { state=JSON.parse(inspected.stdout); } catch { /* unavailable remains explicit */ }
-    const logged = spawnSync("docker",["logs","--tail","500",container],options);
+    const logged = spawnSync("docker",["--host=unix:///var/run/docker.sock","logs","--tail","500",container],options);
     const lines = `${logged.stdout ?? ""}\n${logged.stderr ?? ""}`.split(/\r?\n/);
     return {
       component,
@@ -174,7 +190,7 @@ function integrationEnvironment(status, projectId) {
 }
 
 function configureDisposableGateway(projectId) {
-  assert.match(projectId, /^matter-stats-(fresh|upgrade)-[a-z0-9-]+$/);
+  assert.match(projectId, /^matter-stats-(fresh|upgrade|restore)-[a-z0-9-]+$/);
   // The CLI's Kong can reuse a socket closed by its upstream under the large
   // fixture's burst of real Data API calls. Disable only this owned gateway's
   // connection reuse, using Kong's supported setting. No retry or auth bypass.
@@ -188,7 +204,10 @@ function configureDisposableGateway(projectId) {
   return { upstreamKeepalivePoolSize: 0, configuration: "verified", scope: "owned-disposable-only" };
 }
 
-async function verifyPath({ name, workdir, projectId, upgrade }) {
+export const DATABASE_PHASES = ['migrations-preservation', 'gateway', 'catalog', 'security', 'lease', 'page', 'word-method', 'continuation', 'requests', 'preview', 'status', 'repair'];
+
+async function verifyPath({ name, workdir, projectId, upgrade, phases, evidenceDir }) {
+  phases.begin(`${name}:migrations-preservation`);
   if (upgrade) await copyMigrations(workdir, (filename) => filename.slice(0, 14) <= UPGRADE_BASELINE);
   else await copyMigrations(workdir);
   cli(["start", "--workdir", workdir], { env: sanitizedEnvironment() });
@@ -294,9 +313,17 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   }
   if (upgrade) assert.equal(containerPsql(projectId, "select count(*) from public.reading_sessions where id='legacy-session' and word_estimation_method is null;").trim(), "1");
   if (upgrade) assert.equal(containerPsql(projectId, "select count(*) from public.daily_stats where date='2026-05-19' and reading_provenance is null;").trim(), "1");
+  phases.end();
+  phases.begin(`${name}:gateway`);
   const gatewayTransport = configureDisposableGateway(projectId);
   const status = parseStatusEnv(cli(["status", "--workdir", workdir, "-o", "env"], { env: sanitizedEnvironment() }));
+  phases.end();
+  phases.begin(`${name}:catalog`);
+  containerPsql(projectId, catalogCoverageProbesSql());
   const versions = await catalog(projectId, path.join(workdir, "supabase/migrations"));
+  writeFileSync(path.join(evidenceDir, `${name}-migrations.json`), JSON.stringify({status:'passed', migrationHistory:versions},null,2)+'\n');
+  const retainSuite = (suite, report) => writeFileSync(path.join(evidenceDir, `${name}-${suite}.json`), JSON.stringify(report,null,2)+'\n');
+  phases.end();
   let leaseEvidence;
   let pageEvidence;
   let continuationEvidence;
@@ -306,9 +333,15 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
   let repairEvidence;
   let statusEvidence;
   const runIntegration = () => {
-    command(process.execPath, [path.join(repoRoot, "node_modules/typescript/bin/tsc"), "-p", "tests/tsconfig.json"], { env: sanitizedEnvironment() });
     const env = integrationEnvironment(status, projectId);
-    command(process.execPath, [path.join(repoRoot, "tests/integration/supabase-security.mjs")], { env });
+    phases.begin(`${name}:security`);
+    const securityOutput = command(process.execPath, [path.join(repoRoot, "tests/integration/supabase-security.mjs")], { env });
+    const securityReport = JSON.parse(securityOutput.trim().split(/\r?\n/).at(-1));
+    assert.equal(securityReport.status, 'passed');
+    assert.equal(securityReport.cleanup, 'passed');
+    retainSuite('security', {status:'passed',fixtures:securityReport.fixtures,limiterGroups:securityReport.limiterGroups,requestsPerGroup:securityReport.requestsPerGroup,cleanup:'passed'});
+    phases.end();
+    phases.begin(`${name}:lease`);
     const output = command(process.execPath, [path.join(repoRoot, "tests/integration/matter-sync-lease.mjs")], { env });
     const report = JSON.parse(output.trim().split(/\r?\n/).at(-1));
     assert.equal(report.status, "passed");
@@ -317,6 +350,9 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     assert.ok(Array.isArray(report.checks) && report.checks.every((check) => typeof check === "string"));
     // Copy only the integration report's known, credential-free evidence fields.
     leaseEvidence = { checks: report.checks, realSqlAndDataApi: true, syntheticMatterOnly: true };
+    retainSuite('lease', {status:'passed',...leaseEvidence});
+    phases.end();
+    phases.begin(`${name}:page`);
     const pageOutput = command(process.execPath, [path.join(repoRoot, "tests/integration/matter-page-commit.mjs")], { env });
     const pageReport = JSON.parse(pageOutput.trim().split(/\r?\n/).at(-1));
     assert.equal(pageReport.status, "passed");
@@ -324,11 +360,17 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     assert.equal(pageReport.syntheticMatterOnly, true);
     assert.equal(pageReport.cleanup, "passed");
     pageEvidence = { checks: pageReport.checks, realSqlAndDataApi: true, syntheticMatterOnly: true, cleanup: "passed" };
+    retainSuite('page', {status:'passed',...pageEvidence});
+    phases.end();
+    phases.begin(`${name}:word-method`);
     const wordMethodOutput=command(process.execPath,[path.join(repoRoot,"tests/integration/session-word-method.mjs")],{env});
     const wordMethodReport=JSON.parse(wordMethodOutput.trim().split(/\r?\n/).at(-1));
     assert.equal(wordMethodReport.status,"passed");assert.equal(wordMethodReport.realSqlAndDataApi,true);assert.equal(wordMethodReport.cleanup,"passed");
     assert.deepEqual(wordMethodReport.range,{start:0,endInclusive:600,rows:601,committedPages:7,rejectedPages:10});
     wordMethodEvidence={checks:wordMethodReport.checks,range:wordMethodReport.range,boundaries:wordMethodReport.boundaries,realSqlAndDataApi:true,cleanup:"passed"};
+    retainSuite('word-method', {status:'passed',...wordMethodEvidence});
+    phases.end();
+    phases.begin(`${name}:continuation`);
     const continuationOutput = command(process.execPath, [path.join(repoRoot, "tests/integration/matter-continuation.mjs")], { env });
     const continuationReport = JSON.parse(continuationOutput.trim().split(/\r?\n/).at(-1));
     assert.equal(continuationReport.status, "passed");
@@ -340,23 +382,38 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
     continuationEvidence = { checks: continuationReport.checks,
       historyReference:Object.fromEntries(referenceFields.map((field)=>[field,continuationReport.historyReference[field]])),
       realSqlAndDataApi: true, syntheticMatterOnly: true, cleanup: "passed" };
+    retainSuite('continuation', {status:'passed',...continuationEvidence});
+    phases.end();
+    phases.begin(`${name}:requests`);
     const requestOutput = command(process.execPath,[path.join(repoRoot,"tests/integration/matter-requests.mjs")],{env});
     const requestReport=JSON.parse(requestOutput.trim().split(/\r?\n/).at(-1));
     assert.equal(requestReport.status,"passed"); assert.equal(requestReport.realSqlAndDataApi,true); assert.equal(requestReport.cleanup,"passed");
     requestEvidence={checks:requestReport.checks,realSqlAndDataApi:true,syntheticMatterOnly:true,cleanup:"passed"};
+    retainSuite('requests', {status:'passed',...requestEvidence});
+    phases.end();
+    phases.begin(`${name}:preview`);
     const previewOutput=command(process.execPath,[path.join(repoRoot,"tests/integration/historical-preview.mjs")],{env});
     const previewReport=JSON.parse(previewOutput.trim().split(/\r?\n/).at(-1));
     assert.equal(previewReport.status,"passed");assert.equal(previewReport.realSql,true);assert.equal(previewReport.cleanup,"passed");
     previewEvidence={checks:previewReport.checks,realSql:true,syntheticOnly:true,cleanup:"passed"};
+    retainSuite('preview', {status:'passed',...previewEvidence});
+    phases.end();
+    phases.begin(`${name}:status`);
     const statusOutput=command(process.execPath,[path.join(repoRoot,"tests/integration/matter-status.mjs")],{env});
-    statusEvidence=JSON.parse(statusOutput.trim().split(/\r?\n/).at(-1));
+    const statusReport=JSON.parse(statusOutput.trim().split(/\r?\n/).at(-1));
+    statusEvidence={status:statusReport.status,checks:statusReport.checks,realSqlAndDataApi:statusReport.realSqlAndDataApi,cleanup:statusReport.cleanup};
     assert.equal(statusEvidence.status,"passed");assert.equal(statusEvidence.realSqlAndDataApi,true);assert.equal(statusEvidence.cleanup,"passed");
+    retainSuite('status', {status:'passed',...statusEvidence});
+    phases.end();
+    phases.begin(`${name}:repair`);
     const repairOutput=command(process.execPath,[path.join(repoRoot,"tests/integration/historical-repair.mjs")],{env});
     const repairReport=JSON.parse(repairOutput.trim().split(/\r?\n/).at(-1));
     assert.equal(repairReport.status,"passed");assert.equal(repairReport.realSqlAndDataApi,true);assert.equal(repairReport.cleanup,"passed");
     assert.ok(repairReport.reference.sessions>10000);
     repairEvidence={checks:repairReport.checks,checkCounts:repairReport.checkCounts,reference:repairReport.reference,afterIngestion:repairReport.afterIngestion,reconciliation:repairReport.reconciliation,boundaryCases:repairReport.boundaryCases,range:repairReport.range,browserDenials:repairReport.browserDenials,realSqlAndDataApi:true,syntheticOnly:true,cleanup:"passed"};
 
+    retainSuite('repair', {status:'passed',...repairEvidence});
+    phases.end();
   };
   if (upgrade) {
     await removeOwnedLegacySingleton({ query: (sql) => Promise.resolve(containerPsql(projectId, sql)), ownershipMarker, runIntegration });
@@ -366,10 +423,16 @@ async function verifyPath({ name, workdir, projectId, upgrade }) {
 
 export async function runStabilizationDatabases({ evidenceRoot = path.join(repoRoot, "artifacts/stabilization-db"), hasDocker = dockerAvailable } = {}) {
   if (process.env.DISPOSABLE_DB_ACK !== "yes") throw new Error("Refusing to run without DISPOSABLE_DB_ACK=yes.");
-  const sha = command("git", ["rev-parse", "HEAD"]).trim();
+  const identity = executionIdentity();
+  const sha = identity.testedSha;
   const evidenceDir = path.join(evidenceRoot, sha);
   await mkdir(evidenceDir, { recursive: true });
+  const phaseNames = ['toolchain', 'compilation', 'configuration', ...['fresh', 'upgrade'].flatMap(name => DATABASE_PHASES.map(phase => `${name}:${phase}`)), 'backup-restore'];
+  const phases = phaseRecorder(phaseNames, data => writeFileSync(path.join(evidenceDir, 'outcomes.json'), JSON.stringify({ ...identity, ...data }, null, 2) + '\n'));
+  await writeFile(path.join(evidenceDir, 'identity.json'), JSON.stringify(identity, null, 2) + '\n');
+  phases.begin('toolchain');
   if (!hasDocker()) {
+    phases.fail('infrastructure');
     const blocked = { status: "blocked", reason: "Docker-compatible runtime unavailable", gitSha: sha, realDatabaseVerification: false };
     await writeFile(path.join(evidenceDir, "blocked.json"), `${JSON.stringify(blocked, null, 2)}\n`);
     return blocked;
@@ -384,43 +447,99 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
   const started = [];
   const cleanup = [];
   const results = [];
+  const persistCleanup = temporaryDirectoryRemoved => writeFileSync(path.join(evidenceDir, 'cleanup.json'), JSON.stringify({ gitSha:sha, resources:cleanup, temporaryDirectoryRemoved }, null, 2)+'\n');
+  persistCleanup(false);
+  const registerStack = stack => {
+    assert.equal(command('docker',['ps','-a','--filter',`name=_${stack.projectId}$`,'--format','{{.Names}}']).trim(), '', 'refusing existing stack containers');
+    assert.equal(command('docker',['volume','ls','--filter',`name=_${stack.projectId}$`,'--format','{{.Name}}']).trim(), '', 'refusing existing stack volumes');
+    started.push(stack); cleanup.push({path:stack.name,status:'pending'}); persistCleanup(false); };
+  const stopStack = stack => {
+    assertDisposableDirectory(stack.workdir);
+    cli(['stop','--workdir',stack.workdir,'--no-backup']);
+    for (const [resource, args] of [['containers',['ps','-a']],['volumes',['volume','ls']],['networks',['network','ls']]]) {
+      assert.equal(command('docker',[...args,'--filter',`name=_${stack.projectId}$`,'--format',resource==='containers'?'{{.Names}}':'{{.Name}}']).trim(), '', `owned ${resource} remain after stop`);
+    }
+    stack.stopped = true;
+    cleanup.find(row => row.path===stack.name).status='verified-removed';
+    persistCleanup(false);
+  };
   let activePath = "configuration";
   let evidence;
   try {
+    const actualCli = cli(['--version']).trim();
+    assert.equal(actualCli, SUPABASE_CLI_VERSION, 'unexpected Supabase CLI version');
+    await writeFile(path.join(evidenceDir, 'toolchain.json'), JSON.stringify({ node:identity.node, npm:identity.npm, supabaseCli:actualCli }, null, 2) + '\n');
+    phases.end();
+    phases.begin('compilation');
+    command(process.execPath, [path.join(repoRoot, 'node_modules/typescript/bin/tsc'), '-p', 'tests/tsconfig.json']);
+    phases.end();
+    phases.begin('configuration');
     for (const stack of stacks) await configureStack(stack.workdir, stack);
+    phases.end();
     for (const stack of stacks) {
       activePath = stack.name;
-      started.push(stack);
-      results.push(await verifyPath({ ...stack, upgrade: stack.name === "upgrade" }));
+      registerStack(stack);
+      results.push(await verifyPath({ ...stack, upgrade: stack.name === "upgrade", phases, evidenceDir }));
     }
+    activePath = "backup-restore";
+    phases.begin('backup-restore');
+    const restoreStack = { ...stacks[0], name:'restore', projectId:`matter-stats-restore-${suffix}`, workdir:path.join(root,'restore'), apiPort:57421, dbPort:57422, shadowPort:57420, studioPort:57423, inbucketPort:57424, analyticsPort:57427 };
+    await configureStack(restoreStack.workdir, restoreStack);
+    // Retain the fresh source; free the completed upgrade stack before restore.
+    stopStack(stacks[1]);
+    registerStack(restoreStack);
+    cli(['start','--workdir',restoreStack.workdir]);
+    const restoreEvidence = await rehearseRestore({
+      source: stacks[0].projectId, target: restoreStack.projectId,
+      sql: containerPsql,
+      dump: project => command('docker', ['exec', `supabase_db_${project}`, 'pg_dump', '-U','postgres','-d','postgres', '--schema=public','--schema=supabase_migrations','--clean','--if-exists','--no-owner']),
+      restore: (project, backup) => containerPsql(project, `begin; set local session_replication_role=replica;\n${backup}\ncommit;`),
+      verifyCatalog: project => catalog(project, migrationsSource),
+      verifyDataApi: project => {
+        configureDisposableGateway(project);
+        const status = parseStatusEnv(cli(['status','--workdir',restoreStack.workdir,'-o','env']));
+        const before = containerPsql(project, restoreSnapshotSql);
+        const output = command(process.execPath, [path.join(repoRoot,'tests/integration/supabase-restored.mjs')], { env:integrationEnvironment(status, project) });
+        const report = JSON.parse(output.trim().split(/\r?\n/).at(-1));
+        assert.equal(report.status, 'passed');
+        assert.equal(report.cleanup, 'passed');
+        assert.equal(containerPsql(project, restoreSnapshotSql), before, 'restore Data API controls changed app data/progress');
+      },
+    });
+    phases.end();
+    await writeFile(path.join(evidenceDir,'backup-restore.json'), JSON.stringify(restoreEvidence,null,2)+'\n');
     evidence = { status: "passed", gitSha: sha, supabaseCli: SUPABASE_CLI_VERSION, paths: results, cleanup: "pending" };
     await writeFile(path.join(evidenceDir, "results.json"), `${JSON.stringify(evidence, null, 2)}\n`);
     return evidence;
   } catch (error) {
+    phases.fail(error.failureKind);
     await writeFile(path.join(evidenceDir, "failure.json"), `${JSON.stringify({
       status: "failed",
       gitSha: sha,
       failedPath: activePath,
+      failureKind: error.failureKind ?? "assertion-or-suite",
+      category: error.category ?? "assertion-or-execution",
       paths: results,
       // Subprocess stderr can contain generated local credentials. Keep it in
       // the job diagnostic, never copy arbitrary error text into an artifact.
-      message: "Disposable verification failed; see the workflow job log.",
+      message: "Disposable verification failed; consult phase outcomes and sanitized diagnostics.",
       disposableDiagnostics: started.length ? disposableDiagnostics(started.at(-1).projectId) : [],
       cleanup: "pending",
     }, null, 2)}\n`);
     throw error;
   } finally {
-    for (const stack of [...started].reverse()) {
+    for (const stack of [...started].reverse().filter(stack => !stack.stopped)) {
       try {
-        assertDisposableDirectory(stack.workdir);
-        cli(["stop", "--workdir", stack.workdir, "--no-backup"], { env: sanitizedEnvironment() });
-        cleanup.push({ path: stack.name, status: "stopped" });
+        stopStack(stack);
       } catch {
-        cleanup.push({ path: stack.name, status: "failed", error: "Disposable stack cleanup failed; see the workflow job log." });
+        cleanup.find(row => row.path===stack.name).status="failed";
+        persistCleanup(false);
       }
     }
-    await rm(root, { recursive: true, force: true });
-    await writeFile(path.join(evidenceDir, "cleanup.json"), `${JSON.stringify({ gitSha: sha, resources: cleanup, temporaryDirectoryRemoved: true }, null, 2)}\n`);
+    let temporaryDirectoryRemoved = false;
+    try { if (!cleanup.some(row => row.status === "failed")) { await rm(root, { recursive: true, force: true }); temporaryDirectoryRemoved = true; } }
+    catch { cleanup.push({ path:'temporary-directory', status:'failed' }); }
+    await writeFile(path.join(evidenceDir, "cleanup.json"), `${JSON.stringify({ gitSha: sha, resources: cleanup, temporaryDirectoryRemoved }, null, 2)}\n`);
     if (cleanup.some(({ status }) => status === "failed")) throw new Error("One or more disposable stacks failed cleanup; see sanitized cleanup evidence.");
     if (evidence) {
       evidence.cleanup = "passed";

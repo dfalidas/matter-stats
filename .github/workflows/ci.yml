@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
@@ -53,15 +55,14 @@ jobs:
 
   disposable-database:
     name: Fresh and upgrade database verification
-    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - name: Check out exact PR head
+      - name: Check out event commit (PR head or main push)
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -74,30 +75,17 @@ jobs:
       - name: Verify disposable fresh and upgrade databases
         id: database
         run: |
-          npm run test
           DISPOSABLE_DB_ACK=yes npm run test:stabilization-db
       - name: Record sanitized CI outcome
         if: ${{ always() }}
         env:
-          TESTED_SHA: ${{ github.event.pull_request.head.sha }}
           VERIFICATION_OUTCOME: ${{ steps.database.outcome }}
-        run: |
-          node --input-type=module <<'NODE'
-          import { mkdirSync, writeFileSync } from 'node:fs';
-          const directory = `artifacts/stabilization-db/${process.env.TESTED_SHA}`;
-          mkdirSync(directory, { recursive: true });
-          writeFileSync(`${directory}/ci.json`, JSON.stringify({
-            gitSha: process.env.TESTED_SHA,
-            verificationOutcome: process.env.VERIFICATION_OUTCOME,
-            workflowRun: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
-            runAttempt: process.env.GITHUB_RUN_ATTEMPT,
-          }, null, 2) + '\n');
-          NODE
+        run: node scripts/database-evidence.mjs
       - name: Retain sanitized database evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: stabilization-db-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
+          name: stabilization-db-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
           path: artifacts/stabilization-db/**/*.json
           if-no-files-found: error
           retention-days: 14
