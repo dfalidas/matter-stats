@@ -61,8 +61,9 @@ function cli(args, options) {
 
 function dockerAvailable() {
   const executable = process.platform === "win32" ? "docker.exe" : "docker";
-  const result = spawnSync(executable, ["--host=unix:///var/run/docker.sock", "info"], { timeout:10000, encoding: "utf8", env: sanitizedEnvironment() });
-  return !result.error && result.status === 0;
+  const result = spawnSync(executable, ["--host=unix:///var/run/docker.sock", "info"], { timeout:30000, encoding: "utf8", env: sanitizedEnvironment() });
+  return { available: !result.error && result.status === 0,
+    reason: result.error?.code === 'ETIMEDOUT' ? 'Docker info timed out after 30 seconds' : 'Docker-compatible local runtime unavailable' };
 }
 
 // Failure-only disposable diagnostics. Never retain raw logs, environment,
@@ -438,9 +439,10 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
   });
   await writeFile(path.join(evidenceDir, 'identity.json'), JSON.stringify(identity, null, 2) + '\n');
   phases.begin('toolchain');
-  if (!hasDocker()) {
+  const dockerProbe = hasDocker();
+  if (!(typeof dockerProbe === 'boolean' ? dockerProbe : dockerProbe.available)) {
     phases.fail('infrastructure');
-    const blocked = { status: "blocked", reason: "Docker-compatible runtime unavailable", gitSha: sha, realDatabaseVerification: false };
+    const blocked = { status: "blocked", reason: typeof dockerProbe === 'boolean' ? 'Docker-compatible runtime unavailable' : dockerProbe.reason, gitSha: sha, realDatabaseVerification: false };
     await writeFile(path.join(evidenceDir, "blocked.json"), `${JSON.stringify(blocked, null, 2)}\n`);
     return blocked;
   }

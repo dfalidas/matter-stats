@@ -175,6 +175,16 @@ only schema scope, byte count and SHA-256 identity, never the dump. Source and
 restore target are still separately owned local stacks, with full fresh/upgrade
 verification following the prerequisite. Final acceptance evidence is linked in PR #86.
 
+## Guarded-restore prerequisite blocker
+
+[Run 39433255802](https://github.com/dfalidas/matter-stats/actions/runs/39433255802)
+at `43283ddeff3169e159349bd5f828982541a35618` blocked before stack creation when
+Docker info exceeded the original ten-second probe limit. Its [inspected artifact](https://github.com/dfalidas/matter-stats/actions/runs/39433255802/artifacts/12269900018)
+records `realDatabaseVerification=false`; no restore or security pass is claimed.
+The single local-socket probe now allows a bounded thirty seconds and records a
+specific timeout reason. No retry loop, alternate database or assertion fallback
+is introduced. The empty-target protocol still requires actual successful execution.
+
 ## Evidence, impact and rollback
 
 The obsolete initial run is superseded by the corrected head; a cancelled/incomplete
