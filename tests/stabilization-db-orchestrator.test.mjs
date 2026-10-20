@@ -25,12 +25,15 @@ test("Docker-unavailable path writes honest sanitized blocked evidence without p
   const previous = process.env.DISPOSABLE_DB_ACK;
   process.env.DISPOSABLE_DB_ACK = "yes";
   t.after(() => { if (previous === undefined) delete process.env.DISPOSABLE_DB_ACK; else process.env.DISPOSABLE_DB_ACK = previous; });
-  const result = await runStabilizationDatabases({ evidenceRoot: root, hasDocker: () => false, getIdentity: () => ({testedSha:"a".repeat(40),event:"unit-test"}) });
-  assert.equal(result.status, "blocked");
-  assert.equal(result.realDatabaseVerification, false);
-  const stored = JSON.parse(await readFile(path.join(root, result.gitSha, "blocked.json"), "utf8"));
-  assert.deepEqual(stored, result);
-  assert.deepEqual(Object.keys(stored).sort(), ["gitSha", "realDatabaseVerification", "reason", "status"]);
+  for (const probe of [false, {available:false,reason:"Docker info timed out after 30 seconds"}]) {
+    const result = await runStabilizationDatabases({ evidenceRoot: root, hasDocker: () => probe, getIdentity: () => ({testedSha:"a".repeat(40),event:"unit-test"}) });
+    assert.equal(result.status, "blocked");
+    assert.equal(result.realDatabaseVerification, false);
+    assert.equal(result.reason, typeof probe === 'boolean' ? 'Docker-compatible runtime unavailable' : probe.reason);
+    const stored = JSON.parse(await readFile(path.join(root, result.gitSha, "blocked.json"), "utf8"));
+    assert.deepEqual(stored, result);
+    assert.deepEqual(Object.keys(stored).sort(), ["gitSha", "realDatabaseVerification", "reason", "status"]);
+  }
 });
 
 test("owned preserved singleton is removed and confirmed absent before integration", async () => {
