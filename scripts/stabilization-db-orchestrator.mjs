@@ -50,7 +50,8 @@ function command(binary, args, { cwd = repoRoot, env = sanitizedEnvironment(), i
     const category = commandFailureCategory(result.stderr);
     const databaseCode = result.stderr.match(/(?:ERROR|FATAL):\s+([0-9A-Z]{5}):/)?.[1] ?? null;
     const missingRelation = result.stderr.match(/relation "([a-z_][a-z0-9_.]{0,127})" does not exist/)?.[1] ?? null;
-    throw Object.assign(new Error(`Disposable ${path.basename(binary)} failed (exit ${result.status}; ${category}; SQLSTATE ${databaseCode ?? "unavailable"}; relation ${missingRelation ?? "unavailable"}). Raw output withheld.`), { failureKind: ['disk-capacity','image-pull','timeout','transport','command-unavailable'].includes(category) ? 'infrastructure' : 'assertion-or-suite', category, databaseCode, missingRelation });
+    const permissionReason = result.stderr.match(/must be owner of (?:schema|table|function|extension) [a-z_][a-z0-9_.]*|must be (?:able to SET ROLE|member of role) "[a-z_][a-z0-9_]*"|permission denied to set parameter "[a-z_][a-z0-9_]*"|permission denied for (?:schema|table|function) [a-z_][a-z0-9_.]*/)?.[0] ?? null;
+    throw Object.assign(new Error(`Disposable ${path.basename(binary)} failed (exit ${result.status}; ${category}; SQLSTATE ${databaseCode ?? "unavailable"}; relation ${missingRelation ?? "unavailable"}; permission ${permissionReason ?? "unavailable"}). Raw output withheld.`), { failureKind: ['disk-capacity','image-pull','timeout','transport','command-unavailable'].includes(category) ? 'infrastructure' : 'assertion-or-suite', category, databaseCode, missingRelation, permissionReason });
   }
   return result.stdout;
 }
@@ -545,6 +546,18 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
   } catch (error) {
     phases.fail(error.failureKind);
     restoreProgress?.fail(error.failureKind);
+    if (activePath === 'backup-restore' && started.length) {
+      let metadata = {available:false};
+      try {
+        metadata = JSON.parse(containerPsql(started.at(-1).projectId, `select jsonb_build_object(
+          'available',true,'role',current_user,'sessionRole',session_user,
+          'databaseOwner',(select pg_get_userbyid(datdba) from pg_database where datname=current_database()),
+          'schemas',(select jsonb_object_agg(nspname,pg_get_userbyid(nspowner)) from pg_namespace where nspname in ('public','supabase_migrations')),
+          'tables',(select coalesce(jsonb_object_agg(n.nspname || '.' || c.relname,pg_get_userbyid(c.relowner)),'{}') from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname in ('public','supabase_migrations') and c.relkind in ('r','p'))
+        )::text;`));
+      } catch { /* preserve primary failure; diagnostic unavailability is explicit */ }
+      await writeFile(path.join(evidenceDir,'restore-target-metadata.json'),JSON.stringify(metadata,null,2)+'\n');
+    }
     failureEvidence = {
       status: "failed",
       gitSha: sha,
@@ -553,6 +566,7 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
       category: error.category ?? "assertion-or-execution",
       databaseCode: error.databaseCode ?? null,
       missingRelation: error.missingRelation ?? null,
+      permissionReason: error.permissionReason ?? null,
       paths: results,
       // Subprocess stderr can contain generated local credentials. Raw child
       // output is withheld; retain only known classifications and phase results.
