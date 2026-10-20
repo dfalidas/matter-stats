@@ -133,6 +133,31 @@ The historical failure above is never relabeled; an earlier head's artifact does
 not certify the final head. Main-push execution still requires a separately
 authorized merge, and no staging/production gate is closed by CI alone.
 
+## Final-head attempt history before restore correction
+
+At `0649d73c2e1d3905195c350e5e6965759430160c`, local and application CI
+passed **397 tests**, zero failed/cancelled/skipped/TODO. Application CI actually
+checked merge `55186e21987aeb6fcb5621f242becc01306f7783`, Node 22.23.3/npm 10.9.9.
+[Run 39427897430 attempt 1](https://github.com/dfalidas/matter-stats/actions/runs/39427897430/attempts/1)
+blocked on image pull before assertions (**4 passed / 1 blocked / 24 not-run**
+phase groups); cleanup passed. Its [artifact](https://github.com/dfalidas/matter-stats/actions/runs/39427897430/artifacts/12266312702)
+was downloaded and inspected. One bounded rerun of only the failed DB job followed.
+
+[Attempt 2](https://github.com/dfalidas/matter-stats/actions/runs/39427897430/attempts/2)
+completed both full database paths, including the new prohibited-TRUNCATE negative
+control. Restore then failed with **SQLSTATE 42P01**. The [inspected artifact](https://github.com/dfalidas/matter-stats/actions/runs/39427897430/artifacts/12268615339)
+records target, seed, snapshot and dump passed; restore failed; preservation/catalog/
+Data API not run (**4 / 1 / 3**, separate from global **28 passed / 1 failed**).
+All three stacks and the temporary root were verified removed. This is an actual
+restore failure, not an infrastructure pass or completed backup/restore gate.
+
+The rehearsal now runs after fresh schema/catalog prerequisites, before the longer
+integration suites. Its owned source is reset through the same complete fresh
+migration path before those suites; upgrade intermediates and every suite remain
+required. The restore target is removed before upgrade begins. Failure evidence
+includes a constrained missing-relation identifier alongside SQLSTATE; no raw dump
+or arbitrary database stderr is retained. Final-head outcomes remain linked in PR #86.
+
 ## Evidence, impact and rollback
 
 The obsolete initial run is superseded by the corrected head; a cancelled/incomplete

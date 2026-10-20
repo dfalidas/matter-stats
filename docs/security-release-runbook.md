@@ -215,14 +215,16 @@ npm ci
 DISPOSABLE_DB_ACK=yes npm run test:stabilization-db
 ```
 
-The existing runner executes fresh/upgrade suites, then seeds a small synthetic
-raw/progress fixture and exercises the existing bounded Task 20 generation engine.
+After fresh schema/catalog setup, the existing runner seeds a small synthetic
+raw/progress fixture before the longer integration suites and exercises the existing bounded Task 20 generation engine.
 It dumps `public` + `supabase_migrations` from its fresh stack in memory, restores
 into a third, separately owned local **Supabase** stack, compares every app table,
 checks the catalog and reuses the real Auth/Data API permission assertions for every
 restored table plus generation/retry read controls. Full CRUD and limiter concurrency
 checks already ran on both fresh/upgrade sources.
-The completed upgrade stack is removed before starting restore. The rehearsal
+The restore stack is removed before starting upgrade. Only the owned synthetic
+fresh source is then reset through the existing full migration path before all
+original fresh/upgrade integration suites run. The rehearsal
 uses the source container's matching pg_dump/psql; neither dumps nor generated
 keys are retained. Snapshot equality precedes any security-fixture mutations.
 This is separate from Task 24's UI flow. Only a completed `backup-restore.json`

@@ -49,7 +49,8 @@ function command(binary, args, { cwd = repoRoot, env = sanitizedEnvironment(), i
   if (result.status !== 0) {
     const category = commandFailureCategory(result.stderr);
     const databaseCode = result.stderr.match(/(?:ERROR|FATAL):\s+([0-9A-Z]{5}):/)?.[1] ?? null;
-    throw Object.assign(new Error(`Disposable ${path.basename(binary)} failed (exit ${result.status}; ${category}; SQLSTATE ${databaseCode ?? "unavailable"}). Raw output withheld.`), { failureKind: ['disk-capacity','image-pull','timeout','transport','command-unavailable'].includes(category) ? 'infrastructure' : 'assertion-or-suite', category, databaseCode });
+    const missingRelation = result.stderr.match(/relation "([a-z_][a-z0-9_.]{0,127})" does not exist/)?.[1] ?? null;
+    throw Object.assign(new Error(`Disposable ${path.basename(binary)} failed (exit ${result.status}; ${category}; SQLSTATE ${databaseCode ?? "unavailable"}; relation ${missingRelation ?? "unavailable"}). Raw output withheld.`), { failureKind: ['disk-capacity','image-pull','timeout','transport','command-unavailable'].includes(category) ? 'infrastructure' : 'assertion-or-suite', category, databaseCode, missingRelation });
   }
   return result.stdout;
 }
@@ -204,11 +205,11 @@ function configureDisposableGateway(projectId) {
 
 export const DATABASE_PHASES = ['migrations-preservation', 'gateway', 'catalog', 'security', 'lease', 'page', 'word-method', 'continuation', 'requests', 'preview', 'status', 'repair'];
 
-async function verifyPath({ name, workdir, projectId, upgrade, phases, evidenceDir }) {
+async function verifyPath({ name, workdir, projectId, upgrade, phases, evidenceDir, beforeIntegration }) {
   if (upgrade) await copyMigrations(workdir, (filename) => filename.slice(0, 14) <= UPGRADE_BASELINE);
   else await copyMigrations(workdir);
   cli(["start", "--workdir", workdir], { env: sanitizedEnvironment() });
-  if (!upgrade) cli(["db", "reset", "--local", "--workdir", workdir], { env: sanitizedEnvironment() });
+  if (!upgrade && !beforeIntegration) cli(["db", "reset", "--local", "--workdir", workdir], { env: sanitizedEnvironment() });
   let preservation = null;
   let streamPreservation = null;
   let leasePreservation = null;
@@ -313,7 +314,7 @@ async function verifyPath({ name, workdir, projectId, upgrade, phases, evidenceD
   phases.end();
   phases.begin(`${name}:gateway`);
   const gatewayTransport = configureDisposableGateway(projectId);
-  const status = parseStatusEnv(cli(["status", "--workdir", workdir, "-o", "env"], { env: sanitizedEnvironment() }));
+  let status = parseStatusEnv(cli(["status", "--workdir", workdir, "-o", "env"], { env: sanitizedEnvironment() }));
   phases.end();
   phases.begin(`${name}:catalog`);
   containerPsql(projectId, catalogCoverageProbesSql());
@@ -321,6 +322,7 @@ async function verifyPath({ name, workdir, projectId, upgrade, phases, evidenceD
   writeFileSync(path.join(evidenceDir, `${name}-migrations.json`), JSON.stringify({status:'passed', migrationHistory:versions},null,2)+'\n');
   const retainSuite = (suite, report) => writeFileSync(path.join(evidenceDir, `${name}-${suite}.json`), JSON.stringify(report,null,2)+'\n');
   phases.end();
+  if (beforeIntegration) status = await beforeIntegration();
   let leaseEvidence;
   let pageEvidence;
   let continuationEvidence;
@@ -427,7 +429,7 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
   await writeFile(path.join(evidenceDir, 'repository-inventory.json'), JSON.stringify({
     migrationVersions:await repositoryMigrationVersions(migrationsSource), tables:INVENTORIED_TABLES, views:[], functions:INVENTORIED_FUNCTIONS,
   },null,2)+'\n');
-  const phaseNames = ['toolchain', 'compilation', 'configuration', ...['fresh', 'upgrade'].flatMap(name => DATABASE_PHASES.map(phase => `${name}:${phase}`)), 'backup-restore', 'cleanup'];
+  const phaseNames = ['toolchain', 'compilation', 'configuration', ...DATABASE_PHASES.slice(0,3).map(phase=>`fresh:${phase}`), 'backup-restore', ...DATABASE_PHASES.slice(3).map(phase=>`fresh:${phase}`), ...DATABASE_PHASES.map(phase=>`upgrade:${phase}`), 'cleanup'];
   let announcedPhase;
   const phases = phaseRecorder(phaseNames, data => {
     writeFileSync(path.join(evidenceDir, 'outcomes.json'), JSON.stringify({ ...identity, ...data }, null, 2) + '\n');
@@ -457,6 +459,7 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
   const registerStack = stack => {
     assert.equal(command('docker',['ps','-a','--filter',`name=_${stack.projectId}$`,'--format','{{.Names}}']).trim(), '', 'refusing existing stack containers');
     assert.equal(command('docker',['volume','ls','--filter',`name=_${stack.projectId}$`,'--format','{{.Name}}']).trim(), '', 'refusing existing stack volumes');
+    assert.equal(command('docker',['network','ls','--filter',`name=_${stack.projectId}$`,'--format','{{.Name}}']).trim(), '', 'refusing existing stack networks');
     started.push(stack); cleanup.push({path:stack.name,status:'pending'}); persistCleanup(false); };
   const stopStack = (stack, record = true) => {
     assertDisposableDirectory(stack.workdir);
@@ -483,42 +486,51 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
     phases.begin('configuration');
     for (const stack of stacks) await configureStack(stack.workdir, stack);
     phases.end();
+    const verifyRestoreBeforeFresh = async () => {
+      activePath = "backup-restore";
+      phases.begin('backup-restore');
+      restoreProgress = phaseRecorder(['target', ...RESTORE_PHASES, 'source-reset'], data => writeFileSync(path.join(evidenceDir,'backup-restore-outcomes.json'), JSON.stringify(data,null,2)+'\n'));
+      restoreProgress.begin('target');
+      const restoreStack = { ...stacks[0], name:'restore', projectId:`matter-stats-restore-${suffix}`, workdir:path.join(root,'restore'), apiPort:57421, dbPort:57422, shadowPort:57420, studioPort:57423, inbucketPort:57424, analyticsPort:57427 };
+      await configureStack(restoreStack.workdir, restoreStack);
+      registerStack(restoreStack);
+      cli(['start','--workdir',restoreStack.workdir]);
+      restoreProgress.end();
+      const restoreEvidence = await rehearseRestore({
+        source: stacks[0].projectId, target: restoreStack.projectId, progress:restoreProgress,
+        sql: containerPsql,
+        dump: project => command('docker', ['exec', `supabase_db_${project}`, 'pg_dump', '-U','postgres','-d','postgres', '--schema=public','--schema=supabase_migrations','--clean','--if-exists','--no-owner']),
+        restore: (project, backup) => containerPsql(project, `begin; set local session_replication_role=replica;\n${backup}\ncommit;\nnotify pgrst, 'reload schema';`),
+        verifyCatalog: project => catalog(project, migrationsSource),
+        verifyDataApi: project => {
+          configureDisposableGateway(project);
+          const status = parseStatusEnv(cli(['status','--workdir',restoreStack.workdir,'-o','env']));
+          const before = containerPsql(project, restoreSnapshotSql);
+          const output = command(process.execPath, [path.join(repoRoot,'tests/integration/supabase-restored.mjs')], { env:integrationEnvironment(status, project) });
+          const report = JSON.parse(output.trim().split(/\r?\n/).at(-1));
+          assert.equal(report.status, 'passed');
+          assert.equal(report.cleanup, 'passed');
+          assert.equal(containerPsql(project, restoreSnapshotSql), before, 'restore Data API controls changed app data/progress');
+        },
+      });
+      stopStack(restoreStack);
+      restoreProgress.begin('source-reset');
+      cli(['db','reset','--local','--workdir',stacks[0].workdir]);
+      configureDisposableGateway(stacks[0].projectId);
+      await catalog(stacks[0].projectId, migrationsSource);
+      const refreshedStatus = parseStatusEnv(cli(['status','--workdir',stacks[0].workdir,'-o','env']));
+      restoreProgress.end();
+      phases.end();
+      await writeFile(path.join(evidenceDir,'backup-restore.json'), JSON.stringify(restoreEvidence,null,2)+'\n');
+      activePath = "fresh";
+      return refreshedStatus;
+    };
     for (const stack of stacks) {
       activePath = stack.name;
       phases.begin(`${stack.name}:migrations-preservation`);
       registerStack(stack);
-      results.push(await verifyPath({ ...stack, upgrade: stack.name === "upgrade", phases, evidenceDir }));
+      results.push(await verifyPath({ ...stack, upgrade: stack.name === "upgrade", phases, evidenceDir, beforeIntegration: stack.name === "fresh" ? verifyRestoreBeforeFresh : undefined }));
     }
-    activePath = "backup-restore";
-    phases.begin('backup-restore');
-    restoreProgress = phaseRecorder(['target', ...RESTORE_PHASES], data => writeFileSync(path.join(evidenceDir,'backup-restore-outcomes.json'), JSON.stringify(data,null,2)+'\n'));
-    restoreProgress.begin('target');
-    const restoreStack = { ...stacks[0], name:'restore', projectId:`matter-stats-restore-${suffix}`, workdir:path.join(root,'restore'), apiPort:57421, dbPort:57422, shadowPort:57420, studioPort:57423, inbucketPort:57424, analyticsPort:57427 };
-    await configureStack(restoreStack.workdir, restoreStack);
-    // Retain the fresh source; free the completed upgrade stack before restore.
-    stopStack(stacks[1]);
-    registerStack(restoreStack);
-    cli(['start','--workdir',restoreStack.workdir]);
-    restoreProgress.end();
-    const restoreEvidence = await rehearseRestore({
-      source: stacks[0].projectId, target: restoreStack.projectId, progress:restoreProgress,
-      sql: containerPsql,
-      dump: project => command('docker', ['exec', `supabase_db_${project}`, 'pg_dump', '-U','postgres','-d','postgres', '--schema=public','--schema=supabase_migrations','--clean','--if-exists','--no-owner']),
-      restore: (project, backup) => containerPsql(project, `begin; set local session_replication_role=replica;\n${backup}\ncommit;\nnotify pgrst, 'reload schema';`),
-      verifyCatalog: project => catalog(project, migrationsSource),
-      verifyDataApi: project => {
-        configureDisposableGateway(project);
-        const status = parseStatusEnv(cli(['status','--workdir',restoreStack.workdir,'-o','env']));
-        const before = containerPsql(project, restoreSnapshotSql);
-        const output = command(process.execPath, [path.join(repoRoot,'tests/integration/supabase-restored.mjs')], { env:integrationEnvironment(status, project) });
-        const report = JSON.parse(output.trim().split(/\r?\n/).at(-1));
-        assert.equal(report.status, 'passed');
-        assert.equal(report.cleanup, 'passed');
-        assert.equal(containerPsql(project, restoreSnapshotSql), before, 'restore Data API controls changed app data/progress');
-      },
-    });
-    phases.end();
-    await writeFile(path.join(evidenceDir,'backup-restore.json'), JSON.stringify(restoreEvidence,null,2)+'\n');
     evidence = { status: "passed", gitSha: sha, supabaseCli: SUPABASE_CLI_VERSION, paths: results, cleanup: "pending" };
     await writeFile(path.join(evidenceDir, "results.json"), `${JSON.stringify(evidence, null, 2)}\n`);
     return evidence;
@@ -532,6 +544,7 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
       failureKind: error.failureKind ?? "assertion-or-suite",
       category: error.category ?? "assertion-or-execution",
       databaseCode: error.databaseCode ?? null,
+      missingRelation: error.missingRelation ?? null,
       paths: results,
       // Subprocess stderr can contain generated local credentials. Raw child
       // output is withheld; retain only known classifications and phase results.
