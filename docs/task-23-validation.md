@@ -158,6 +158,23 @@ required. The restore target is removed before upgrade begins. Failure evidence
 includes a constrained missing-relation identifier alongside SQLSTATE; no raw dump
 or arbitrary database stderr is retained. Final-head outcomes remain linked in PR #86.
 
+## Restore protocol correction
+
+[Run 39431946867](https://github.com/dfalidas/matter-stats/actions/runs/39431946867)
+at `9b1b57ca4653c99a01591e07181ff9306c440976` identified the missing relation as
+`public.matter_sync_streams` during destination restoration, SQLSTATE 42P01.
+No restore, preservation or Data API pass is inferred from this failure.
+
+The corrected procedure dumps the two explicitly selected schemas without clean
+commands and loads them into a guarded new Supabase destination. Preparation
+refuses any app-owned public object or applied migration before replacing its
+initial schemas; a real SQL negative control must reject the populated source.
+All errors still stop and roll back restoration. Source data/progress comparisons,
+exact catalog and real Data API checks remain required. Backup evidence now records
+only schema scope, byte count and SHA-256 identity, never the dump. Source and
+restore target are still separately owned local stacks, with full fresh/upgrade
+verification following the prerequisite. Final acceptance evidence is linked in PR #86.
+
 ## Evidence, impact and rollback
 
 The obsolete initial run is superseded by the corrected head; a cancelled/incomplete

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { INVENTORIED_TABLES } from './stabilization-db-runner.mjs';
 
 // All columns, every row, deterministic order. Only hashes/counts leave SQL;
@@ -6,6 +7,39 @@ import { INVENTORIED_TABLES } from './stabilization-db-runner.mjs';
 export const restoreSnapshotSql = INVENTORIED_TABLES.map(table =>
   `select jsonb_build_object('table','${table}','count',count(*),'hash',md5(coalesce(string_agg(to_jsonb(r)::text,E'\\n' order by to_jsonb(r)::text),'')))::text from public.${table} r;`
 ).join('\n');
+
+// Refuse a source/live/prepopulated target. This script is only for a NEW
+// dedicated Supabase destination; explicit schema dumps recreate both schemas.
+export const restoreTargetGuardSql = String.raw`
+DO $empty_target$
+declare applied bigint;
+begin
+  if exists(select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
+    where n.nspname='public' and c.relkind in ('r','p','v','m','f')
+      and not exists(select 1 from pg_depend d where d.classid='pg_class'::regclass and d.objid=c.oid and d.deptype='e'))
+    or exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname='public' and not exists(select 1 from pg_depend d where d.classid='pg_proc'::regclass and d.objid=p.oid and d.deptype='e')) then
+    raise exception 'Restore requires a new target with no app-owned public objects';
+  end if;
+  if to_regclass('supabase_migrations.schema_migrations') is not null then
+    execute 'select count(*) from supabase_migrations.schema_migrations' into applied;
+    if applied <> 0 then raise exception 'Restore target has applied migrations'; end if;
+  end if;
+end $empty_target$;
+`;
+export const restoreTargetPreparationSql = restoreTargetGuardSql + String.raw`
+drop schema public cascade;
+drop schema if exists supabase_migrations cascade;
+`;
+export const restoreSourceRefusalSql = `DO $refusal$ begin
+  begin
+    execute $guard$${restoreTargetGuardSql}$guard$;
+    raise exception 'Restore guard accepted source';
+  exception when raise_exception then
+    if sqlerrm <> 'Restore requires a new target with no app-owned public objects' then raise; end if;
+  end;
+end $refusal$;`;
+
 
 export const restoreSeedSql = String.raw`
 insert into public.matter_items(id,title) values('restore-item','Synthetic restore');
@@ -70,5 +104,6 @@ export async function rehearseRestore({ source, target, sql, dump, restore, veri
   await step('catalog', () => verifyCatalog(target));
   await step('data-api', () => verifyDataApi(target));
   return { status: 'passed', syntheticOnly: true, separateTarget: true, tablesCompared: INVENTORIED_TABLES.length,
-    schemaAndSecurity: 'passed', rawAndProgress: 'passed', dataApi: 'passed', backupUploaded: false };
+    schemaAndSecurity: 'passed', rawAndProgress: 'passed', dataApi: 'passed', backupUploaded: false,
+    backupIdentity:{schemas:['public','supabase_migrations'],bytes:Buffer.byteLength(backup),sha256:createHash('sha256').update(backup).digest('hex')} };
 }

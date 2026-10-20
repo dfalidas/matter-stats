@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
 import { executionIdentity, phaseRecorder, sanitizedEnvironment } from "./database-evidence.mjs";
-import { rehearseRestore, restoreSnapshotSql, RESTORE_PHASES } from "./disposable-restore.mjs";
+import { rehearseRestore, restoreSnapshotSql, restoreTargetPreparationSql, restoreSourceRefusalSql, RESTORE_PHASES } from "./disposable-restore.mjs";
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -489,7 +489,10 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
     const verifyRestoreBeforeFresh = async () => {
       activePath = "backup-restore";
       phases.begin('backup-restore');
-      restoreProgress = phaseRecorder(['target', ...RESTORE_PHASES, 'source-reset'], data => writeFileSync(path.join(evidenceDir,'backup-restore-outcomes.json'), JSON.stringify(data,null,2)+'\n'));
+      restoreProgress = phaseRecorder(['source-rejection', 'target', ...RESTORE_PHASES, 'source-reset'], data => writeFileSync(path.join(evidenceDir,'backup-restore-outcomes.json'), JSON.stringify(data,null,2)+'\n'));
+      restoreProgress.begin('source-rejection');
+      containerPsql(stacks[0].projectId, restoreSourceRefusalSql);
+      restoreProgress.end();
       restoreProgress.begin('target');
       const restoreStack = { ...stacks[0], name:'restore', projectId:`matter-stats-restore-${suffix}`, workdir:path.join(root,'restore'), apiPort:57421, dbPort:57422, shadowPort:57420, studioPort:57423, inbucketPort:57424, analyticsPort:57427 };
       await configureStack(restoreStack.workdir, restoreStack);
@@ -499,8 +502,11 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
       const restoreEvidence = await rehearseRestore({
         source: stacks[0].projectId, target: restoreStack.projectId, progress:restoreProgress,
         sql: containerPsql,
-        dump: project => command('docker', ['exec', `supabase_db_${project}`, 'pg_dump', '-U','postgres','-d','postgres', '--schema=public','--schema=supabase_migrations','--clean','--if-exists','--no-owner']),
-        restore: (project, backup) => containerPsql(project, `begin; set local session_replication_role=replica;\n${backup}\ncommit;\nnotify pgrst, 'reload schema';`),
+        dump: project => command('docker', ['exec', `supabase_db_${project}`, 'pg_dump', '-U','postgres','-d','postgres', '--schema=public','--schema=supabase_migrations','--no-owner']),
+        restore: (project, backup) => {
+          assert.equal(project, restoreStack.projectId, 'refusing an unowned restore target');
+          return containerPsql(project, `begin;\n${restoreTargetPreparationSql}\nset local session_replication_role=replica;\n${backup}\ncommit;\nnotify pgrst, 'reload schema';`);
+        },
         verifyCatalog: project => catalog(project, migrationsSource),
         verifyDataApi: project => {
           configureDisposableGateway(project);

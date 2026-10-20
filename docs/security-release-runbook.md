@@ -167,18 +167,25 @@ pg_dump --version
 psql --version
 # BACKUP_FILE is a new absolute path in private encrypted operator storage.
 pg_dump --dbname='service=release_source' --schema=public \
-  --schema=supabase_migrations --clean --if-exists --no-owner \
+  --schema=supabase_migrations --no-owner \
   --file="$BACKUP_FILE"
 sha256sum "$BACKUP_FILE" > "$BACKUP_FILE.sha256"
+# RESTORE_PREFLIGHT is another private absolute path, outside the checkout.
+# Generate the reviewed empty-target guard and schema preparation (no connection):
+node --input-type=module -e 'import {restoreTargetPreparationSql} from "./scripts/disposable-restore.mjs"; process.stdout.write(restoreTargetPreparationSql)' > "$RESTORE_PREFLIGHT"
 # Into a NEW, dedicated Supabase target with compatible managed prerequisites:
 psql -X --dbname='service=isolated_restore' --single-transaction \
-  --variable ON_ERROR_STOP=1 --command 'SET LOCAL session_replication_role=replica' \
+  --variable ON_ERROR_STOP=1 --file="$RESTORE_PREFLIGHT" \
+  --command 'SET LOCAL session_replication_role=replica' \
   --file="$BACKUP_FILE" --command "NOTIFY pgrst, 'reload schema';"
 ```
 
-This dump includes destructive clean statements **only for the selected schemas**;
-restore is solely into the approved new target. Never run that file against the
-source/live database. Retain grants (do not add `--no-acl`). Supabase default grants
+The destination preparation refuses app-owned public objects and nonempty migration
+history, then replaces only that new target's initial schemas. Explicit schema
+selection makes the dump recreate both schemas. The source is never a restore
+destination; the rehearsal verifies that the guard rejects its populated source.
+Never run destination preparation or the restore against the source/live database.
+Retain grants (do not add `--no-acl`). Supabase default grants
 in a new target can differ; verify effective privileges after restore. `replica`
 is restricted to the offline restore transaction to prevent source-maintenance
 triggers from double-applying generation changes. Normal release/rollback never
@@ -325,5 +332,7 @@ Official sources checked 2026-10-20: Supabase [backups](https://supabase.com/doc
 GitHub [event SHAs](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows),
 [checkout v4.2.2](https://github.com/actions/checkout/tree/v4.2.2);
 Vercel [Instant Rollback](https://vercel.com/docs/instant-rollback),
-[rollback](https://vercel.com/docs/cli/rollback). CLI flags were checked with the
+[rollback](https://vercel.com/docs/cli/rollback). PostgreSQL dump/restore behavior was also checked against the official
+[PostgreSQL 17 source](https://github.com/postgres/postgres/tree/REL_17_STABLE/src/bin/pg_dump).
+CLI flags were checked with the
 actual 2.48.3 `--help`; no pin, dependency or audit policy was upgraded.
