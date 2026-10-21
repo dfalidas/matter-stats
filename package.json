@@ -11,7 +11,8 @@
     "test": "tsc -p tests/tsconfig.json && node --test .test-build/tests/*.test.js tests/*.test.mjs && node scripts/test-disposable-db.mjs",
     "audit:ci": "node scripts/audit-policy.mjs",
     "test:security-db": "node tests/integration/supabase-security.mjs",
-    "test:stabilization-db": "node scripts/stabilization-db-orchestrator.mjs"
+    "test:stabilization-db": "node scripts/stabilization-db-orchestrator.mjs",
+    "test:full-stack": "node scripts/task24-full-stack.mjs"
   },
   "dependencies": {
     "@radix-ui/react-separator": "^1.1.0",
@@ -37,6 +38,7 @@
     "@types/react-dom": "^19.0.4",
     "eslint": "^9.26.0",
     "eslint-config-next": "^15.5.27",
+    "playwright": "1.64.1",
     "postcss": "8.5.23",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",

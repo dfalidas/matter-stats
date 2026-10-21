@@ -42,22 +42,36 @@ export function commandFailureCategory(stderr = '') {
   return /AssertionError|ERR_ASSERTION/i.test(stderr) ? 'assertion' : 'execution';
 }
 
-function command(binary, args, { cwd = repoRoot, env = sanitizedEnvironment(), input } = {}) {
+export function command(binary, args, { cwd = repoRoot, env = sanitizedEnvironment(), input } = {}) {
   if (binary === "docker") args = ["--host=unix:///var/run/docker.sock", ...args];
   const result = spawnSync(binary, args, { cwd, env, input, encoding: "utf8", timeout: 20 * 60 * 1000, maxBuffer: 32 * 1024 * 1024 });
   if (result.error) throw Object.assign(new Error(`Disposable command unavailable or timed out (${result.error.code ?? 'unknown'}).`), { failureKind: "infrastructure", category:result.error.code === 'ETIMEDOUT' ? 'timeout' : 'command-unavailable' });
   if (result.status !== 0) {
     const category = commandFailureCategory(result.stderr);
-    const databaseCode = result.stderr.match(/(?:ERROR|FATAL):\s+([0-9A-Z]{5}):/)?.[1] ?? null;
+    const databaseCode = result.stderr.match(/(?:ERROR|FATAL):\s+([0-9A-Z]{5}):|SQLSTATE\s+([0-9A-Z]{5})/)?.slice(1).find(Boolean) ?? null;
     const missingRelation = result.stderr.match(/relation "([a-z_][a-z0-9_.]{0,127})" does not exist/)?.[1] ?? null;
     const permissionReason = result.stderr.match(/must be owner of (?:schema|table|function|extension) [a-z_][a-z0-9_.]*|must be (?:able to SET ROLE|member of role) "[a-z_][a-z0-9_]*"|permission denied to set parameter "[a-z_][a-z0-9_]*"|permission denied for (?:schema|table|function) [a-z_][a-z0-9_.]*/)?.[0] ?? null;
-    throw Object.assign(new Error(`Disposable ${path.basename(binary)} failed (exit ${result.status}; ${category}; SQLSTATE ${databaseCode ?? "unavailable"}; relation ${missingRelation ?? "unavailable"}; permission ${permissionReason ?? "unavailable"}). Raw output withheld.`), { failureKind: ['disk-capacity','image-pull','timeout','transport','command-unavailable'].includes(category) ? 'infrastructure' : 'assertion-or-suite', category, databaseCode, missingRelation, permissionReason });
+    const infrastructureReason = /port is already allocated|address already in use/i.test(result.stderr) ? 'port-conflict'
+      : /not healthy|unhealthy|not ready/i.test(result.stderr) ? 'service-health'
+      : /permission denied.*docker|cannot connect.*docker/i.test(result.stderr) ? 'docker-access' : null;
+    const diagnosticStages = ['Starting database', 'Starting containers', 'Waiting for health checks', 'Applying migration', 'Stopping containers'].filter(label => result.stderr.includes(label));
+    const diagnosticWords = ['migration', 'sql', 'postgres', 'container', 'docker', 'network', 'permission', 'connection', 'refused', 'timeout', 'port', 'mount', 'file', 'directory', 'parse', 'config', 'health', 'unhealthy', 'image', 'pull', 'denied', 'schema', 'function', 'already', 'exists', 'fatal', 'database', 'seed'].filter(word => new RegExp(`\\b${word}\\b`, 'i').test(result.stderr));
+    const operation = ['start','status','init','exec','reload','cat','stop'].find(value=>args.includes(value)) ?? 'other';
+    throw Object.assign(new Error(`Disposable ${path.basename(binary)} failed (exit ${result.status}; ${category}; SQLSTATE ${databaseCode ?? "unavailable"}; relation ${missingRelation ?? "unavailable"}; permission ${permissionReason ?? "unavailable"}). Raw output withheld.`), { failureKind: ['disk-capacity','image-pull','timeout','transport','command-unavailable'].includes(category) || infrastructureReason ? 'infrastructure' : 'assertion-or-suite', category, infrastructureReason, databaseCode, missingRelation, permissionReason, diagnosticStages, diagnosticWords, tool:path.basename(binary), operation });
   }
   return result.stdout;
 }
 
-function cli(args, options) {
-  return command("npx", ["--yes", `supabase@${SUPABASE_CLI_VERSION}`, ...args], options);
+export function imageRegistryEnvironment(env = process.env) {
+  const registry = env.STABILIZATION_TEST_IMAGE_REGISTRY;
+  assert.ok(!registry || registry === 'docker.io', 'unreviewed disposable image registry refused');
+  return registry ? {SUPABASE_INTERNAL_IMAGE_REGISTRY:registry} : {};
+}
+
+export function cli(args, options = {}) {
+  const env = {...(options.env ?? sanitizedEnvironment())};
+  delete env.SUPABASE_INTERNAL_IMAGE_REGISTRY;
+  return command("npx", ["--yes", `supabase@${SUPABASE_CLI_VERSION}`, ...args], {...options,env:{...env,...imageRegistryEnvironment()}});
 }
 
 function dockerAvailable() {
@@ -69,7 +83,7 @@ function dockerAvailable() {
 
 // Failure-only disposable diagnostics. Never retain raw logs, environment,
 // container identifiers or generated local credentials in evidence artifacts.
-function disposableDiagnostics(projectId) {
+export function disposableDiagnostics(projectId) {
   return ["kong", "rest", "db"].map((component) => {
     const container = `supabase_${component}_${projectId}`;
     const options = { encoding:"utf8", env:sanitizedEnvironment(), timeout:5000, maxBuffer:1024*1024 };
@@ -98,7 +112,7 @@ function disposableDiagnostics(projectId) {
   });
 }
 
-async function configureStack(workdir, { projectId, apiPort, dbPort, shadowPort, studioPort, inbucketPort, analyticsPort }) {
+export async function configureStack(workdir, { projectId, apiPort, dbPort, shadowPort, studioPort, inbucketPort, analyticsPort }) {
   assertDisposableDirectory(workdir);
   await mkdir(workdir, { recursive: true });
   cli(["init", "--workdir", workdir], { env: sanitizedEnvironment() });
@@ -116,7 +130,7 @@ async function configureStack(workdir, { projectId, apiPort, dbPort, shadowPort,
   await writeFile(configPath, config);
 }
 
-async function copyMigrations(workdir, predicate = () => true) {
+export async function copyMigrations(workdir, predicate = () => true) {
   const target = path.join(workdir, "supabase/migrations");
   await mkdir(target, { recursive: true });
   for (const filename of (await readdir(migrationsSource)).filter((name) => name.endsWith(".sql") && predicate(name)).sort()) {
@@ -166,7 +180,7 @@ export async function removeOwnedLegacySingleton({ query, ownershipMarker, runIn
   return runIntegration();
 }
 
-function containerPsql(projectId, sql, { quiet = true } = {}) {
+export function containerPsql(projectId, sql, { quiet = true } = {}) {
   const flags = quiet ? "-XAtq" : "-XAt";
   return command("docker", ["exec", "-i", `supabase_db_${projectId}`, "psql", flags, "-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=verbose", "-U", "postgres", "-d", "postgres", "-f", "-"], { input: sql });
 }
@@ -190,7 +204,7 @@ function integrationEnvironment(status, projectId) {
   });
 }
 
-function configureDisposableGateway(projectId) {
+export function configureDisposableGateway(projectId) {
   assert.match(projectId, /^matter-stats-(fresh|upgrade|restore)-[a-z0-9-]+$/);
   // The CLI's Kong can reuse a socket closed by its upstream under the large
   // fixture's burst of real Data API calls. Disable only this owned gateway's
@@ -481,7 +495,7 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
   try {
     const actualCli = cli(['--version']).trim();
     assert.equal(actualCli, SUPABASE_CLI_VERSION, 'unexpected Supabase CLI version');
-    await writeFile(path.join(evidenceDir, 'toolchain.json'), JSON.stringify({ node:identity.node, npm:identity.npm, supabaseCli:actualCli }, null, 2) + '\n');
+    await writeFile(path.join(evidenceDir, 'toolchain.json'), JSON.stringify({ node:identity.node, npm:identity.npm, supabaseCli:actualCli, imageRegistry:process.env.STABILIZATION_TEST_IMAGE_REGISTRY ?? 'public.ecr.aws' }, null, 2) + '\n');
     phases.end();
     phases.begin('compilation');
     command(process.execPath, [path.join(repoRoot, 'node_modules/typescript/bin/tsc'), '-p', 'tests/tsconfig.json']);

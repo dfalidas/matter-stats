@@ -1,0 +1,34 @@
+{
+  "environment": "A: GitHub Actions application verification",
+  "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/39597331904",
+  "jobId": 119213053362,
+  "attempt": 1,
+  "prHeadSha": "69fdc63b69383efbb064a6ee92b7edba657e16e1",
+  "actualCheckoutSha": "381bd5b329d6bb93cf3c6daf840d6e392989f350",
+  "checkoutKind": "GitHub PR merge",
+  "treeSha": "b0e424572eaad58a4220f48a4ec17ad696a62d88",
+  "mergeAndHeadTreesVerifiedIdentical": true,
+  "node": "v22.23.3",
+  "npm": "10.9.9",
+  "commands": {
+    "npm ci": "passed (458 packages)",
+    "next typegen": "passed",
+    "typecheck": "passed",
+    "lint": "passed",
+    "test": "passed",
+    "build": "passed",
+    "audit:ci": "passed"
+  },
+  "applicationTests": {
+    "passed": 403,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "audit": {
+    "fullHigh": 8,
+    "productionVulnerabilities": 0,
+    "policy": "unchanged"
+  }
+}

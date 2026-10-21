@@ -1,0 +1,42 @@
+{
+  "environment": "B: local Docker on GitHub runner, not hosted staging",
+  "baseSha": "7723e13af842d456828a47897532d56722c79acb",
+  "testedSha": "69fdc63b69383efbb064a6ee92b7edba657e16e1",
+  "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/39597331904",
+  "attempt": 1,
+  "browserArtifact": {
+    "id": 12344324796,
+    "url": "https://github.com/dfalidas/matter-stats/actions/runs/39597331904/artifacts/12344324796",
+    "sha256": "e4274a9a21381114ee7a689cb18e31eebfb5e1c22a38d7d56860cedd11401aa2",
+    "downloadDigestVerified": true
+  },
+  "recoveryArtifacts": [
+    {
+      "testedSha": "160ed48f93340c0056abdb450fec17566a4ae85f",
+      "id": 12331810196,
+      "sha256": "b31b4c611ba0868213fdb9e0db1c5239873a17b714f2c01eed4227c3f3940f70",
+      "downloadDigestVerified": true
+    },
+    {
+      "testedSha": "8c1675db97449e1abf35ad04ad192b0ffc2c1349",
+      "id": 12343394814,
+      "sha256": "8c2b2c038bc1c7c0ed200680618244c09e776cac3dfa07630e38cbeebb367126",
+      "downloadDigestVerified": true
+    }
+  ],
+  "hostedStaging": "blocked/not-run",
+  "production": "not-run",
+  "realScheduledDelivery": "not-run",
+  "auditArtifact": {
+    "id": 12344417225,
+    "url": "https://github.com/dfalidas/matter-stats/actions/runs/39597331904/artifacts/12344417225",
+    "sha256": "765c66b91f95291ea3321d0d23b6c9bfc8d964e6b09140d5e1e182d5711972f7",
+    "downloadDigestVerified": true
+  },
+  "databaseArtifact": {
+    "id": 12344569555,
+    "url": "https://github.com/dfalidas/matter-stats/actions/runs/39597331904/artifacts/12344569555",
+    "sha256": "6b82eeadecdae09aa21a8853b075587d86b6a449942bab134a04a18738a3648c",
+    "downloadDigestVerified": true
+  }
+}

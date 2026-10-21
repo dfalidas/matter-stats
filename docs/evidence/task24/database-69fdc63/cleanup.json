@@ -1,0 +1,18 @@
+{
+  "gitSha": "69fdc63b69383efbb064a6ee92b7edba657e16e1",
+  "resources": [
+    {
+      "path": "fresh",
+      "status": "verified-removed"
+    },
+    {
+      "path": "restore",
+      "status": "verified-removed"
+    },
+    {
+      "path": "upgrade",
+      "status": "verified-removed"
+    }
+  ],
+  "temporaryDirectoryRemoved": true
+}

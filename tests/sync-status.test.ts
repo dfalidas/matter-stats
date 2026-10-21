@@ -68,17 +68,34 @@ test('legacy, building, blocked, frozen, ready candidate, active cutover and rol
   g.active!.timezone='UTC';assert.equal(derive(i).derived,'timezone mismatch');
   assert.equal(derive(i).coverage,'unverified');assert.match(derive(i).view.details.find(d=>d.label==='Session-to-item attribution')!.value,/Unsupported.*not guaranteed/);
 });
-function httpFixture(fail?:string, missingCount=false) {
+function httpFixture(fail?:string, missingCount=false, generation:unknown=gen) {
   const tables={matter_sync_streams:[],matter_cycle_completions:[{stream:'recent_sessions',cycle_generation:1,source_boundary:'2026-10-12T00:00:00Z',completed_at:completed}],matter_invocation_status:[],sync_runs:[],matter_sync_continuation:[{account_scope:'matter',history_status:'none',requested_at:null}],matter_sync_leases:[{account_scope:'matter',expires_at:null}],reading_sessions:[{id:'session',item_id:null,started_at:'2026-10-15T08:00:00Z',duration_seconds:60}],matter_items:[{id:'item',title:'Synthetic'}],daily_stats:[],matter_dirty_rollups:[]};
   return cappedPostgrest(tables,{respond:({table,url})=>{
     if(table===fail)return Response.json({message:'SENSITIVE_DATABASE_PAYLOAD',code:'XX000'},{status:500});
     if(missingCount && table==='matter_items')return new Response(null,{status:200});
-    if(table==='read_matter_generation_status')return Response.json(gen);
+    if(table==='read_matter_generation_status')return Response.json(generation);
     if(table==='read_matter_retry_status')return Response.json({nextEligibleAt:null,manualRecovery:false,pendingRequests:0});
     if(table==='reading_generation_control')return Response.json({active:null});
     void url;
   }});
 }
+test('new persisted candidate with SQL NULL reconciliation retains frozen/unapplied status without claiming readiness',async()=>{
+  const candidate={state:'capture_sessions',timezone:'Europe/Athens',readinessAt:null,reconciled:null,pendingChanges:false};
+  const {client}=httpFixture(undefined,false,{...gen,frozen:true,candidate});
+  const s=await loadSyncStatus(client,now,'Europe/Athens');
+  assert.equal(s.derived,'writer barrier frozen');
+  assert.match(s.view.details.find(d=>d.label==='Historical repair')!.value,/reconciliation unresolved; not applied/);
+  assert.equal(s.hasUnavailableSections,false);
+});
+test('malformed candidate reconciliation still fails closed while explicit false and true retain their meanings',async()=>{
+  for(const reconciled of [false,true,'true',undefined]){
+    const candidate={state:'ready',timezone:'Europe/Athens',readinessAt:completed,reconciled,pendingChanges:false};
+    const {client}=httpFixture(undefined,false,{...gen,candidate});
+    const s=await loadSyncStatus(client,now,'Europe/Athens');
+    assert.equal(s.derived,typeof reconciled==='boolean'?'historical repair ready; not applied':'unavailable');
+    if(typeof reconciled==='boolean')assert.match(s.view.details.find(d=>d.label==='Historical repair')!.value,reconciled?/reconciled candidate; not applied/:/reconciliation unresolved; not applied/);
+  }
+});
 test('bounded local status reads check every independent query failure without false healthy fallbacks',async()=>{
   for(const fail of ['matter_sync_streams','matter_cycle_completions','matter_invocation_status','sync_runs','reading_sessions','matter_sync_continuation','matter_sync_leases','read_matter_retry_status','sync_state','matter_dirty_rollups','read_matter_generation_status']){
     const {client,requests}=httpFixture(fail);const s=await loadSyncStatus(client,now,'Europe/Athens');assert.doesNotMatch(JSON.stringify(s),/SENSITIVE/);

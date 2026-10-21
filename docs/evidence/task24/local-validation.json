@@ -1,0 +1,64 @@
+{
+  "testedSha": "8c1675db97449e1abf35ad04ad192b0ffc2c1349",
+  "environment": "A: local isolated application verification",
+  "startedAt": "2026-10-21T12:02:47.146Z",
+  "node": "v22.23.3",
+  "commands": [
+    {
+      "name": "npm-ci",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "name": "route-types",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "name": "typecheck",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "name": "lint",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "name": "test",
+      "status": "passed",
+      "exit": 0,
+      "counts": {
+        "tests": 403,
+        "pass": 403,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "name": "build",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "name": "audit",
+      "status": "passed",
+      "exit": 0
+    }
+  ],
+  "npm": "10.9.9",
+  "worktreeDirty": true,
+  "dirtyScope": "Task 24 documentation only; tested runtime, test and harness files match 8c1675d",
+  "audit": {
+    "policy": "unchanged",
+    "fullHigh": 8,
+    "productionVulnerabilities": 0
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 3,
+    "warningScope": "pre-existing local .agents skill scripts, absent from tracked CI checkout"
+  }
+}

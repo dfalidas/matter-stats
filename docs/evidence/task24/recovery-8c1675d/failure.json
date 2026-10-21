@@ -1,0 +1,69 @@
+{
+  "status": "failed",
+  "category": "AssertionError",
+  "failureLocation": [
+    "task24-journeys.mjs",
+    "1057",
+    "12"
+  ],
+  "rawDetailsWithheld": true,
+  "infrastructureReason": null,
+  "databaseCode": null,
+  "diagnosticStages": [],
+  "diagnosticWords": [],
+  "tool": null,
+  "operation": null,
+  "disposableDiagnostics": [
+    {
+      "component": "kong",
+      "stateAvailable": true,
+      "running": true,
+      "outOfMemory": false,
+      "exitCode": 0,
+      "logsAvailable": true,
+      "errorCounts": {
+        "upstream": 0,
+        "connectionReset": 0,
+        "processCrash": 0,
+        "databaseError": 0,
+        "workerConnections": 0,
+        "databaseConnections": 0,
+        "postgrest": 0
+      }
+    },
+    {
+      "component": "rest",
+      "stateAvailable": true,
+      "running": true,
+      "outOfMemory": false,
+      "exitCode": 0,
+      "logsAvailable": true,
+      "errorCounts": {
+        "upstream": 0,
+        "connectionReset": 0,
+        "processCrash": 0,
+        "databaseError": 0,
+        "workerConnections": 0,
+        "databaseConnections": 0,
+        "postgrest": 0
+      }
+    },
+    {
+      "component": "db",
+      "stateAvailable": true,
+      "running": true,
+      "outOfMemory": false,
+      "exitCode": 0,
+      "logsAvailable": true,
+      "errorCounts": {
+        "upstream": 0,
+        "connectionReset": 0,
+        "processCrash": 0,
+        "databaseError": 0,
+        "workerConnections": 0,
+        "databaseConnections": 0,
+        "postgrest": 0
+      }
+    }
+  ]
+}

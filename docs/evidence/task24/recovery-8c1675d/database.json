@@ -1,0 +1,65 @@
+{
+  "migrationInventory": [
+    "20260513000000",
+    "20260514000000",
+    "20260515000000",
+    "20260515010000",
+    "20260515020000",
+    "20260515030000",
+    "20260518000000",
+    "20260519090000",
+    "20260929000000",
+    "20260929010000",
+    "20261004000000",
+    "20261004010000",
+    "20261005000000",
+    "20261007085051",
+    "20261007132750",
+    "20261007145024",
+    "20261008095102",
+    "20261014084407",
+    "20261014140402",
+    "20261015141435"
+  ],
+  "realSqlAndDataApi": "not-run",
+  "postgres": "17.6",
+  "steps": [
+    {
+      "name": "migrations",
+      "status": "passed"
+    },
+    {
+      "name": "sessions",
+      "status": "passed"
+    },
+    {
+      "name": "analytics-reference",
+      "status": "passed"
+    },
+    {
+      "name": "ingestion",
+      "status": "passed"
+    },
+    {
+      "name": "faults",
+      "status": "passed"
+    },
+    {
+      "name": "status",
+      "status": "passed"
+    },
+    {
+      "name": "logout",
+      "status": "passed"
+    }
+  ],
+  "counts": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0,
+    "blocked": 0,
+    "not-run": 0,
+    "running": 0
+  }
+}

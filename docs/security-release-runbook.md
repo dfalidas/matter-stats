@@ -7,15 +7,25 @@ rotation or real Matter sync requires separate authorization. No such operation
 was performed for this document. Record observations for the actual target;
 repository implementation and automatic Git deployment statuses are not production certification.
 
+Task 24 adds a separate [release-gate summary and evidence matrix](task-24-validation.md)
+and [reproducible browser-to-real-Supabase guide](task-24-execution-guide.md).
+The proposed additional check is **Isolated browser and Supabase verification**.
+Its runner-owned local/CI result is category B; actual hosted staging remains a
+separate category C gate, and production plus two real scheduled cycles category D.
+No branch-protection enforcement is configured by this documentation.
+
 ## Preflight checklist
 
 - [ ] Record exact candidate Git SHA, target/environment identity privately, reviewer,
   maintenance window, abort owner and the compatible application recovery SHA.
-- [ ] Read successful checks **for that candidate**: `verify` and
-  `Fresh and upgrade database verification` in workflow `CI`. These are the exact
+- [ ] Read successful checks **for that candidate**: `verify`,
+  `Fresh and upgrade database verification` and
+  `Isolated browser and Supabase verification` in workflow `CI`. These are the exact
   check names recommended for branch protection. Repository rules were not changed
   or verified here. The application job checks GitHub's PR merge commit; the database
-  job checks PR head. On pushes both check the pushed main commit. Retain both SHAs.
+  and browser jobs check PR head. On pushes all check the pushed main commit.
+  Retain the actual checkout identities. Browser/DB success remains isolated B;
+  [Task 24's hosted C and production D gates](task-24-validation.md) stay separate.
 - [ ] Inspect sanitized artifact outcomes and cleanup, not just a green status.
   A blocked/not-run/failed database path is an unresolved gate. Verify all 20 ordered
   migrations in `supabase/migrations` against actual target history; latest is

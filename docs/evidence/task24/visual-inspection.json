@@ -1,0 +1,53 @@
+{
+  "inspectedAt": "2026-10-21",
+  "environment": "B: production Next server + real runner-owned local Supabase in GitHub Actions",
+  "testedSha": "69fdc63b69383efbb064a6ee92b7edba657e16e1",
+  "reviewer": "Codex visual inspection via view_image",
+  "outcome": "inspected",
+  "privacy": "All seven contain synthetic data only; no credentials, cookies, cursors, tokens, private project identifiers or personal data observed.",
+  "scope": "Viewport/layout and representative rendered outcomes; not hosted staging or formal accessibility certification. Original journey manifest visualInspection=pending is preserved; this separate record documents completed review.",
+  "screenshots": [
+    {
+      "file": "overview-desktop.png",
+      "sha256": "911eef9818719a12c2b90c9f52c1c5c7aaf98c6301ef97fabd0f6ffd6cf711b4",
+      "result": "inspected",
+      "observation": "Athens 2 January 2025 custom range; 3 min, approximately 675 words and 3 sessions; unknown completion/legacy calculations/coverage uncertainty remain explicit; desktop controls clear."
+    },
+    {
+      "file": "reports-cross-month-desktop.png",
+      "sha256": "36d56f38f0e086cdcbbb84cae079cef8897ef20b7a5fa981a0e3882366432f00",
+      "result": "inspected",
+      "observation": "Selected March 1 reference retained in weekly view; February 24\u2013March 2 and previous week shown; approximately 233 words, 2 sessions, CSV control visible."
+    },
+    {
+      "file": "activity-mobile-final-control.png",
+      "sha256": "d42b289014d4493971de429c2807eedb905ba8bbc3bfaf5f19b50d06f8e8f7b9",
+      "result": "inspected",
+      "observation": "390px viewport, page 2 of 2 with five remaining sessions; whole-day approximately 100 words and 25 sessions retained; Previous/disabled final Next visible above fixed bottom navigation."
+    },
+    {
+      "file": "reports-mobile-three-sessions.png",
+      "sha256": "eb89ee6b0a6f4bce58d7d36827bdd5a3c1a20966bdd323c80373a5e1784bde5e",
+      "result": "inspected",
+      "observation": "390px viewport; period input, Day/Week/Month/Year, Apply and Export CSV remain visible; January 2 Athens daily range and three imported sessions; vertical scrolling remains available."
+    },
+    {
+      "file": "settings-partial-desktop.png",
+      "sha256": "54339a0d78a6c87bf51bb1b03bf3110e1316c2635b092a3b11b5096946b577a7",
+      "result": "inspected",
+      "observation": "Actual UI import of eight sessions: work remains, pages budget reached, committed checkpoint retained, history running, completion never established and coverage unverified; latest competing route is skipped_locked. Scheduled(invocation) is a route trigger, not delivery evidence."
+    },
+    {
+      "file": "overview-synced-desktop.png",
+      "sha256": "b2ea9b20b50a24cfa9dfa5c981e30296f7ad638bc6af09b4b6faf84d687bfc3e",
+      "result": "inspected",
+      "observation": "Actual persisted 19-session continuation renders 19 min and approximately 4,275 words; sessions completion recent while metadata never completed, saved calculations legacy/unverified and coverage unverified."
+    },
+    {
+      "file": "overview-independent-outage-desktop.png",
+      "sha256": "b6b710e1b2c92527905030295414be08e2f3e81874986c4b8b2756fdc4851248",
+      "result": "inspected",
+      "observation": "Injected metrics transport outage shows Reading data unavailable; actual independent status shows stale completion and pending updates; real Library preview and period controls remain visible."
+    }
+  ]
+}

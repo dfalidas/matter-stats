@@ -57,6 +57,8 @@ jobs:
     name: Fresh and upgrade database verification
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      STABILIZATION_TEST_IMAGE_REGISTRY: docker.io
     steps:
       - name: Check out event commit (PR head or main push)
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -87,5 +89,64 @@ jobs:
         with:
           name: stabilization-db-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
           path: artifacts/stabilization-db/**/*.json
+          if-no-files-found: error
+          retention-days: 14
+
+  isolated-full-stack:
+    name: Isolated browser and Supabase verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      STABILIZATION_TEST_IMAGE_REGISTRY: docker.io
+    steps:
+      - name: Check out event commit (PR head or main push)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install pinned Chromium and system libraries
+        run: npx --no-install playwright install --with-deps chromium
+      - name: Verify production browser to real isolated Supabase
+        id: browser
+        run: DISPOSABLE_DB_ACK=yes npm run test:full-stack
+      - name: Record event and CI step outcome
+        if: ${{ always() }}
+        env:
+          TASK24_STEP_OUTCOME: ${{ steps.browser.outcome }}
+        run: node scripts/task24-ci-evidence.mjs
+      - name: Retain only sanitized Task 24 evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: task24-full-stack-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: |
+            artifacts/task24/**/identity.json
+            artifacts/task24/**/ci.json
+            artifacts/task24/**/outcomes.json
+            artifacts/task24/**/database.json
+            artifacts/task24/**/build.json
+            artifacts/task24/**/toolchain.json
+            artifacts/task24/**/fixtures.json
+            artifacts/task24/**/journeys.json
+            artifacts/task24/**/browser.json
+            artifacts/task24/**/network.json
+            artifacts/task24/**/failure.json
+            artifacts/task24/**/cleanup.json
+            artifacts/task24/**/overview-desktop.png
+            artifacts/task24/**/overview-synced-desktop.png
+            artifacts/task24/**/reports-cross-month-desktop.png
+            artifacts/task24/**/activity-mobile-final-control.png
+            artifacts/task24/**/reports-mobile-three-sessions.png
+            artifacts/task24/**/settings-partial-desktop.png
+            artifacts/task24/**/overview-independent-outage-desktop.png
           if-no-files-found: error
           retention-days: 14

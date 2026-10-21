@@ -1,0 +1,13 @@
+{
+  "pageErrors": 0,
+  "consoleErrors": [
+    {
+      "kind": "resource"
+    },
+    {
+      "kind": "other"
+    }
+  ],
+  "unexpectedRequests": 0,
+  "failedResources": []
+}
