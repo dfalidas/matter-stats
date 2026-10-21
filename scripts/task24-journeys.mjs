@@ -1007,6 +1007,10 @@ export async function runJourneys({
     sql(
       `select public.repair_prepare('${candidate}','${owner}',null,0,'Europe/Athens');`,
     );
+    const prepared = JSON.parse(sql("select public.read_matter_generation_status()::text;"));
+    assert.equal(prepared.frozen, true);
+    assert.equal(prepared.candidate.state, "capture_sessions");
+    assert.equal(prepared.candidate.reconciled, null);
     for (const route of ["/dashboard", "/settings"]) {
       await goto(route);
       assert.match(
@@ -1017,6 +1021,7 @@ export async function runJourneys({
     }
     check(
       "unapplied generation candidate: real isolated repair_prepare state; never described as analytics-ready",
+      { persistedReconciliation: null, expectedReadiness: "writer barrier frozen" },
     );
     databasePhases.end();
     phases.end();

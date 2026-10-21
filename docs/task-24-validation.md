@@ -59,6 +59,39 @@ status. These are reused coverage, not duplicate new browser assertion counts.
 
 ## Execution and evidence status
 
+### Recovery checkpoint — 2026-10-21
+
+Resumed after the five-hour interruption. Read root `AGENTS.md`, inspected the
+clean worktree, recent commits, remote branches, PR/reviews, ignored work/evidence,
+processes and Docker inventories before editing. Local HEAD and draft PR #87 head
+were both `160ed48f93340c0056abdb450fec17566a4ae85f`. Refetched main remains
+`7723e13af842d456828a47897532d56722c79acb`; no subsequent changes. No uncommitted
+or untracked nonignored files. No live task app/browser/build processes, containers,
+volumes or task temporary stack directories remained. Six defunct Next process
+entries owned by PID 1 are exited processes, not running servers; no blind kill or
+resource removal was performed. PR #87 is open/draft, with no human reviews.
+
+| Requirement | Existing implementation | Actual evidence and tested SHA | Remaining work | Current outcome at recovery |
+| --- | --- | --- | --- | --- |
+| A / supported application checks | Node 22 lockfile, route types, typecheck, lint, tests, production build and unchanged audit | [CI 39568890074](https://github.com/dfalidas/matter-stats/actions/runs/39568890074), head `160ed48`; verify passed | Final candidate checks | Implemented and verified at recorded source |
+| B / auth, analytics, navigation, real ingestion and faults | Owned real Supabase + production browser harness | Same run, artifact [12331810196](https://github.com/dfalidas/matter-stats/actions/runs/39568890074/artifacts/12331810196), SHA-256 `b31b4c611ba0868213fdb9e0db1c5239873a17b714f2c01eed4227c3f3940f70`; 30 behavioral groups passed before generation assertion | Diagnose generation boundary; run remaining logout/network assertions and rerun affected checks | Implemented; overall FAILED, not accepted |
+| B / generation candidate status | Real isolated `repair_prepare` then Overview/Settings reads | Same head, `task24-journeys.mjs:1012`; real Data API errors 0 | Determine actual persisted status contract and smallest necessary correction | Failed |
+| B / logout and final network audit | Implemented | Same run: not-run after failure | Execute | Implemented but unverified |
+| Task 23 fresh/upgrade and synthetic restore | Existing full gate retained | Same run, database job passed; [artifact 12331712608](https://github.com/dfalidas/matter-stats/actions/runs/39568890074/artifacts/12331712608) | Inspect final candidate artifact | Verified at recorded source |
+| Cleanup | Exact owned-resource checks | Browser artifact: processes removed, browser closed, stack and temporary directory removed; current local Docker/task-temp inventory empty | Final candidate cleanup | Verified for this completed attempt; canceled historical jobs remain unverified where recorded |
+| Local Docker provisioning | Existing full-stack command | Earlier dirty/base-keyed local attempt blocked by disk capacity before browser/DB assertions | Use adequately sized CI runner; retain original outcome | Blocked infrastructure |
+| Release evidence, visual inspection, PR and tracker | Docs/guide and draft PR #87 exist; ignored sanitized artifacts/screenshots preserved | Two partial-run desktop captures inspected at original `2af68b2` source; PR description still in-progress | Inspect completed captures, retain allowlisted results, finalize docs/PR/Craft | Interrupted |
+| C hosted staging / D production and scheduling | Operator procedure exists | Discovery found no authorized isolated hosted target | External setup/authorization; production work outside scope | C BLOCKED/NOT RUN; D NOT RUN |
+
+Recovery diagnosis: `read_matter_generation_status` legitimately returns SQL NULL
+for a newly prepared candidate's reconciliation conjunction before evidence exists.
+The application reader previously rejected that whole successful status response,
+hiding the known frozen/unapplied state as unavailable. A narrow reader correction
+normalizes only this NULL flag to false; malformed values still fail closed. Two
+focused regressions and a real SQL NULL assertion cover the boundary. No migration,
+reconciliation/cutover condition or writer behavior changes. This is the sole
+application correction in Task 24; final execution results follow below.
+
 Reproduce using the [execution guide](task-24-execution-guide.md). Actual completed
 command results, final-head CI links, browser/database group counts, screenshot
 inspection and local provisioning attempts will be recorded here before handoff.

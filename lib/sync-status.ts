@@ -180,7 +180,7 @@ export async function loadSyncStatus(client: MatterStatsSupabaseClient, now: Dat
     lease:lease.state === 'known' ? known({occupied:!!lease.value.expires_at,expiresAt:lease.value.expires_at}) : unavailable,
     retry:retry.state === 'known' && validRetry(retry.value) ? known(retry.value) : unavailable,
     legacyCooldown:legacy.state === 'known' ? legacy.value.rate_limited_until ? known(legacy.value.rate_limited_until) : absent : legacy,
-    dirtyRollups:dirty,generation:generation.state === 'known' && validGeneration(generation.value) ? known(generation.value) : unavailable},now,timezone,thresholdHours);
+    dirtyRollups:dirty,generation:generation.state === 'known' ? normalizeGeneration(generation.value) : unavailable},now,timezone,thresholdHours);
 }
 export async function readStatusEvidence<T>(query: PromiseLike<{data:T;error:unknown}>): Promise<Evidence<NonNullable<T>>> {
   try { const r = await query; return r.error ? unavailable : r.data === null ? absent : known(r.data as NonNullable<T>); }
@@ -188,6 +188,13 @@ export async function readStatusEvidence<T>(query: PromiseLike<{data:T;error:unk
 }
 function object(v: unknown): v is Record<string, unknown> { return !!v && typeof v === 'object' && !Array.isArray(v); }
 function nullableInstant(v: unknown): boolean { return v === null || typeof v === 'string' && Number.isFinite(Date.parse(v)); }
+function normalizeGeneration(value: unknown): Evidence<GenerationEvidence> {
+  // The persisted SQL conjunction is NULL before a candidate has reconciliation
+  // evidence. It proves no reconciliation, rather than a failed status query.
+  const normalized = object(value) && object(value.candidate) && value.candidate.reconciled === null
+    ? {...value, candidate:{...value.candidate, reconciled:false}} : value;
+  return validGeneration(normalized) ? known(normalized) : unavailable;
+}
 function validRetry(v: unknown): v is RetryEvidence {
   return object(v) && Number.isSafeInteger(v.pendingRequests) && Number(v.pendingRequests) >= 0
     && typeof v.manualRecovery === 'boolean' && nullableInstant(v.nextEligibleAt);
