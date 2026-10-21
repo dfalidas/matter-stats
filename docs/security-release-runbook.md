@@ -7,6 +7,13 @@ rotation or real Matter sync requires separate authorization. No such operation
 was performed for this document. Record observations for the actual target;
 repository implementation and automatic Git deployment statuses are not production certification.
 
+Task 24 adds a separate [release-gate summary and evidence matrix](task-24-validation.md)
+and [reproducible browser-to-real-Supabase guide](task-24-execution-guide.md).
+The proposed additional check is **Isolated browser and Supabase verification**.
+Its runner-owned local/CI result is category B; actual hosted staging remains a
+separate category C gate, and production plus two real scheduled cycles category D.
+No branch-protection enforcement is configured by this documentation.
+
 ## Preflight checklist
 
 - [ ] Record exact candidate Git SHA, target/environment identity privately, reviewer,

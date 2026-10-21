@@ -42,7 +42,7 @@ export function commandFailureCategory(stderr = '') {
   return /AssertionError|ERR_ASSERTION/i.test(stderr) ? 'assertion' : 'execution';
 }
 
-function command(binary, args, { cwd = repoRoot, env = sanitizedEnvironment(), input } = {}) {
+export function command(binary, args, { cwd = repoRoot, env = sanitizedEnvironment(), input } = {}) {
   if (binary === "docker") args = ["--host=unix:///var/run/docker.sock", ...args];
   const result = spawnSync(binary, args, { cwd, env, input, encoding: "utf8", timeout: 20 * 60 * 1000, maxBuffer: 32 * 1024 * 1024 });
   if (result.error) throw Object.assign(new Error(`Disposable command unavailable or timed out (${result.error.code ?? 'unknown'}).`), { failureKind: "infrastructure", category:result.error.code === 'ETIMEDOUT' ? 'timeout' : 'command-unavailable' });
@@ -56,7 +56,7 @@ function command(binary, args, { cwd = repoRoot, env = sanitizedEnvironment(), i
   return result.stdout;
 }
 
-function cli(args, options) {
+export function cli(args, options) {
   return command("npx", ["--yes", `supabase@${SUPABASE_CLI_VERSION}`, ...args], options);
 }
 
@@ -98,7 +98,7 @@ function disposableDiagnostics(projectId) {
   });
 }
 
-async function configureStack(workdir, { projectId, apiPort, dbPort, shadowPort, studioPort, inbucketPort, analyticsPort }) {
+export async function configureStack(workdir, { projectId, apiPort, dbPort, shadowPort, studioPort, inbucketPort, analyticsPort }) {
   assertDisposableDirectory(workdir);
   await mkdir(workdir, { recursive: true });
   cli(["init", "--workdir", workdir], { env: sanitizedEnvironment() });
@@ -116,7 +116,7 @@ async function configureStack(workdir, { projectId, apiPort, dbPort, shadowPort,
   await writeFile(configPath, config);
 }
 
-async function copyMigrations(workdir, predicate = () => true) {
+export async function copyMigrations(workdir, predicate = () => true) {
   const target = path.join(workdir, "supabase/migrations");
   await mkdir(target, { recursive: true });
   for (const filename of (await readdir(migrationsSource)).filter((name) => name.endsWith(".sql") && predicate(name)).sort()) {
@@ -166,7 +166,7 @@ export async function removeOwnedLegacySingleton({ query, ownershipMarker, runIn
   return runIntegration();
 }
 
-function containerPsql(projectId, sql, { quiet = true } = {}) {
+export function containerPsql(projectId, sql, { quiet = true } = {}) {
   const flags = quiet ? "-XAtq" : "-XAt";
   return command("docker", ["exec", "-i", `supabase_db_${projectId}`, "psql", flags, "-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=verbose", "-U", "postgres", "-d", "postgres", "-f", "-"], { input: sql });
 }
@@ -190,7 +190,7 @@ function integrationEnvironment(status, projectId) {
   });
 }
 
-function configureDisposableGateway(projectId) {
+export function configureDisposableGateway(projectId) {
   assert.match(projectId, /^matter-stats-(fresh|upgrade|restore)-[a-z0-9-]+$/);
   // The CLI's Kong can reuse a socket closed by its upstream under the large
   // fixture's burst of real Data API calls. Disable only this owned gateway's

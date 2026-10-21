@@ -36,6 +36,8 @@ Specialist references:
 - [Task 21 status definitions, freshness, invocation correlation and uncertainty](task-21-status.md).
 - [Task 22 route/UI validation and historical audit discrepancy](task-22-qa.md).
 - [Task 23 requirements, verification and unresolved gates](task-23-validation.md).
+- [Task 24 isolated full-stack matrix and release gates](task-24-validation.md).
+- [Task 24 execution and actual hosted-staging prerequisites](task-24-execution-guide.md).
 
 Keep `vercel.json`'s daily **`0 6 * * *` UTC** cron and exact Bearer `CRON_SECRET`.
 Manual actions use the opaque database session guard. Partial bounded synchronization
