@@ -22,6 +22,15 @@ DISPOSABLE_DB_ACK=yes npm run test:stabilization-db
 git diff --check
 ```
 
+CI explicitly selects `STABILIZATION_TEST_IMAGE_REGISTRY=docker.io` for both
+isolated database jobs. CLI 2.48.3 supports this official registry through
+`SUPABASE_INTERNAL_IMAGE_REGISTRY`; the wrapper forwards only the reviewed enum
+value and retains the CLI's exact image tags. The default ECR registry returned
+`toomanyrequests: Rate exceeded` during Task 24; the same pinned Postgres image's
+Docker Hub manifest was reachable. Local operators can prefix the two disposable
+commands with `STABILIZATION_TEST_IMAGE_REGISTRY=docker.io`. No production
+configuration or application dependency changes. Never pass an arbitrary mirror.
+
 The separate `CI` jobs are `verify`, `Fresh and upgrade database verification`,
 and **`Isolated browser and Supabase verification`**. These are proposed check
 names only; no branch protection is changed or claimed configured. The browser
@@ -35,6 +44,11 @@ Those required suites remain in their separate existing jobs.
 
 `task24-full-stack.mjs` creates one owned stack using Task 23's configuration,
 migration, SQL, catalog and gateway helpers. CLI bootstrap credentials are local;
+the CLI's 40-character project-ID bound is asserted before resource creation.
+The browser stack retains real Postgres, PostgREST, Kong and Auth; unused Studio,
+Storage, Realtime, image proxy, email, analytics, vector, Edge Runtime, pooler and
+postgres-meta containers are excluded with the reviewed CLI flag. Task 23's full
+fresh/upgrade/restore services and assertions remain intact.
 the application uses a fresh signed service-role JWT and generated app/cron/Matter
 credentials. The normal database transport is real. Seeded analytics and supplementary
 status states use SQL on that owned stack. Sync uses actual production actions,

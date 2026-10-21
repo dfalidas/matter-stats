@@ -83,6 +83,7 @@ export async function runJourneys({
       });
   });
   const text = () => page.locator("main").innerText();
+  const loginAlert = page.locator("main").getByRole("alert");
   const goto = async (route) => {
     await page.goto(origin + route, { waitUntil: "networkidle" });
   };
@@ -254,16 +255,13 @@ export async function runJourneys({
       .getByLabel("Access password")
       .fill("incorrect-synthetic-password");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await page
-      .getByRole("alert")
-      .filter({ hasText: "Invalid password" })
-      .waitFor();
+    await loginAlert.filter({ hasText: "Invalid password" }).waitFor();
     for (let i = 0; i < 5; i++) {
       await page
         .getByLabel("Access password")
         .fill("incorrect-synthetic-password");
       await page.getByRole("button", { name: "Sign in", exact: true }).click();
-      await page.getByRole("alert").waitFor();
+      await loginAlert.waitFor();
       // Wait for action settlement, including the form's uncontrolled reset.
       await page.waitForFunction(
         () => document.querySelector('input[name="password"]')?.value === "",
@@ -271,10 +269,7 @@ export async function runJourneys({
     }
     await page.getByLabel("Access password").fill(credentials.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await page
-      .getByRole("alert")
-      .filter({ hasText: /Too many attempts/ })
-      .waitFor();
+    await loginAlert.filter({ hasText: /Too many attempts/ }).waitFor();
     assert.equal(
       (await context.cookies()).filter((row) => row.name === cookieName).length,
       0,
@@ -293,10 +288,7 @@ export async function runJourneys({
     state.fault = "record_app_login_attempt";
     await page.getByLabel("Access password").fill(credentials.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await page
-      .getByRole("alert")
-      .filter({ hasText: /temporarily unavailable/ })
-      .waitFor();
+    await loginAlert.filter({ hasText: /temporarily unavailable/ }).waitFor();
     assert.equal((await context.cookies()).length, 0);
     state.fault = "app_sessions";
     await page.getByLabel("Access password").fill(credentials.password);
@@ -304,10 +296,7 @@ export async function runJourneys({
     await page.waitForFunction(
       () => document.querySelector('input[name="password"]')?.value === "",
     );
-    await page
-      .getByRole("alert")
-      .filter({ hasText: /temporarily unavailable/ })
-      .waitFor();
+    await loginAlert.filter({ hasText: /temporarily unavailable/ }).waitFor();
     assert.equal((await context.cookies()).length, 0);
     state.fault = null;
     let cookie = await login();
@@ -526,9 +515,21 @@ export async function runJourneys({
     await page.waitForURL("**/articles/task24-item-001");
     assert.match(await text(), /Reading sessions are not attributed/);
     await goto("/articles/task24-item-000");
-    assert.match(await text(), /Unknown|Unavailable|Not available|—/);
+    assert.match(
+      await page
+        .getByText("Article size", { exact: true })
+        .locator("..")
+        .innerText(),
+      /Unknown|Unavailable|Not available|Not provided|—/,
+    );
     await goto("/articles/task24-item-002");
-    assert.match(await text(), /0/);
+    assert.match(
+      await page
+        .getByText("Article size", { exact: true })
+        .locator("..")
+        .innerText(),
+      /≈0 words/,
+    );
     check(
       "Library 105 real metadata rows: stable 100+5 ordering, combined filters, keyboard detail, null versus known zero; metadata excluded from reading estimates",
     );
@@ -752,7 +753,13 @@ export async function runJourneys({
           "one transient failure must use the unchanged natural retry policy",
         );
       assert.equal(sessionState().count, before.count);
-      assert.equal(sessionState().stream.cursor, before.stream.cursor);
+      if (fault === "429")
+        assert.equal(sessionState().stream.cursor, before.stream.cursor);
+      else
+        assert.ok(
+          outcome.body.pages_committed > 0 && outcome.body.pages_committed <= 8,
+          "successful natural retry may advance its durable contract within the unchanged budget",
+        );
       state.fault = null;
       await goto("/settings");
       await safe();
