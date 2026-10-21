@@ -456,6 +456,9 @@ try {
     category: error.category ?? error.name,
     rawDetailsWithheld: true,
     infrastructureReason: error.infrastructureReason ?? null,
+    databaseCode: error.databaseCode ?? null,
+    diagnosticStages: error.diagnosticStages ?? [],
+    diagnosticWords: error.diagnosticWords ?? [],
     disposableDiagnostics:
       stack && cleanup.stack === "pending"
         ? disposableDiagnostics(stack.projectId)

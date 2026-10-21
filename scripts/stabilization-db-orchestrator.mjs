@@ -48,13 +48,15 @@ export function command(binary, args, { cwd = repoRoot, env = sanitizedEnvironme
   if (result.error) throw Object.assign(new Error(`Disposable command unavailable or timed out (${result.error.code ?? 'unknown'}).`), { failureKind: "infrastructure", category:result.error.code === 'ETIMEDOUT' ? 'timeout' : 'command-unavailable' });
   if (result.status !== 0) {
     const category = commandFailureCategory(result.stderr);
-    const databaseCode = result.stderr.match(/(?:ERROR|FATAL):\s+([0-9A-Z]{5}):/)?.[1] ?? null;
+    const databaseCode = result.stderr.match(/(?:ERROR|FATAL):\s+([0-9A-Z]{5}):|SQLSTATE\s+([0-9A-Z]{5})/)?.slice(1).find(Boolean) ?? null;
     const missingRelation = result.stderr.match(/relation "([a-z_][a-z0-9_.]{0,127})" does not exist/)?.[1] ?? null;
     const permissionReason = result.stderr.match(/must be owner of (?:schema|table|function|extension) [a-z_][a-z0-9_.]*|must be (?:able to SET ROLE|member of role) "[a-z_][a-z0-9_]*"|permission denied to set parameter "[a-z_][a-z0-9_]*"|permission denied for (?:schema|table|function) [a-z_][a-z0-9_.]*/)?.[0] ?? null;
     const infrastructureReason = /port is already allocated|address already in use/i.test(result.stderr) ? 'port-conflict'
       : /not healthy|unhealthy|not ready/i.test(result.stderr) ? 'service-health'
       : /permission denied.*docker|cannot connect.*docker/i.test(result.stderr) ? 'docker-access' : null;
-    throw Object.assign(new Error(`Disposable ${path.basename(binary)} failed (exit ${result.status}; ${category}; SQLSTATE ${databaseCode ?? "unavailable"}; relation ${missingRelation ?? "unavailable"}; permission ${permissionReason ?? "unavailable"}). Raw output withheld.`), { failureKind: ['disk-capacity','image-pull','timeout','transport','command-unavailable'].includes(category) || infrastructureReason ? 'infrastructure' : 'assertion-or-suite', category, infrastructureReason, databaseCode, missingRelation, permissionReason });
+    const diagnosticStages = ['Starting database', 'Starting containers', 'Waiting for health checks', 'Applying migration', 'Stopping containers'].filter(label => result.stderr.includes(label));
+    const diagnosticWords = ['migration', 'sql', 'postgres', 'container', 'docker', 'network', 'permission', 'connection', 'refused', 'timeout', 'port', 'mount', 'file', 'directory', 'parse', 'config', 'health', 'unhealthy', 'image', 'pull', 'denied', 'schema', 'function', 'already', 'exists', 'fatal', 'database', 'seed'].filter(word => new RegExp(`\\b${word}\\b`, 'i').test(result.stderr));
+    throw Object.assign(new Error(`Disposable ${path.basename(binary)} failed (exit ${result.status}; ${category}; SQLSTATE ${databaseCode ?? "unavailable"}; relation ${missingRelation ?? "unavailable"}; permission ${permissionReason ?? "unavailable"}). Raw output withheld.`), { failureKind: ['disk-capacity','image-pull','timeout','transport','command-unavailable'].includes(category) || infrastructureReason ? 'infrastructure' : 'assertion-or-suite', category, infrastructureReason, databaseCode, missingRelation, permissionReason, diagnosticStages, diagnosticWords });
   }
   return result.stdout;
 }
