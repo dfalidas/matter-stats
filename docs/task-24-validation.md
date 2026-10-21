@@ -24,7 +24,7 @@ production readiness, production backup, historical completeness or Vercel deliv
 | Fault/recovery | Task 23 detailed real DB stale-fence/page/retry suites | Process transport 429, timeout, interruption/lost persisted response; truthful settings, retained state, natural eligibility and recovery; no quota/progress reset | B; `sync-faults` | Hosted interruption/runtime behavior; real scheduled recovery |
 | Truthful status/independent failure | Task 21 semantics and real status RPC/security; Task 22 broad fixture-only state matrix | Runtime partial/completed/failed/skipped states; supplementary SQL never/stale/incomplete-metadata/dirty/candidate demonstrations against real reads; independent read transport failures versus successful empty | B; `truthful-status`; fixture states explicitly labeled | Production coverage, history and actual freshness |
 | CI/evidence/cleanup | Task 23 fresh/upgrade and synthetic backup→restore, owned cleanup | Separate bounded secret-free browser job, event SHA check, explicit artifact allowlist, outcome distinction, generated test credentials and verified exact-owned cleanup | B; identity/toolchain/outcomes/network/browser/cleanup JSON | Branch protection unchanged; human review |
-| C: actual hosted staging | Only one connected Vercel project and one Supabase project named `matter-stats-prod` found on 2026-10-21; previews are not proof of isolation | No hosted mutation or credential use; [operator procedure](task-24-execution-guide.md#actual-hosted-staging-gate) | **BLOCKED / NOT RUN** | Authorized isolated app+DB, synthetic upstream, private credentials, verified deployed SHA/configuration |
+| C: actual hosted staging | Only one connected Vercel project, one production-named Supabase project, zero development branches and zero custom environments found on 2026-10-21 and confirmed at recovery; previews are not proof of isolation | No hosted mutation or credential use; [operator procedure](task-24-execution-guide.md#actual-hosted-staging-gate) | **BLOCKED / NOT RUN** | Authorized isolated app+DB, synthetic upstream, private credentials, verified deployed SHA/configuration |
 | D: production and real scheduled cycles | Baseline main CI success is isolated evidence only | None under this task | **NOT RUN** | Production authorization/configuration/schema/backup/restore, separate repair/cutover, two actual scheduled cycles |
 
 ## Independent reference contract
@@ -68,7 +68,8 @@ were both `160ed48f93340c0056abdb450fec17566a4ae85f`. Refetched main remains
 `7723e13af842d456828a47897532d56722c79acb`; no subsequent changes. No uncommitted
 or untracked nonignored files. No live task app/browser/build processes, containers,
 volumes or task temporary stack directories remained. Six defunct Next process
-entries owned by PID 1 are exited processes, not running servers; no blind kill or
+entries and their six defunct Node wrappers owned by PID 1 are exited processes,
+not running servers; no blind kill or
 resource removal was performed. PR #87 is open/draft, with no human reviews.
 
 | Requirement | Existing implementation | Actual evidence and tested SHA | Remaining work | Current outcome at recovery |
@@ -92,26 +93,46 @@ focused regressions and a real SQL NULL assertion cover the boundary. No migrati
 reconciliation/cutover condition or writer behavior changes. This is the sole
 application correction in Task 24; final execution results follow below.
 
-Reproduce using the [execution guide](task-24-execution-guide.md). Actual completed
-command results, final-head CI links, browser/database group counts, screenshot
-inspection and local provisioning attempts will be recorded here before handoff.
+Reproduce using the [execution guide](task-24-execution-guide.md). The recovery
+application run at `8c1675db97449e1abf35ad04ad192b0ffc2c1349` passed `npm ci`
+(458 packages), route-type generation, typecheck, lint, **403/403 application tests**,
+production build and `audit:ci` on Node 22.23.3/npm 10.9.9. Local lint had zero errors
+and three pre-existing ignored skill-script warnings; tracked CI lint passed.
+[Sanitized local outcomes](evidence/task24/local-validation.json) identify the
+documentation-only dirty scope. No real database/Matter connection was used for A.
+The opt-in DB suite's ordinary-test skip is not a DB pass. Audit remains eight high
+development entries and zero production vulnerabilities, with unchanged policy.
+
+Completed browser/database results and inspected screenshots are recorded below.
 Pending checks are not passes. The historical Task 22 Node 24/npm 11 local audit
 failure versus Node 22/npm 10 CI pass remains at its original SHA/date in
 [Task 22 QA](task-22-qa.md); audit policy and exceptions are unchanged.
 
+[Attempt history](evidence/task24/attempt-history.json) preserves failed/interrupted
+CI identities and cleanup limitations. [Recovery failure evidence](evidence/task24/recovery-160ed48/)
+retains the 30-group partial browser run at its original SHA. The earlier local
+[provisioning attempt](evidence/task24/local-provisioning-blocked/) was blocked by
+disk capacity before database/browser assertions. Its base-keyed dirty identity
+does not certify the baseline. Canceled jobs and historical long-ID absence checks
+are not independently verified cleanup; current short IDs match CLI-created names.
+
 ## Impact and rollback
 
-No application runtime, authentication, metric/timezone/attribution, migration,
-generation/progress, quota/backoff/fence/receipt or cron change. `0 6 * * *` UTC is
-unchanged. Existing disposable orchestration functions are exported for reuse;
+The only application correction is the candidate-status reader described above:
+SQL NULL reconciliation means unproven, retaining frozen/unapplied status. There is
+no authentication, metric/timezone/attribution, migration, generation/progress,
+quota/backoff/fence/receipt or cron change. `0 6 * * *` UTC is unchanged.
+Existing disposable orchestration functions are exported for reuse;
 Task 23's fresh/upgrade/backup/restore flow is unchanged. Only development dependency
 `playwright` **1.64.1** and its exact matching `playwright-core` lock entries are added
 (458 installed packages versus baseline 456). No unrelated package refresh or audit
 exception. Generated synthetic app/cron/Matter secrets and freshly signed local
 service-role JWT stay in private memory; only owned local Kong accepts that test key.
 
-Rollback is a code-only revert of this task's scripts/tests/docs/workflow and the two
-development lock entries. Preserve every applied migration and all durable data.
+Rollback is a code-only revert of this task's status-reader correction,
+scripts/tests/docs/workflow and the two development lock entries. Reverting the
+reader restores its earlier unavailable display for new candidates; no persisted
+repair state changes. Preserve every applied migration and all durable data.
 There is no production SQL, data rollback, secret rotation or deployment to perform.
 
 Release gates still require focused PR review/merge approval, final-head CI, hosted

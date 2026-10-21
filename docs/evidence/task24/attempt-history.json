@@ -1,0 +1,126 @@
+{
+  "recordedAt": "2026-10-21",
+  "environment": "B: runner-owned local Supabase on GitHub Actions",
+  "attempts": [
+    {
+      "conclusion": "failure",
+      "createdAt": "2026-10-21T08:23:23Z",
+      "databaseId": 39568890074,
+      "headSha": "160ed48f93340c0056abdb450fec17566a4ae85f",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39568890074"
+    },
+    {
+      "conclusion": "cancelled",
+      "createdAt": "2026-10-21T08:12:19Z",
+      "databaseId": 39567511771,
+      "headSha": "486e1349682ce8311f385a9de40b3d183d5aa1f9",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39567511771"
+    },
+    {
+      "conclusion": "cancelled",
+      "createdAt": "2026-10-21T07:47:25Z",
+      "databaseId": 39564466545,
+      "headSha": "fc3af6d14a3ebc6922d02633988e127e384ac388",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39564466545"
+    },
+    {
+      "conclusion": "cancelled",
+      "createdAt": "2026-10-21T07:32:00Z",
+      "databaseId": 39562644044,
+      "headSha": "7fa46162c0acdcc9814867ef678cd9bbc4984b8c",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39562644044"
+    },
+    {
+      "conclusion": "failure",
+      "createdAt": "2026-10-21T07:12:04Z",
+      "databaseId": 39560328465,
+      "headSha": "2af68b2c1f4ad2a94542209fbf8667f74b50cb4f",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39560328465"
+    },
+    {
+      "conclusion": "cancelled",
+      "createdAt": "2026-10-21T07:05:11Z",
+      "databaseId": 39559555141,
+      "headSha": "2f4a15e6d3cd96dc41a286068c9e479a844c3bb3",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39559555141"
+    },
+    {
+      "conclusion": "failure",
+      "createdAt": "2026-10-21T06:56:17Z",
+      "databaseId": 39558564781,
+      "headSha": "568a9344f3c9e643a0d86bc5953db9327a69103b",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39558564781"
+    },
+    {
+      "conclusion": "failure",
+      "createdAt": "2026-10-21T06:49:30Z",
+      "databaseId": 39557838256,
+      "headSha": "b6053be6c976686d2c1f3f34e17fa31a77953b86",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39557838256"
+    },
+    {
+      "conclusion": "cancelled",
+      "createdAt": "2026-10-21T06:47:11Z",
+      "databaseId": 39557595411,
+      "headSha": "315fb581147b4922956566ace01978c38e605d91",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39557595411"
+    },
+    {
+      "conclusion": "cancelled",
+      "createdAt": "2026-10-21T06:39:02Z",
+      "databaseId": 39556729488,
+      "headSha": "851bfcbff3e06d096ad6c85d428f7588b9801c67",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39556729488"
+    },
+    {
+      "conclusion": "cancelled",
+      "createdAt": "2026-10-21T06:36:23Z",
+      "databaseId": 39556450698,
+      "headSha": "85d5272671d1a755c7b41b4266c853d2fd425f78",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39556450698"
+    },
+    {
+      "conclusion": "cancelled",
+      "createdAt": "2026-10-21T06:31:49Z",
+      "databaseId": 39555974541,
+      "headSha": "a05f293ca220f41c23e9c603fbd71730890e7e04",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39555974541"
+    },
+    {
+      "conclusion": "cancelled",
+      "createdAt": "2026-10-21T06:25:26Z",
+      "databaseId": 39555306907,
+      "headSha": "c581d12e4929e0e910158ca263f009af2ad4c241",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39555306907"
+    },
+    {
+      "conclusion": "failure",
+      "createdAt": "2026-10-21T06:22:52Z",
+      "databaseId": 39555043802,
+      "headSha": "cd1570c88c7a5344ed66e6050780bf9cfe42a8da",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39555043802"
+    }
+  ],
+  "notes": [
+    "Canceled runs are interrupted, not passed; cleanup remains unverified wherever the original artifact says pending or was not independently checked.",
+    "Earlier long project IDs were silently truncated by CLI 2.48.3; their absence checks used the untruncated name and are not independent proof of actual resource absence. Later short-ID checks verify the actual created name.",
+    "Default official ECR image requests were rate-limited. Later jobs explicitly use the reviewed official docker.io registry with unchanged CLI image tags.",
+    "recovery-160ed48 preserves 30 passed behavioral groups followed by a generation-status assertion failure, 5 passed DB phase groups, 1 failed and 1 not-run; not an overall pass. Its legacy realSqlAndDataApi=not-run field was only finalized on full completion; per-phase records show actual partial database execution.",
+    "Local dirty-worktree provisioning was blocked by disk extraction capacity before DB/browser assertions. Original identity includes harness content hashes; the base-keyed directory does not certify base code.",
+    "Historical local cleanup applicationProcesses=verified-removed includes no app created; it establishes no running test process, not an executed browser journey. Current runner reports not-created separately."
+  ]
+}

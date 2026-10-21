@@ -49,7 +49,7 @@ The browser stack retains real Postgres, PostgREST, Kong and Auth; unused Studio
 Storage, Realtime, image proxy, email, analytics, vector, Edge Runtime, pooler and
 postgres-meta containers are excluded with the reviewed CLI flag. Task 23's full
 fresh/upgrade/restore services and assertions remain intact.
-the application uses a fresh signed service-role JWT and generated app/cron/Matter
+The application uses a fresh signed service-role JWT and generated app/cron/Matter
 credentials. The normal database transport is real. Seeded analytics and supplementary
 status states use SQL on that owned stack. Sync uses actual production actions,
 the actual HTTP cron route and the production ingestion/RPC chain.
@@ -85,10 +85,11 @@ records base/application/build/harness/checkout SHA, dirty flag and harness cont
 hashes, event/run/attempt and environment type. Actual Node/npm/CLI/Next/Playwright/
 Chromium versions, migration inventory, build ID and journey/group outcomes are
 separate. Application test counts come from `verify`, browser behavioral counts from
-`journeys.json`, DB phase-group counts from `outcomes.json` and Task 23 artifacts.
+`journeys.json`, database phase-group counts from `database.json`, overall harness
+groups from `outcomes.json` and Task 23's separate artifacts.
 Do not add these unlike units into one total.
 
-The workflow explicitly allows only named sanitized JSON files and six selected
+The workflow explicitly allows only named sanitized JSON files and seven selected
 screenshots. Phase state is written before execution. Infrastructure-blocked,
 assertion-failed, skipped, TODO, not-run and running remain distinct; unsuccessful
 prerequisites/assertions exit nonzero. Success and failure both retain sanitized
@@ -106,7 +107,9 @@ attempts at their original identity; rerun affected checks after implementation 
 ## Actual hosted staging gate
 
 **BLOCKED / NOT RUN:** discovery on 2026-10-21 found one Vercel app and only a
-production-named Supabase database. Ready previews do not establish DB isolation.
+production-named Supabase database, zero Supabase development branches and zero
+Vercel custom environments. Recovery discovery confirmed the same state. Ready
+previews do not establish DB isolation.
 No hosted runtime request, mutating check or environment read of secret values was
 performed. No service, deployment, configuration or production data was created/copied.
 

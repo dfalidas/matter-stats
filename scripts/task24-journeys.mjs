@@ -22,7 +22,7 @@ export async function runJourneys({
   sql,
   state,
   observations,
-  startApp,
+  startApp: restartApplication,
   output,
   phases,
   save,
@@ -68,6 +68,22 @@ export async function runJourneys({
     socket.close();
   });
   const page = await context.newPage();
+  // A process restart is deliberate, but an unrelated browser prefetch racing
+  // shutdown is not part of that fault scenario. Drain existing requests, then
+  // hold new browser traffic until the recreated production server is ready.
+  const startApp = async (version) => {
+    await page.waitForLoadState("networkidle");
+    let release;
+    const ready = new Promise((resolve) => { release = resolve; });
+    const hold = async (route) => { await ready; await route.fallback(); };
+    await context.route("**/*", hold);
+    try {
+      await restartApplication(version);
+    } finally {
+      release();
+      await context.unroute("**/*", hold);
+    }
+  };
   page.on("pageerror", () => browserEvents.pageErrors++);
   page.on("console", (message) => {
     if (message.type() === "error")
@@ -75,6 +91,11 @@ export async function runJourneys({
         kind: message.text().startsWith("Failed to load resource")
           ? "resource"
           : "other",
+        classification: message.text().startsWith("Failed to fetch RSC payload")
+          ? "rsc-fetch-failure"
+          : message.text().startsWith("Failed to load resource")
+            ? "resource-load-failure" : "unclassified",
+        route: new URL(page.url()).pathname,
       });
   });
   page.on("response", (response) => {
