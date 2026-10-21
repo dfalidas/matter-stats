@@ -100,6 +100,20 @@ export function installTransport(config, ipc) {
     }
     assert.ok(["real", "drop-after"].includes(decision.kind));
     const response = await originalFetch(input, init);
+    if (url.origin === database && !response.ok) {
+      const body = await response
+        .clone()
+        .json()
+        .catch(() => null);
+      ipc.send({
+        type: "database-error",
+        path: url.pathname,
+        status: response.status,
+        code: /^(?:[A-Z0-9]{5}|PGRST\d{3})$/.test(body?.code)
+          ? body.code
+          : null,
+      });
+    }
     if (decision.kind === "drop-after") {
       await response.arrayBuffer();
       throw new TypeError("Synthetic lost persisted response");

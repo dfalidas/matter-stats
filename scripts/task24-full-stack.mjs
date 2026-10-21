@@ -123,6 +123,8 @@ const observations = {
   matter: [],
   databaseRequests: 0,
   applicationSelfRequests: 0,
+  databaseErrorCount: 0,
+  databaseErrors: [],
   injectedFaults: 0,
   unexpectedNetwork: 0,
   serverOutputLines: 0,
@@ -354,6 +356,16 @@ try {
       observations.serverOutputLines += data.toString().split("\n").length - 1;
     });
     app.on("message", (message) => {
+      if (message.type === "database-error") {
+        observations.databaseErrorCount++;
+        if (observations.databaseErrors.length < 20)
+          observations.databaseErrors.push({
+            path: message.path,
+            status: message.status,
+            code: message.code,
+          });
+        return;
+      }
       if (message.type === "unexpected-network") {
         observations.unexpectedNetwork++;
         return;
@@ -486,6 +498,11 @@ try {
   databasePhases.fail(); // Persist final metadata; no active phase remains.
   phases.begin("network-audit");
   assert.equal(observations.unexpectedNetwork, 0);
+  assert.equal(
+    observations.databaseErrorCount,
+    0,
+    "unexpected real Data API errors",
+  );
   save("network", {
     ...observations,
     matter: {

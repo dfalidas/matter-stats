@@ -116,6 +116,24 @@ export async function runJourneys({
       visualInspection: "pending",
     });
   };
+  const submitLogin = async (redirects = false) => {
+    const responded = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/login" &&
+        response.request().method() === "POST" &&
+        Boolean(response.request().headers()["next-action"]),
+    );
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await (await responded).finished();
+    if (!redirects) {
+      await page
+        .getByRole("button", { name: "Sign in", exact: true })
+        .waitFor();
+      await page.waitForFunction(
+        () => document.querySelector('input[name="password"]')?.value === "",
+      );
+    }
+  };
   let clientIdentity = 0;
   const login = async () => {
     await context.clearCookies();
@@ -124,7 +142,7 @@ export async function runJourneys({
     });
     await goto("/login");
     await page.getByLabel("Access password").fill(credentials.password);
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await submitLogin(true);
     await page.waitForURL("**/dashboard");
     const cookie = (await context.cookies()).find(
       (row) => row.name === cookieName,
@@ -209,8 +227,25 @@ export async function runJourneys({
                 : "recent_activity_manual",
           ),
     );
+    const responded = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        Boolean(response.request().headers()["next-action"]) &&
+        response
+          .request()
+          .postData()
+          ?.includes(
+            label === "Backfill Library"
+              ? "backfill_library"
+              : label === "Start / Resume Session History"
+                ? "backfill_sessions"
+                : "recent_activity_manual",
+          ),
+      { timeout: 175000 },
+    );
     await page.getByRole("button", { name: label, exact: true }).click();
     const request = await next;
+    assert.equal(new URL(request.url()).origin, origin);
     capturedAction = {
       body: request.postDataBuffer(),
       headers: {
@@ -220,6 +255,7 @@ export async function runJourneys({
       },
       url: request.url(),
     };
+    await (await responded).finished();
     await page
       .getByRole("button", { name: label, exact: true })
       .waitFor({ timeout: 175000 });
@@ -258,21 +294,17 @@ export async function runJourneys({
     await page
       .getByLabel("Access password")
       .fill("incorrect-synthetic-password");
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await submitLogin();
     await loginAlert.filter({ hasText: "Invalid password" }).waitFor();
     for (let i = 0; i < 5; i++) {
       await page
         .getByLabel("Access password")
         .fill("incorrect-synthetic-password");
-      await page.getByRole("button", { name: "Sign in", exact: true }).click();
+      await submitLogin();
       await loginAlert.waitFor();
-      // Wait for action settlement, including the form's uncontrolled reset.
-      await page.waitForFunction(
-        () => document.querySelector('input[name="password"]')?.value === "",
-      );
     }
     await page.getByLabel("Access password").fill(credentials.password);
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await submitLogin();
     await loginAlert.filter({ hasText: /Too many attempts/ }).waitFor();
     assert.equal(
       (await context.cookies()).filter((row) => row.name === cookieName).length,
@@ -291,15 +323,12 @@ export async function runJourneys({
     await context.setExtraHTTPHeaders({ "x-forwarded-for": "127.24.0.240" });
     state.fault = "record_app_login_attempt";
     await page.getByLabel("Access password").fill(credentials.password);
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await submitLogin();
     await loginAlert.filter({ hasText: /temporarily unavailable/ }).waitFor();
     assert.equal((await context.cookies()).length, 0);
     state.fault = "app_sessions";
     await page.getByLabel("Access password").fill(credentials.password);
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await page.waitForFunction(
-      () => document.querySelector('input[name="password"]')?.value === "",
-    );
+    await submitLogin();
     await loginAlert.filter({ hasText: /temporarily unavailable/ }).waitFor();
     assert.equal((await context.cookies()).length, 0);
     state.fault = null;
