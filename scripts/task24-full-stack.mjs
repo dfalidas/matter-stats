@@ -125,6 +125,7 @@ const observations = {
   applicationSelfRequests: 0,
   databaseErrorCount: 0,
   databaseErrors: [],
+  matterFaults: { 429: 0, timeout: 0, interrupt: 0 },
   injectedFaults: 0,
   unexpectedNetwork: 0,
   serverOutputLines: 0,
@@ -380,14 +381,16 @@ try {
               ? Number(message.query.cursor.replace("task24-page-", ""))
               : 0,
           });
-          if (state.fault === "429")
+          if (state.fault === "429") {
+            observations.matterFaults["429"]++;
             decision = {
               kind: "synthetic",
               status: 429,
               headers: { "Retry-After": "2" },
               body: { message: "Synthetic rate limit" },
             };
-          else if (state.fault === "timeout") {
+          } else if (state.fault === "timeout") {
+            observations.matterFaults.timeout++;
             decision = {
               kind: "synthetic",
               delay: 11000,
@@ -395,6 +398,7 @@ try {
             };
             state.fault = null; // One real production timeout, then natural retry.
           } else if (state.fault === "interrupt") {
+            observations.matterFaults.interrupt++;
             decision = { kind: "drop" };
             state.fault = null; // One interrupted attempt, never a quota reset.
           } else decision = syntheticMatter(message, state);

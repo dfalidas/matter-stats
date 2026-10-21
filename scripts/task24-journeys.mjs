@@ -124,7 +124,7 @@ export async function runJourneys({
         Boolean(response.request().headers()["next-action"]),
     );
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await (await responded).finished();
+    await responded;
     if (!redirects) {
       await page
         .getByRole("button", { name: "Sign in", exact: true })
@@ -255,7 +255,7 @@ export async function runJourneys({
       },
       url: request.url(),
     };
-    await (await responded).finished();
+    await responded;
     await page
       .getByRole("button", { name: label, exact: true })
       .waitFor({ timeout: 175000 });
@@ -742,7 +742,7 @@ export async function runJourneys({
     const manualText = await pendingManual;
     state.onMatter = null;
     state.hold = false;
-    assert.match(manualText, /budget reached|pending continuation/i);
+    assert.match(manualText, /pages budget reached/i);
     let persisted = sessionState();
     assert.equal(persisted.count, 8);
     assert.equal(persisted.receipt, 1);
@@ -874,10 +874,15 @@ export async function runJourneys({
     assert.equal(sessionState().history, "complete");
     for (const fault of ["429", "timeout", "interrupt"]) {
       state.fault = fault;
+      const observedBefore = observations.matterFaults[fault];
       const before = sessionState();
       const outcome = await cron(`Bearer ${credentials.cron}`);
-      if (fault === "429")
-        assert.ok(outcome.status === 500 || outcome.body.status === "skipped");
+      assert.equal(
+        observations.matterFaults[fault],
+        observedBefore + 1,
+        "the deliberate upstream fault must actually execute once",
+      );
+      if (fault === "429") assert.equal(outcome.status, 500);
       else
         assert.equal(
           outcome.status,
@@ -922,7 +927,8 @@ export async function runJourneys({
       await startApp(2);
       const recovered = await cron(`Bearer ${credentials.cron}`);
       assert.equal(recovered.status, 200);
-      assert.notEqual(recovered.body.status, "error");
+      assert.ok(["success", "partial"].includes(recovered.body.status));
+      assert.ok(recovered.body.pages_committed > 0);
       assert.equal(sessionState().count, 19);
       check(
         `route fault ${fault}: retained checkpoint and rows, truthful persisted outcome, eligible recovery after restart`,

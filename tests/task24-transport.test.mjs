@@ -50,14 +50,25 @@ test("Task 24 process transport never forwards Matter or unknown requests; real 
     globalThis.fetch = original;
   });
   const actual = [];
+  let failRead = false;
   globalThis.fetch = async (input, init) => {
     actual.push([String(input), init]);
+    if (failRead)
+      return Response.json(
+        { code: "42703", message: "private synthetic database detail" },
+        { status: 400 },
+      );
     return Response.json({ persisted: true });
   };
   const ipc = new EventEmitter();
+  const databaseErrors = [];
   let mode = "real",
     unexpected = 0;
   ipc.send = (message) => {
+    if (message.type === "database-error") {
+      databaseErrors.push(message);
+      return;
+    }
     if (message.type === "unexpected-network") {
       unexpected++;
       return;
@@ -116,6 +127,25 @@ test("Task 24 process transport never forwards Matter or unknown requests; real 
     /persisted response/,
   );
   assert.equal(actual.length, 3);
+  mode = "real";
+  failRead = true;
+  assert.equal(
+    (await fetch("http://127.0.0.1:58421/rest/v1/reading_sessions")).status,
+    400,
+  );
+  assert.deepEqual(databaseErrors, [
+    {
+      type: "database-error",
+      path: "/rest/v1/reading_sessions",
+      status: 400,
+      code: "42703",
+    },
+  ]);
+  assert.ok(
+    !JSON.stringify(databaseErrors).includes(
+      "private synthetic database detail",
+    ),
+  );
 });
 
 test("independent fixture states 180 seconds/675 words and excludes exclusive midnight; fractional estimates sum per session", () => {
