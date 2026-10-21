@@ -50,6 +50,7 @@ export async function runJourneys({
     timezoneId: "America/New_York",
     reducedMotion: "reduce",
     acceptDownloads: true,
+    serviceWorkers: "block",
   });
   context.setDefaultTimeout(15000);
   context.setDefaultNavigationTimeout(20000);
@@ -58,6 +59,10 @@ export async function runJourneys({
       return route.continue();
     browserEvents.unexpectedRequests++;
     return route.abort();
+  });
+  await context.routeWebSocket("**/*", (socket) => {
+    browserEvents.unexpectedRequests++;
+    socket.close();
   });
   const page = await context.newPage();
   page.on("pageerror", () => browserEvents.pageErrors++);

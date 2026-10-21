@@ -162,7 +162,7 @@ try {
   const suffix = `${process.pid}-${randomBytes(6).toString("hex")}`;
   stack = {
     name: "fresh",
-    projectId: `matter-stats-fresh-task24-${suffix}`,
+    projectId: `matter-stats-fresh-${suffix}`,
     workdir: path.join(directory, "supabase-stack"),
     apiPort: 58421,
     dbPort: 58422,
@@ -171,6 +171,12 @@ try {
     inbucketPort: 58424,
     analyticsPort: 58427,
   };
+  // CLI 2.48.3 silently sanitizes project IDs longer than 40 characters. Match
+  // its exact bound so resource checks, SQL and cleanup use the created name.
+  assert.ok(
+    stack.projectId.length <= 40,
+    "owned project exceeds pinned CLI length",
+  );
   const resourceLists = [
     ["ps", "-a"],
     ["volume", "ls"],
@@ -238,6 +244,7 @@ try {
     ["exec", "-i", gateway, "sh", "-c", `cat > ${gatewayFile}`],
     { input: gatewayConfig.replaceAll(status.SERVICE_ROLE_KEY, freshKey) },
   );
+  command("docker", ["exec", gateway, "chmod", "0600", gatewayFile]);
   configureDisposableGateway(stack.projectId);
   status.SERVICE_ROLE_KEY = freshKey;
   console.log("Task 24 stack: fresh local application key configured");

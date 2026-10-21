@@ -66,6 +66,18 @@ values ${sessions.map((r) => `('${r.id}','${r.timestamp}',${r.seconds},null,9999
 
 export function syntheticMatter(request, state) {
   const { path, query } = request;
+  if (request.method !== "GET")
+    throw new Error("Synthetic Matter supports GET only");
+  const knownQuery =
+    path === "/public/v1/me"
+      ? []
+      : path === "/public/v1/items"
+        ? ["limit", "cursor", "status", "order", "updated_since"]
+        : path.endsWith("/annotations")
+          ? ["limit", "cursor"]
+          : ["limit", "cursor", "since"];
+  if (Object.keys(query).some((key) => !knownQuery.includes(key)))
+    throw new Error("Unknown synthetic query");
   if (path === "/public/v1/me")
     return {
       kind: "synthetic",
