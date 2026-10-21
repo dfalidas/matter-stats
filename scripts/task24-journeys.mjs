@@ -580,20 +580,22 @@ export async function runJourneys({
       .waitFor();
     assert.match(await text(), /Reading sessions are not attributed/);
     await goto("/articles/task24-item-000");
-    assert.match(
+    assert.equal(
       await page
         .getByText("Article size", { exact: true })
         .locator("..")
-        .innerText(),
-      /Unknown|Unavailable|Not available|Not provided|—/,
+        .locator("dd")
+        .textContent(),
+      "Not available",
     );
     await goto("/articles/task24-item-002");
-    assert.match(
+    assert.equal(
       await page
         .getByText("Article size", { exact: true })
         .locator("..")
-        .innerText(),
-      /≈0 words/,
+        .locator("dd")
+        .textContent(),
+      "≈0 words",
     );
     check(
       "Library 105 real metadata rows: stable 100+5 ordering, combined filters, keyboard detail, null versus known zero; metadata excluded from reading estimates",
