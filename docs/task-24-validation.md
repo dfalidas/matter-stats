@@ -15,16 +15,16 @@ production readiness, production backup, historical completeness or Vercel deliv
 
 | Requirement / journey | Existing coverage and limitation | New verification / evidence | Environment / result | Remaining external gate |
 | --- | --- | --- | --- | --- |
-| A: unit/component, synthetic browser | Tasks 01–23 application suite; Task 22 production Next pages against fake Data API, detailed route/layout/contrast and PR #85 calendar assertions | Retained; transport safety regressions added | A; exact command counts below / CI `verify` | Does not prove persisted Supabase state |
-| B: browser → production app → real SQL/Data API → rendered data | Task 23 real SQL/runtime suites had no production browser/application server chain | `test:full-stack`; owned Supabase, full migration chain, production build/start, real session/ingestion/RPC/rollup writes | B; `outcomes.json`, `database.json`, `build.json`, `journeys.json` | Hosted application and DB still require C |
-| Login/access/logout | Auth unit/concurrency/security suites; Task 22 fake auth storage | Form wrong/correct/limited/storage-failure login; missing/malformed/expired/revoked/version-invalid session; real hash row; Secure/HttpOnly/Lax; action replay denial; logout DB revocation/cookie removal/replay rejection | B; `authentication`, `logout-replay` groups | Hosting proxy/cookie configuration |
-| Analytics/CSV/calendar | Canonical metric tests; 601 boundary and >10,000 generation tests; Task 22 synthetic reference/CSV | Independent explicit UTC/local date vectors and every downloaded CSV row; unlinked sessions, metadata sentinel, per-session rounding, exclusive endpoint, Monday weeks, Athens midnight/DST/year/month; PR #85 frequency/history/reload | B; `analytics-csv`, fixtures and selected screenshots | Actual hosted reads and deployed timezone |
-| Library/Activity/navigation | Task 22 100+5 library, 20+5 activity, secondary routes and mobile/desktop QA using fake API | 105 real library rows, combined filters/stable pages, null/zero metadata, keyboard details; 25 real sessions with unchanged whole-day totals; all primary/useful secondary routes, mobile final controls | B; `navigation-library`, screenshots | Hosted browser journeys |
-| Manual/cron/continuation | Real DB runtime suites cover fencing, receipts, page atomicity, retries, 5,000-row continuation and restart; prior route handler tests lack HTTP | Actual UI controls and GET cron route, missing/wrong/query-secret rejection without work, one-owner concurrency, 19-page unchanged-budget import, manual→scheduled→manual across process restarts, real rows/checkpoints/receipt/rollup reconciliation | B; `sync-continuation` | Explicit cron request is not scheduler delivery |
-| Fault/recovery | Task 23 detailed real DB stale-fence/page/retry suites | Process transport 429, timeout, interruption/lost persisted response; truthful settings, retained state, natural eligibility and recovery; no quota/progress reset | B; `sync-faults` | Hosted interruption/runtime behavior; real scheduled recovery |
-| Truthful status/independent failure | Task 21 semantics and real status RPC/security; Task 22 broad fixture-only state matrix | Runtime partial/completed/failed/skipped states; supplementary SQL never/stale/incomplete-metadata/dirty/candidate demonstrations against real reads; independent read transport failures versus successful empty | B; `truthful-status`; fixture states explicitly labeled | Production coverage, history and actual freshness |
-| CI/evidence/cleanup | Task 23 fresh/upgrade and synthetic backup→restore, owned cleanup | Separate bounded secret-free browser job, event SHA check, explicit artifact allowlist, outcome distinction, generated test credentials and verified exact-owned cleanup | B; identity/toolchain/outcomes/network/browser/cleanup JSON | Branch protection unchanged; human review |
-| C: actual hosted staging | Only one connected Vercel project, one production-named Supabase project, zero development branches and zero custom environments found on 2026-10-21 and confirmed at recovery; previews are not proof of isolation | No hosted mutation or credential use; [operator procedure](task-24-execution-guide.md#actual-hosted-staging-gate) | **BLOCKED / NOT RUN** | Authorized isolated app+DB, synthetic upstream, private credentials, verified deployed SHA/configuration |
+| A: unit/component, synthetic browser | Tasks 01–23 application suite; Task 22 production Next pages against fake Data API, detailed route/layout/contrast and PR #85 calendar assertions | Retained; transport safety regressions added | A **PASSED**: 403 tests and required commands; CI `verify` | Does not prove persisted Supabase state |
+| B: browser → production app → real SQL/Data API → rendered data | Task 23 real SQL/runtime suites had no production browser/application server chain | `test:full-stack`; owned Supabase, full migration chain, production build/start, real session/ingestion/RPC/rollup writes | B **PASSED** at `69fdc63`; `outcomes.json`, `database.json`, `build.json`, `journeys.json` | Hosted application and DB still require C |
+| Login/access/logout | Auth unit/concurrency/security suites; Task 22 fake auth storage | Form wrong/correct/limited/storage-failure login; missing/malformed/expired/revoked/version-invalid session; real hash row; Secure/HttpOnly/Lax; action replay denial; logout DB revocation/cookie removal/replay rejection | B **PASSED** at `69fdc63`; `authentication`, `logout-replay` groups | Hosting proxy/cookie configuration |
+| Analytics/CSV/calendar | Canonical metric tests; 601 boundary and >10,000 generation tests; Task 22 synthetic reference/CSV | Independent explicit UTC/local date vectors and every downloaded CSV row; unlinked sessions, metadata sentinel, per-session rounding, exclusive endpoint, Monday weeks, Athens midnight/DST/year/month; PR #85 frequency/history/reload | B **PASSED** at `69fdc63`; `analytics-csv`, fixtures and selected screenshots | Actual hosted reads and deployed timezone |
+| Library/Activity/navigation | Task 22 100+5 library, 20+5 activity, secondary routes and mobile/desktop QA using fake API | 105 real library rows, combined filters/stable pages, null/zero metadata, keyboard details; 25 real sessions with unchanged whole-day totals; all primary/useful secondary routes, mobile final controls | B **PASSED** at `69fdc63`; `navigation-library`, screenshots | Hosted browser journeys |
+| Manual/cron/continuation | Real DB runtime suites cover fencing, receipts, page atomicity, retries, 5,000-row continuation and restart; prior route handler tests lack HTTP | Actual UI controls and GET cron route, missing/wrong/query-secret rejection without work, one-owner concurrency, 19-page unchanged-budget import, manual→scheduled→manual across process restarts, real rows/checkpoints/receipt/rollup reconciliation | B **PASSED** at `69fdc63`; `sync-continuation` | Explicit cron request is not scheduler delivery |
+| Fault/recovery | Task 23 detailed real DB stale-fence/page/retry suites | Process transport 429, timeout, interruption/lost persisted response; truthful settings, retained state, natural eligibility and recovery; no quota/progress reset | B **PASSED** at `69fdc63`; `sync-faults` | Hosted interruption/runtime behavior; real scheduled recovery |
+| Truthful status/independent failure | Task 21 semantics and real status RPC/security; Task 22 broad fixture-only state matrix | Runtime partial/completed/failed/skipped states; supplementary SQL never/stale/incomplete-metadata/dirty/candidate demonstrations against real reads; independent read transport failures versus successful empty | B **PASSED** at `69fdc63`; `truthful-status`; fixture states explicitly labeled | Production coverage, history and actual freshness |
+| CI/evidence/cleanup | Task 23 fresh/upgrade and synthetic backup→restore, owned cleanup | Separate bounded secret-free browser job, event SHA check, explicit artifact allowlist, outcome distinction, generated test credentials and verified exact-owned cleanup | B **PASSED** at `69fdc63`; identity/toolchain/outcomes/network/browser/cleanup JSON | Branch protection unchanged; human review |
+| C: actual hosted staging | Only one connected Vercel project, one production-named Supabase project, zero development branches and zero custom environments found on 2026-10-21 and confirmed at recovery; previews are not proof of isolation | No hosted runtime checks, database mutation or credential use; [operator procedure](task-24-execution-guide.md#actual-hosted-staging-gate) | **BLOCKED / NOT RUN** | Authorized isolated app+DB, synthetic upstream, private credentials, verified deployed SHA/configuration |
 | D: production and real scheduled cycles | Baseline main CI success is isolated evidence only | None under this task | **NOT RUN** | Production authorization/configuration/schema/backup/restore, separate repair/cutover, two actual scheduled cycles |
 
 ## Independent reference contract
@@ -42,8 +42,9 @@ dates; ranges use inclusive first/last display dates and half-open instant bound
   The session exactly at 2025-01-05 22:00Z belongs to the next week.
 - Cross-month week containing 2025-03-01: **62 seconds, 233 words, 2 sessions**.
   Leap-year counterpart: **60 seconds, 225 words, 1 session**.
-- Two one-second sessions across each Athens DST transition: **2 seconds, 8 words**,
-  demonstrating sum-after-per-session-rounding (rounding the combined duration gives 7).
+- Two one-second sessions across each Athens DST transition: **2 seconds, 8 words**.
+  Each session contributes four words. The 25-session case below distinguishes
+  per-session rounding (**100**) from rounding the combined duration (**94**).
 - Activity 25 one-second sessions: **25 seconds, 100 words, 25 sessions** on both
   visible pages, 20 then 5. Library sizes include NULL, zero and 999,999-word metadata;
   persisted old estimates use an intentionally incorrect sentinel. Neither becomes
@@ -107,6 +108,65 @@ Completed browser/database results and inspected screenshots are recorded below.
 Pending checks are not passes. The historical Task 22 Node 24/npm 11 local audit
 failure versus Node 22/npm 10 CI pass remains at its original SHA/date in
 [Task 22 QA](task-22-qa.md); audit policy and exceptions are unchanged.
+
+### Completed full-stack checkpoint
+
+Tested application/build/harness/checkout:
+**`69fdc63b69383efbb064a6ee92b7edba657e16e1`**, clean PR-head checkout, base
+`7723e13af842d456828a47897532d56722c79acb`. Environment **B**, local disposable
+Supabase containers on a GitHub Actions runner. [CI run 39597331904, attempt 1](https://github.com/dfalidas/matter-stats/actions/runs/39597331904).
+[Immutable identity/build records and outcomes](evidence/task24/verified-69fdc63/)
+retain event merge SHA separately from PR head, build ID, content hashes, timestamps,
+configuration scope and all 20 ordered migration versions.
+
+| Verification unit | Actual result |
+| --- | --- |
+| Application `verify` | 403 passed, 0 failed/cancelled/skipped/TODO; route types, typecheck, lint, production build and audit passed |
+| Browser behavioral groups | **32 passed**, 0 failed/skipped/TODO, including 13 independently reconciled CSV cases |
+| Full-stack database phase groups | **7/7 passed**; migrations, sessions, analytics reference, ingestion, faults, status, logout; real SQL/Data API true |
+| Overall browser harness phases | **13/13 passed**, no blocked/not-run/running groups |
+| Separate Task 23 database gate | **29/29 phases passed** across fresh/upgrade; nested synthetic backup/restore **10/10 stages**, all-column equality for 26 tables, catalog/security and real Data API checks passed; all three owned stacks and temporary directory removed |
+| Network/browser observations | 2,239 real DB requests; 72 controlled synthetic Matter requests; real Matter and unexpected network requests 0; real Data API errors 0; browser console/page errors and failed resources 0 |
+| Deliberate faults | Exactly one 429, timeout and interrupted upstream attempt each; real page-response loss reconciled by receipt; 39 database-transport fault decisions including that response loss and retryable storage/independent outage scenarios |
+| Owned cleanup | App processes removed, browser closed, exact created stack containers/volumes/network absent, private temporary directory removed |
+
+These units are separate, not a combined test total. Toolchain: Node **22.23.3**,
+npm **10.9.9**, Supabase CLI **2.48.3**, Postgres **17.6**, Next **15.5.27**,
+Playwright **1.64.1**, Chromium **156.0.8078.4**. APP_TIMEZONE Europe/Athens,
+browser America/New_York. The [browser ZIP](https://github.com/dfalidas/matter-stats/actions/runs/39597331904/artifacts/12344324796)
+was downloaded and its digest verified:
+`e4274a9a21381114ee7a689cb18e31eebfb5e1c22a38d7d56860cedd11401aa2`.
+[Provenance](evidence/task24/provenance.json) records original artifact identities.
+The [separate database ZIP](https://github.com/dfalidas/matter-stats/actions/runs/39597331904/artifacts/12344569555)
+was also downloaded/digest-verified:
+`6b82eeadecdae09aa21a8853b075587d86b6a449942bab134a04a18738a3648c`.
+[Retained database records](evidence/task24/database-69fdc63/) include both migration
+inventories, security reports, outcomes, synthetic restore metadata and cleanup.
+The dump itself was not uploaded or committed. This is not a production backup.
+
+All seven real-browser screenshots were visually inspected on 2026-10-21:
+[675-word Overview](evidence/task24/verified-69fdc63/overview-desktop.png),
+[cross-month Reports](evidence/task24/verified-69fdc63/reports-cross-month-desktop.png),
+[mobile final Activity controls](evidence/task24/verified-69fdc63/activity-mobile-final-control.png),
+[mobile Reports](evidence/task24/verified-69fdc63/reports-mobile-three-sessions.png),
+[partial Settings](evidence/task24/verified-69fdc63/settings-partial-desktop.png),
+[persisted 19-session Overview](evidence/task24/verified-69fdc63/overview-synced-desktop.png),
+[independent outage](evidence/task24/verified-69fdc63/overview-independent-outage-desktop.png).
+Controls, retained period/totals, partial/completion uncertainty and independent
+outage sections agree with the assertions. The mobile Activity final controls are
+above the fixed navigation. No secret or personal content was observed. This is
+viewport inspection, not hosted staging or a new formal accessibility certification.
+[Inspection notes and image hashes](evidence/task24/visual-inspection.json) are
+separate from the untouched harness manifest, which initially says pending.
+
+At `8c1675d` all 32 behavioral groups passed but the final console assertion failed;
+[its original evidence](evidence/task24/recovery-8c1675d/) is retained as FAILED.
+The runner now drains requests and pauses new browser traffic during deliberate
+server restarts; every request still reaches the recreated real application.
+The console assertion remains unchanged and passes at `69fdc63` with zero errors.
+Final documentation/evidence changes do not replace this tested source identity.
+Final candidate SHA and exact-head CI/artifact links are recorded in draft PR #87;
+affected checks must pass again at that final head before handoff.
 
 [Attempt history](evidence/task24/attempt-history.json) preserves failed/interrupted
 CI identities and cleanup limitations. [Recovery failure evidence](evidence/task24/recovery-160ed48/)

@@ -1,0 +1,296 @@
+{
+  "status": "passed",
+  "checks": [
+    {
+      "name": "auth: protected pages, missing/malformed/unknown cookie, wrong password and persisted limiter",
+      "status": "passed"
+    },
+    {
+      "name": "auth: limiter/session storage faults are retryable, valid form creates real opaque hashed Secure/HttpOnly/Lax session",
+      "status": "passed"
+    },
+    {
+      "name": "auth: expired/revoked/storage-unavailable/version-invalidated sessions fail closed; isolated version 2 login recovers",
+      "status": "passed"
+    },
+    {
+      "name": "CSV daily 2025-01-02",
+      "status": "passed",
+      "expected": [
+        180,
+        675,
+        3
+      ],
+      "first": "2025-01-02",
+      "last": "2025-01-02",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV monthly 2025-01",
+      "status": "passed",
+      "expected": [
+        420,
+        1575,
+        6
+      ],
+      "first": "2025-01-01",
+      "last": "2025-01-31",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV yearly 2025",
+      "status": "passed",
+      "expected": [
+        514,
+        1936,
+        40
+      ],
+      "first": "2025-01-01",
+      "last": "2025-12-31",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV weekly 2025-01-01",
+      "status": "passed",
+      "expected": [
+        301,
+        1129,
+        6
+      ],
+      "first": "2024-12-30",
+      "last": "2025-01-05",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV weekly 2025-03-01",
+      "status": "passed",
+      "expected": [
+        62,
+        233,
+        2
+      ],
+      "first": "2025-02-24",
+      "last": "2025-03-02",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV weekly 2024-03-01",
+      "status": "passed",
+      "expected": [
+        60,
+        225,
+        1
+      ],
+      "first": "2024-02-26",
+      "last": "2024-03-03",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV daily 2025-03-30",
+      "status": "passed",
+      "expected": [
+        2,
+        8,
+        2
+      ],
+      "first": "2025-03-30",
+      "last": "2025-03-30",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV daily 2025-10-26",
+      "status": "passed",
+      "expected": [
+        2,
+        8,
+        2
+      ],
+      "first": "2025-10-26",
+      "last": "2025-10-26",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV daily 2025-12-31",
+      "status": "passed",
+      "expected": [
+        1,
+        4,
+        1
+      ],
+      "first": "2025-12-31",
+      "last": "2025-12-31",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV daily 2026-01-01",
+      "status": "passed",
+      "expected": [
+        1,
+        4,
+        1
+      ],
+      "first": "2026-01-01",
+      "last": "2026-01-01",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV daily 2025-01-04",
+      "status": "passed",
+      "expected": [
+        0,
+        0,
+        1
+      ],
+      "first": "2025-01-04",
+      "last": "2025-01-04",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV daily 2025-04-01",
+      "status": "passed",
+      "expected": [
+        25,
+        100,
+        25
+      ],
+      "first": "2025-04-01",
+      "last": "2025-04-01",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV daily 2025-01-05",
+      "status": "passed",
+      "expected": [
+        0,
+        0,
+        0
+      ],
+      "first": "2025-01-05",
+      "last": "2025-01-05",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "Reports PR85 successful cross-year/week and cross-month references survive frequency/history/reload with real CSV",
+      "status": "passed"
+    },
+    {
+      "name": "Activity Monday-first calendar, Athens midnight, complete daily totals across 20+5 pagination",
+      "status": "passed",
+      "expectedSeconds": 25,
+      "expectedWords": 100
+    },
+    {
+      "name": "Library 105 real metadata rows: stable 100+5 ordering, combined filters, keyboard detail, null versus known zero; metadata excluded from reading estimates",
+      "status": "passed"
+    },
+    {
+      "name": "primary and secondary routes; real mobile/desktop renders, keyboard account navigation and reachable final controls",
+      "status": "passed"
+    },
+    {
+      "name": "never-completed status from synthetic fresh native stream state on Overview and Settings",
+      "status": "passed"
+    },
+    {
+      "name": "runtime-completed sessions remain independent of never-completed library metadata",
+      "status": "passed"
+    },
+    {
+      "name": "real UI manual → authenticated cron without cookie → manual continuation; two app restarts; 19 ordered pages, no duplicates, receipts/checkpoints/rollups, unchanged eight-page budget",
+      "status": "passed",
+      "imported": 19,
+      "estimatedWords": 4275,
+      "persistedSeconds": 1140
+    },
+    {
+      "name": "cron rejects missing/wrong/query-only secrets without work; concurrent route/UI admits one owner; captured protected server action independently rejects unauthorized cookie",
+      "status": "passed"
+    },
+    {
+      "name": "route fault 429: retained checkpoint and rows, truthful persisted outcome, eligible recovery after restart",
+      "status": "passed"
+    },
+    {
+      "name": "route fault timeout: retained checkpoint and rows, truthful persisted outcome, eligible recovery after restart",
+      "status": "passed"
+    },
+    {
+      "name": "route fault interrupt: retained checkpoint and rows, truthful persisted outcome, eligible recovery after restart",
+      "status": "passed"
+    },
+    {
+      "name": "interrupted persisted page response reconciles by real receipt without duplicate sessions",
+      "status": "passed"
+    },
+    {
+      "name": "persisted stale completion and dirty-rollup state demonstrations (supplementary SQL fixtures); durable progress is never cleared",
+      "status": "passed"
+    },
+    {
+      "name": "independent metrics/library/status transport outages keep real remaining reads; failed query differs from successful empty; safe content",
+      "status": "passed"
+    },
+    {
+      "name": "unapplied generation candidate: real isolated repair_prepare state; never described as analytics-ready",
+      "status": "passed",
+      "persistedReconciliation": null,
+      "expectedReadiness": "writer barrier frozen"
+    },
+    {
+      "name": "logout actual form revokes real DB session, deletes Secure cookie and rejects captured pre-logout replay",
+      "status": "passed"
+    }
+  ],
+  "counts": {
+    "passed": 32,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "screenshots": [
+    {
+      "filename": "overview-desktop.png",
+      "route": "/dashboard",
+      "width": 1440,
+      "visualInspection": "pending"
+    },
+    {
+      "filename": "reports-cross-month-desktop.png",
+      "route": "/reports",
+      "width": 1440,
+      "visualInspection": "pending"
+    },
+    {
+      "filename": "activity-mobile-final-control.png",
+      "route": "/activity",
+      "width": 390,
+      "visualInspection": "pending"
+    },
+    {
+      "filename": "reports-mobile-three-sessions.png",
+      "route": "/reports",
+      "width": 390,
+      "visualInspection": "pending"
+    },
+    {
+      "filename": "settings-partial-desktop.png",
+      "route": "/settings",
+      "width": 1440,
+      "visualInspection": "pending"
+    },
+    {
+      "filename": "overview-synced-desktop.png",
+      "route": "/dashboard",
+      "width": 1440,
+      "visualInspection": "pending"
+    },
+    {
+      "filename": "overview-independent-outage-desktop.png",
+      "route": "/dashboard",
+      "width": 1440,
+      "visualInspection": "pending"
+    }
+  ],
+  "applicationTests": "separate CI verify job",
+  "databasePhases": "separate outcomes.json; groups, not individual assertions"
+}

@@ -3,6 +3,22 @@
   "environment": "B: runner-owned local Supabase on GitHub Actions",
   "attempts": [
     {
+      "conclusion": "success",
+      "createdAt": "2026-10-21T12:09:11Z",
+      "databaseId": 39597331904,
+      "headSha": "69fdc63b69383efbb064a6ee92b7edba657e16e1",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39597331904"
+    },
+    {
+      "conclusion": "cancelled",
+      "createdAt": "2026-10-21T12:01:56Z",
+      "databaseId": 39596394511,
+      "headSha": "8c1675db97449e1abf35ad04ad192b0ffc2c1349",
+      "status": "completed",
+      "url": "https://github.com/dfalidas/matter-stats/actions/runs/39596394511"
+    },
+    {
       "conclusion": "failure",
       "createdAt": "2026-10-21T08:23:23Z",
       "databaseId": 39568890074,
@@ -121,6 +137,7 @@
     "Default official ECR image requests were rate-limited. Later jobs explicitly use the reviewed official docker.io registry with unchanged CLI image tags.",
     "recovery-160ed48 preserves 30 passed behavioral groups followed by a generation-status assertion failure, 5 passed DB phase groups, 1 failed and 1 not-run; not an overall pass. Its legacy realSqlAndDataApi=not-run field was only finalized on full completion; per-phase records show actual partial database execution.",
     "Local dirty-worktree provisioning was blocked by disk extraction capacity before DB/browser assertions. Original identity includes harness content hashes; the base-keyed directory does not certify base code.",
-    "Historical local cleanup applicationProcesses=verified-removed includes no app created; it establishes no running test process, not an executed browser journey. Current runner reports not-created separately."
+    "Historical local cleanup applicationProcesses=verified-removed includes no app created; it establishes no running test process, not an executed browser journey. Current runner reports not-created separately.",
+    "At 8c1675d all 32 behavioral groups passed but final console assertion failed; cleanup verified. At 69fdc63 browser traffic is drained/paused during deliberate process recreation, no console assertion changed, and all three CI jobs passed."
   ]
 }

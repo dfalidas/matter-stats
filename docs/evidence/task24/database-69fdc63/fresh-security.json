@@ -1,0 +1,7 @@
+{
+  "status": "passed",
+  "fixtures": 11,
+  "limiterGroups": 2,
+  "requestsPerGroup": 20,
+  "cleanup": "passed"
+}

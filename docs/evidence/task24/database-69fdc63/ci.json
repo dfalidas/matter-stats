@@ -1,0 +1,13 @@
+{
+  "testedSha": "69fdc63b69383efbb064a6ee92b7edba657e16e1",
+  "event": "pull_request",
+  "checkoutKind": "pr-head",
+  "prHeadSha": "69fdc63b69383efbb064a6ee92b7edba657e16e1",
+  "eventSha": "381bd5b329d6bb93cf3c6daf840d6e392989f350",
+  "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/39597331904",
+  "runAttempt": "1",
+  "worktreeDirty": false,
+  "node": "v22.23.3",
+  "npm": "10.9.9",
+  "verificationOutcome": "success"
+}

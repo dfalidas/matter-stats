@@ -14,6 +14,7 @@ npx --no-install next typegen
 npm run typecheck
 npm run lint
 npm run test
+npm run build
 npm run audit:ci
 npx --no-install playwright install --with-deps chromium
 DISPOSABLE_DB_ACK=yes npm run test:full-stack
@@ -111,7 +112,10 @@ production-named Supabase database, zero Supabase development branches and zero
 Vercel custom environments. Recovery discovery confirmed the same state. Ready
 previews do not establish DB isolation.
 No hosted runtime request, mutating check or environment read of secret values was
-performed. No service, deployment, configuration or production data was created/copied.
+performed. No service was provisioned, configuration changed or production data
+created/copied. Existing Git integration generated automatic preview statuses on
+branch pushes; no manual deployment/promotion was performed. Those statuses were
+not treated as runtime verification or proof of database isolation.
 
 The minimal operator setup, outside this task's execution authorization, is:
 

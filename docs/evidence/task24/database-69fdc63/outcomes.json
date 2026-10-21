@@ -1,0 +1,139 @@
+{
+  "testedSha": "69fdc63b69383efbb064a6ee92b7edba657e16e1",
+  "event": "pull_request",
+  "checkoutKind": "pr-head",
+  "prHeadSha": "69fdc63b69383efbb064a6ee92b7edba657e16e1",
+  "eventSha": "381bd5b329d6bb93cf3c6daf840d6e392989f350",
+  "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/39597331904",
+  "runAttempt": "1",
+  "worktreeDirty": false,
+  "node": "v22.23.3",
+  "npm": "10.9.9",
+  "steps": [
+    {
+      "name": "toolchain",
+      "status": "passed"
+    },
+    {
+      "name": "compilation",
+      "status": "passed"
+    },
+    {
+      "name": "configuration",
+      "status": "passed"
+    },
+    {
+      "name": "fresh:migrations-preservation",
+      "status": "passed"
+    },
+    {
+      "name": "fresh:gateway",
+      "status": "passed"
+    },
+    {
+      "name": "fresh:catalog",
+      "status": "passed"
+    },
+    {
+      "name": "backup-restore",
+      "status": "passed"
+    },
+    {
+      "name": "fresh:security",
+      "status": "passed"
+    },
+    {
+      "name": "fresh:lease",
+      "status": "passed"
+    },
+    {
+      "name": "fresh:page",
+      "status": "passed"
+    },
+    {
+      "name": "fresh:word-method",
+      "status": "passed"
+    },
+    {
+      "name": "fresh:continuation",
+      "status": "passed"
+    },
+    {
+      "name": "fresh:requests",
+      "status": "passed"
+    },
+    {
+      "name": "fresh:preview",
+      "status": "passed"
+    },
+    {
+      "name": "fresh:status",
+      "status": "passed"
+    },
+    {
+      "name": "fresh:repair",
+      "status": "passed"
+    },
+    {
+      "name": "upgrade:migrations-preservation",
+      "status": "passed"
+    },
+    {
+      "name": "upgrade:gateway",
+      "status": "passed"
+    },
+    {
+      "name": "upgrade:catalog",
+      "status": "passed"
+    },
+    {
+      "name": "upgrade:security",
+      "status": "passed"
+    },
+    {
+      "name": "upgrade:lease",
+      "status": "passed"
+    },
+    {
+      "name": "upgrade:page",
+      "status": "passed"
+    },
+    {
+      "name": "upgrade:word-method",
+      "status": "passed"
+    },
+    {
+      "name": "upgrade:continuation",
+      "status": "passed"
+    },
+    {
+      "name": "upgrade:requests",
+      "status": "passed"
+    },
+    {
+      "name": "upgrade:preview",
+      "status": "passed"
+    },
+    {
+      "name": "upgrade:status",
+      "status": "passed"
+    },
+    {
+      "name": "upgrade:repair",
+      "status": "passed"
+    },
+    {
+      "name": "cleanup",
+      "status": "passed"
+    }
+  ],
+  "counts": {
+    "passed": 29,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0,
+    "blocked": 0,
+    "not-run": 0,
+    "running": 0
+  }
+}
