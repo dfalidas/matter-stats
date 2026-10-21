@@ -62,7 +62,9 @@ export function installTransport(config, ipc) {
         { status: 503 },
       );
     if (decision.kind === "drop")
-      throw new TypeError("Synthetic interrupted request");
+      throw Object.assign(new TypeError("Synthetic interrupted request"), {
+        cause: { code: "ECONNRESET" },
+      });
     if (matter) {
       assert.equal(
         decision.kind,

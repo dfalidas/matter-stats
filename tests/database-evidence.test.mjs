@@ -18,7 +18,7 @@ test('push evidence requires the pushed main commit; unrelated events fail close
 test('workflow preserves pins, both event checkouts, least privilege and one app test execution', () => {
   const workflow = readFileSync('.github/workflows/ci.yml','utf8');
   assert.match(workflow, /ref: \$\{\{ github.event.pull_request.head.sha \|\| github.sha \}\}/);
-  assert.equal((workflow.match(/persist-credentials: false/g) ?? []).length, 2);
+  assert.equal((workflow.match(/persist-credentials: false/g) ?? []).length, 3);
   assert.equal((workflow.match(/npm run test\n/g) ?? []).length, 1);
   assert.doesNotMatch(workflow, /pull_request_target|secrets\.|if:.*event_name.*pull_request/);
   assert.match(workflow, /permissions:\n  contents: read/);
