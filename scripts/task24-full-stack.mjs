@@ -100,6 +100,22 @@ const phases = phaseRecorder(
     if (active) console.log(`Task 24: ${active.name}`);
   },
 );
+const databaseMetadata = {
+  migrationInventory: [],
+  realSqlAndDataApi: "not-run",
+};
+const databasePhases = phaseRecorder(
+  [
+    "migrations",
+    "sessions",
+    "analytics-reference",
+    "ingestion",
+    "faults",
+    "status",
+    "logout",
+  ],
+  (value) => save("database", { ...databaseMetadata, ...value }),
+);
 let directory, stack, app, browser, state;
 const children = new Set();
 const observations = {
@@ -250,6 +266,7 @@ try {
   console.log("Task 24 stack: fresh local application key configured");
   phases.end();
   phases.begin("migrations");
+  databasePhases.begin("migrations");
   const sql = (statement) => containerPsql(stack.projectId, statement).trim();
   const inventory = await verifyCatalog({
     migrationsDir: path.join(root, "supabase/migrations"),
@@ -259,12 +276,8 @@ try {
     inventory,
     await repositoryMigrationVersions(path.join(root, "supabase/migrations")),
   );
-  save("database", {
-    status: "passed",
-    migrations: inventory,
-    realSqlAndDataApi: true,
-    phaseCountsAreGroups: true,
-  });
+  databaseMetadata.migrationInventory = inventory;
+  databasePhases.end();
   phases.end();
   const credentials = {
     password: randomBytes(32).toString("base64url"),
@@ -372,8 +385,8 @@ try {
           const endpoint = message.path.split("/").at(-1);
           if (endpoint === "app_sessions" && state.authReadControl) {
             state.authReadControl.reads++;
-            if (state.authReadControl.reads === 2)
-              state.authReadControl.onSecond();
+            if (state.authReadControl.reads === 1)
+              state.authReadControl.onActionRead();
           }
           decision = { kind: "real" };
           if (
@@ -455,7 +468,10 @@ try {
       credentials.matter,
       freshKey,
     ],
+    databasePhases,
   });
+  databaseMetadata.realSqlAndDataApi = true;
+  databasePhases.fail(); // Persist final metadata; no active phase remains.
   assert.equal(observations.unexpectedNetwork, 0);
   save("network", {
     ...observations,
@@ -467,9 +483,14 @@ try {
   });
 } catch (error) {
   phases.fail(error.failureKind);
+  databasePhases.fail(error.failureKind);
   save("failure", {
     status: error.failureKind === "infrastructure" ? "blocked" : "failed",
     category: error.category ?? error.name,
+    failureLocation:
+      error.stack
+        ?.match(/scripts\/(task24-[a-z-]+\.mjs):(\d+):(\d+)/)
+        ?.slice(1) ?? null,
     rawDetailsWithheld: true,
     infrastructureReason: error.infrastructureReason ?? null,
     databaseCode: error.databaseCode ?? null,

@@ -27,6 +27,7 @@ export async function runJourneys({
   phases,
   save,
   secrets,
+  databasePhases,
 }) {
   const checks = [],
     screenshots = [],
@@ -222,6 +223,7 @@ export async function runJourneys({
   };
   try {
     phases.begin("authentication");
+    databasePhases.begin("sessions");
     for (const route of [
       "/dashboard",
       "/activity",
@@ -338,9 +340,11 @@ export async function runJourneys({
     check(
       "auth: expired/revoked/storage-unavailable/version-invalidated sessions fail closed; isolated version 2 login recovers",
     );
+    databasePhases.end();
     phases.end();
 
     phases.begin("analytics-csv");
+    databasePhases.begin("analytics-reference");
     sql(seedSql);
     const rawReference = JSON.parse(
       sql(
@@ -455,6 +459,7 @@ export async function runJourneys({
     check(
       "Reports PR85 successful cross-year/week and cross-month references survive frequency/history/reload with real CSV",
     );
+    databasePhases.end();
     phases.end();
 
     phases.begin("navigation-library");
@@ -592,6 +597,7 @@ export async function runJourneys({
     phases.end();
 
     phases.begin("sync-continuation");
+    databasePhases.begin("ingestion");
     const initial = sql("select count(*) from public.sync_runs;"),
       upstreamBefore = observations.matter.length;
     for (const [authorization, query] of [
@@ -643,15 +649,15 @@ export async function runJourneys({
     assert.ok(typeof checkpoint === "string" && checkpoint.length > 0);
     const cycleGeneration = persisted.stream.cycle_generation;
     await capture("settings-partial-desktop");
-    // Both middleware and the action use real DB authorization. Deterministically
-    // revoke AFTER the first (middleware) read, BEFORE the independent action
-    // guard's read. A navigation redirect cannot satisfy this assertion.
+    // Middleware's Edge fetch uses real Supabase directly. Its successful read
+    // precedes this Node action transport hook. Revoke just before the action's
+    // own real lookup; a navigation redirect cannot satisfy the action message.
     const actionCookie = (await context.cookies()).find(
       (row) => row.name === cookieName,
     );
     state.authReadControl = {
       reads: 0,
-      onSecond: () =>
+      onActionRead: () =>
         sql(
           `update public.app_sessions set revoked_at=clock_timestamp() where token_hash='${hash(actionCookie.value)}';`,
         ),
@@ -661,10 +667,9 @@ export async function runJourneys({
       headers: capturedAction.headers,
     });
     assert.match(await unauthorized.text(), /Your session expired/);
-    assert.equal(
-      state.authReadControl.reads,
-      2,
-      "both authorization reads must execute",
+    assert.ok(
+      state.authReadControl.reads >= 1,
+      "the independent action guard must execute",
     );
     state.authReadControl = null;
     assert.equal(sessionState().count, 8);
@@ -725,9 +730,11 @@ export async function runJourneys({
     check(
       "cron rejects missing/wrong/query-only secrets without work; concurrent route/UI admits one owner; captured protected server action independently rejects unauthorized cookie",
     );
+    databasePhases.end();
     phases.end();
 
     phases.begin("sync-faults");
+    databasePhases.begin("faults");
     // Finish any remaining history through the real route, preserving progress.
     for (let i = 0; i < 3 && sessionState().history !== "complete"; i++)
       assert.equal((await cron(`Bearer ${credentials.cron}`)).status, 200);
@@ -790,9 +797,11 @@ export async function runJourneys({
     check(
       "interrupted persisted page response reconciles by real receipt without duplicate sessions",
     );
+    databasePhases.end();
     phases.end();
 
     phases.begin("truthful-status");
+    databasePhases.begin("status");
     await goto("/settings");
     await safe();
     assert.match(await text(), /Coverage unverified|Unverified/);
@@ -859,9 +868,11 @@ export async function runJourneys({
     check(
       "unapplied generation candidate: real isolated repair_prepare state; never described as analytics-ready",
     );
+    databasePhases.end();
     phases.end();
 
     phases.begin("logout-replay");
+    databasePhases.begin("logout");
     await goto("/settings");
     const preLogout = (await context.cookies()).find(
       (row) => row.name === cookieName,
@@ -885,6 +896,7 @@ export async function runJourneys({
     check(
       "logout actual form revokes real DB session, deletes Secure cookie and rejects captured pre-logout replay",
     );
+    databasePhases.end();
     phases.end();
     assert.equal(browserEvents.pageErrors, 0);
     assert.equal(browserEvents.unexpectedRequests, 0);
