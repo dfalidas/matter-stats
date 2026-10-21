@@ -481,10 +481,27 @@ export async function runJourneys({
       .getByRole("link", { name: /^Open / })
       .allTextContents();
     assert.match(titles[0], /Untitled article/);
+    const libraryOrder = await page
+      .getByRole("link", { name: /^Open / })
+      .evaluateAll((links) => links.map((link) => link.getAttribute("href")));
     await page.getByRole("button", { name: "Next", exact: true }).click();
     await page.waitForURL("**page=2**");
     assert.equal(await page.getByRole("row").count(), 6);
     assert.match(await text(), /Synthetic article 104/);
+    libraryOrder.push(
+      ...(await page
+        .getByRole("link", { name: /^Open / })
+        .evaluateAll((links) =>
+          links.map((link) => link.getAttribute("href")),
+        )),
+    );
+    assert.deepEqual(
+      libraryOrder,
+      Array.from(
+        { length: 105 },
+        (_, i) => `/articles/task24-item-${String(i).padStart(3, "0")}`,
+      ),
+    );
     await goto(
       "/articles?q=Synthetic&source=Synthetic+journal&tag=task24-tag&status=queue&author=Sample+author&type=article",
     );
@@ -618,6 +635,8 @@ export async function runJourneys({
     assert.equal(persisted.dirty, 0);
     assert.equal(persisted.rollup, 480);
     const checkpoint = persisted.stream.cursor;
+    assert.ok(typeof checkpoint === "string" && checkpoint.length > 0);
+    const cycleGeneration = persisted.stream.cycle_generation;
     await capture("settings-partial-desktop");
     // Both middleware and the action use real DB authorization. Deterministically
     // revoke AFTER the first (middleware) read, BEFORE the independent action
@@ -654,6 +673,7 @@ export async function runJourneys({
     persisted = sessionState();
     assert.equal(persisted.count, 16);
     assert.notEqual(persisted.stream.cursor, checkpoint);
+    assert.equal(persisted.stream.cycle_generation, cycleGeneration);
     await startApp(2);
     const finalText = await manual("Sync Recent Activity");
     assert.match(finalText, /invocation finished|enumeration/i);
@@ -663,12 +683,24 @@ export async function runJourneys({
     assert.equal(persisted.words, 4275);
     assert.equal(persisted.rollup, 1140);
     assert.equal(persisted.stream.cycle_active, false);
+    assert.equal(persisted.stream.cycle_generation, cycleGeneration);
     assert.equal(persisted.dirty, 0);
     assert.deepEqual(
       observations.matter
         .filter((row) => row.path.endsWith("/reading_sessions"))
         .map((row) => row.page),
       Array.from({ length: 19 }, (_, i) => i),
+    );
+    for (const route of ["/dashboard", "/settings"]) {
+      await goto(route);
+      assert.match(await text(), /Sessions completion is recent/);
+      assert.match(
+        await text(),
+        /Metadata: Never completed|Last completed metadata cycle[\s\S]*Never completed/,
+      );
+    }
+    check(
+      "runtime-completed sessions remain independent of never-completed library metadata",
     );
     const libraryText = await manual("Backfill Library");
     assert.match(libraryText, /invocation finished/);
@@ -771,20 +803,12 @@ export async function runJourneys({
       assert.match(await text(), /completion is stale/);
     }
     sql(
-      "delete from public.matter_cycle_completions where stream='library_items'; update public.matter_sync_streams set completed_watermark=null where stream='library_items';",
-    );
-    await goto("/settings");
-    assert.match(
-      await text(),
-      /Last completed metadata cycle[\s\S]*Never completed/,
-    );
-    sql(
       "insert into public.matter_dirty_rollups(date,revision,timezone) values('2025-01-02',gen_random_uuid(),'Europe/Athens') on conflict(date) do nothing;",
     );
     await goto("/settings");
     assert.match(await text(), /pending dirty rollups/);
     check(
-      "persisted stale completion, incomplete metadata and dirty-rollup state demonstrations (supplementary SQL fixtures)",
+      "persisted stale completion and dirty-rollup state demonstrations (supplementary SQL fixtures); durable progress is never cleared",
     );
     for (const [fault, pattern] of [
       ["metrics", /Reading data unavailable/],

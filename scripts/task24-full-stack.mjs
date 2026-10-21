@@ -191,6 +191,12 @@ try {
   phases.end();
   phases.begin("owned-stack");
   await configureStack(stack.workdir, stack);
+  assert.ok(
+    (
+      await readFile(path.join(stack.workdir, "supabase/config.toml"), "utf8")
+    ).includes(`project_id = "${stack.projectId}"`),
+    "owned project configuration mismatch",
+  );
   await copyMigrations(stack.workdir);
   cleanup.stack = "pending";
   save("cleanup", cleanup);
@@ -203,7 +209,9 @@ try {
     "--exclude",
     "realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor",
   ]);
+  console.log("Task 24 stack: CLI start returned successfully");
   configureDisposableGateway(stack.projectId);
+  console.log("Task 24 stack: owned gateway configured");
   const status = parseStatusEnv(
     cli(["status", "--workdir", stack.workdir, "-o", "env"]),
   );
@@ -232,6 +240,7 @@ try {
   );
   configureDisposableGateway(stack.projectId);
   status.SERVICE_ROLE_KEY = freshKey;
+  console.log("Task 24 stack: fresh local application key configured");
   phases.end();
   phases.begin("migrations");
   const sql = (statement) => containerPsql(stack.projectId, statement).trim();
@@ -459,6 +468,8 @@ try {
     databaseCode: error.databaseCode ?? null,
     diagnosticStages: error.diagnosticStages ?? [],
     diagnosticWords: error.diagnosticWords ?? [],
+    tool: error.tool ?? null,
+    operation: error.operation ?? null,
     disposableDiagnostics:
       stack && cleanup.stack === "pending"
         ? disposableDiagnostics(stack.projectId)
