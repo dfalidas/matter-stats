@@ -165,6 +165,10 @@ The runner now drains requests and pauses new browser traffic during deliberate
 server restarts; every request still reaches the recreated real application.
 The console assertion remains unchanged and passes at `69fdc63` with zero errors.
 Final documentation/evidence changes do not replace this tested source identity.
+Final process review additionally made Chromium's child environment explicit with
+the same sanitizer used for CLI/build/server processes. The secret-free CI
+checkpoint remains valid at its original source; this local-isolation hardening is
+rerun at the final candidate, whose harness content hash differs accordingly.
 Final candidate SHA and exact-head CI/artifact links are recorded in draft PR #87;
 affected checks must pass again at that final head before handoff.
 

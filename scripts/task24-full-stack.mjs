@@ -462,7 +462,10 @@ try {
     }
     assert.ok(ready, "production app startup timeout");
   };
-  browser = await chromium.launch({ headless: true });
+  browser = await chromium.launch({
+    headless: true,
+    env: sanitizedEnvironment(),
+  });
   cleanup.browser = "pending";
   save("cleanup", cleanup);
   save("toolchain", {

@@ -4,7 +4,7 @@ Use a disposable checkout without `.env`, `.env.local` or `.env.production*` fil
 Node **22** / npm **10**, local Docker and the repository's pinned Supabase CLI
 **2.48.3** (selected by the existing runner's `npx --yes supabase@2.48.3`). Do not
 supply application, hosted Supabase or real Matter credentials. Inherited application
-variables are stripped before launching CLI/build/server children. No target URL
+variables are stripped before launching CLI/build/server/browser children. No target URL
 argument is accepted; the harness creates its own stack below the OS temporary
 directory, checks loopback targets and refuses pre-existing owned-name resources.
 
