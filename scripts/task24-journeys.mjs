@@ -897,7 +897,6 @@ export async function runJourneys({
       "logout actual form revokes real DB session, deletes Secure cookie and rejects captured pre-logout replay",
     );
     databasePhases.end();
-    phases.end();
     assert.equal(browserEvents.pageErrors, 0);
     assert.equal(browserEvents.unexpectedRequests, 0);
     assert.ok(
@@ -916,6 +915,7 @@ export async function runJourneys({
       databasePhases:
         "separate outcomes.json; groups, not individual assertions",
     });
+    phases.end();
   } catch (error) {
     save("journeys", {
       status: "failed",

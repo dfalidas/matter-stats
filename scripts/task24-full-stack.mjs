@@ -92,6 +92,7 @@ const phases = phaseRecorder(
     "migrations",
     "production-build",
     ...JOURNEYS,
+    "network-audit",
     "cleanup",
   ],
   (value) => {
@@ -161,6 +162,14 @@ try {
     "supported Node 22 required",
   );
   assert.equal(cli(["--version"]).trim(), SUPABASE_CLI_VERSION);
+  save("toolchain", {
+    node: identity.node,
+    npm: identity.npm,
+    supabase: SUPABASE_CLI_VERSION,
+    imageRegistry:
+      process.env.STABILIZATION_TEST_IMAGE_REGISTRY ?? "public.ecr.aws",
+    browser: "not-run",
+  });
   command("docker", ["info"]);
   // Next loads dotenv even with a sanitized process environment. Refuse those
   // files rather than risk importing a real target or credential from disk.
@@ -277,6 +286,7 @@ try {
     await repositoryMigrationVersions(path.join(root, "supabase/migrations")),
   );
   databaseMetadata.migrationInventory = inventory;
+  databaseMetadata.postgres = sql("select current_setting('server_version');");
   databasePhases.end();
   phases.end();
   const credentials = {
@@ -443,6 +453,8 @@ try {
     node: identity.node,
     npm: identity.npm,
     supabase: SUPABASE_CLI_VERSION,
+    imageRegistry:
+      process.env.STABILIZATION_TEST_IMAGE_REGISTRY ?? "public.ecr.aws",
     playwright: JSON.parse(
       await readFile("node_modules/playwright/package.json", "utf8"),
     ).version,
@@ -472,6 +484,7 @@ try {
   });
   databaseMetadata.realSqlAndDataApi = true;
   databasePhases.fail(); // Persist final metadata; no active phase remains.
+  phases.begin("network-audit");
   assert.equal(observations.unexpectedNetwork, 0);
   save("network", {
     ...observations,
@@ -481,6 +494,7 @@ try {
     },
     realMatterRequests: 0,
   });
+  phases.end();
 } catch (error) {
   phases.fail(error.failureKind);
   databasePhases.fail(error.failureKind);

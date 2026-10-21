@@ -62,8 +62,16 @@ export function command(binary, args, { cwd = repoRoot, env = sanitizedEnvironme
   return result.stdout;
 }
 
-export function cli(args, options) {
-  return command("npx", ["--yes", `supabase@${SUPABASE_CLI_VERSION}`, ...args], options);
+export function imageRegistryEnvironment(env = process.env) {
+  const registry = env.STABILIZATION_TEST_IMAGE_REGISTRY;
+  assert.ok(!registry || registry === 'docker.io', 'unreviewed disposable image registry refused');
+  return registry ? {SUPABASE_INTERNAL_IMAGE_REGISTRY:registry} : {};
+}
+
+export function cli(args, options = {}) {
+  const env = {...(options.env ?? sanitizedEnvironment())};
+  delete env.SUPABASE_INTERNAL_IMAGE_REGISTRY;
+  return command("npx", ["--yes", `supabase@${SUPABASE_CLI_VERSION}`, ...args], {...options,env:{...env,...imageRegistryEnvironment()}});
 }
 
 function dockerAvailable() {
@@ -487,7 +495,7 @@ export async function runStabilizationDatabases({ evidenceRoot = path.join(repoR
   try {
     const actualCli = cli(['--version']).trim();
     assert.equal(actualCli, SUPABASE_CLI_VERSION, 'unexpected Supabase CLI version');
-    await writeFile(path.join(evidenceDir, 'toolchain.json'), JSON.stringify({ node:identity.node, npm:identity.npm, supabaseCli:actualCli }, null, 2) + '\n');
+    await writeFile(path.join(evidenceDir, 'toolchain.json'), JSON.stringify({ node:identity.node, npm:identity.npm, supabaseCli:actualCli, imageRegistry:process.env.STABILIZATION_TEST_IMAGE_REGISTRY ?? 'public.ecr.aws' }, null, 2) + '\n');
     phases.end();
     phases.begin('compilation');
     command(process.execPath, [path.join(repoRoot, 'node_modules/typescript/bin/tsc'), '-p', 'tests/tsconfig.json']);

@@ -6,6 +6,27 @@ import {
   installTransport,
 } from "../scripts/task24-transport.mjs";
 import { expectedRows } from "../scripts/task24-fixtures.mjs";
+import { imageRegistryEnvironment } from "../scripts/stabilization-db-orchestrator.mjs";
+
+test("only the reviewed official CLI image registry selection is forwarded", () => {
+  assert.deepEqual(imageRegistryEnvironment({}), {});
+  assert.deepEqual(
+    imageRegistryEnvironment({
+      STABILIZATION_TEST_IMAGE_REGISTRY: "docker.io",
+    }),
+    { SUPABASE_INTERNAL_IMAGE_REGISTRY: "docker.io" },
+  );
+  for (const value of [
+    "https://docker.io",
+    "unreviewed.example",
+    "public.ecr.aws/other",
+  ])
+    assert.throws(
+      () =>
+        imageRegistryEnvironment({ STABILIZATION_TEST_IMAGE_REGISTRY: value }),
+      /refused/,
+    );
+});
 
 test("Task 24 refuses hosted, credential-bearing and non-HTTP database origins", () => {
   for (const url of [
