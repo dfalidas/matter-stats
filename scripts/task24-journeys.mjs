@@ -615,18 +615,33 @@ export async function runJourneys({
     assert.equal(persisted.rollup, 480);
     const checkpoint = persisted.stream.cursor;
     await capture("settings-partial-desktop");
-    // Replay the ACTUAL action request with a syntactically plausible cookie.
-    // Middleware lets it reach the action; the independent server guard rejects.
+    // Both middleware and the action use real DB authorization. Deterministically
+    // revoke AFTER the first (middleware) read, BEFORE the independent action
+    // guard's read. A navigation redirect cannot satisfy this assertion.
+    const actionCookie = (await context.cookies()).find(
+      (row) => row.name === cookieName,
+    );
+    state.authReadControl = {
+      reads: 0,
+      onSecond: () =>
+        sql(
+          `update public.app_sessions set revoked_at=clock_timestamp() where token_hash='${hash(actionCookie.value)}';`,
+        ),
+    };
     const unauthorized = await context.request.post(capturedAction.url, {
       data: capturedAction.body,
-      headers: {
-        ...capturedAction.headers,
-        cookie: `${cookieName}=${malformed.value}`,
-      },
+      headers: capturedAction.headers,
     });
     assert.match(await unauthorized.text(), /Your session expired/);
+    assert.equal(
+      state.authReadControl.reads,
+      2,
+      "both authorization reads must execute",
+    );
+    state.authReadControl = null;
     assert.equal(sessionState().count, 8);
     assert.equal(sessionState().stream.cursor, checkpoint);
+    await login();
     await startApp(2);
     const scheduled = await cron(`Bearer ${credentials.cron}`);
     assert.equal(scheduled.status, 200);

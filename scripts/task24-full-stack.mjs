@@ -23,6 +23,7 @@ import {
   copyMigrations,
   containerPsql,
   configureDisposableGateway,
+  disposableDiagnostics,
   parseStatusEnv,
   sanitizedEnvironment,
   SUPABASE_CLI_VERSION,
@@ -192,7 +193,15 @@ try {
   await copyMigrations(stack.workdir);
   cleanup.stack = "pending";
   save("cleanup", cleanup);
-  cli(["start", "--workdir", stack.workdir]);
+  // Only unused services are excluded. Real Postgres, PostgREST, Kong and Auth
+  // stay enabled; the complete Task 23 stack and suites are unchanged.
+  cli([
+    "start",
+    "--workdir",
+    stack.workdir,
+    "--exclude",
+    "realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor",
+  ]);
   configureDisposableGateway(stack.projectId);
   const status = parseStatusEnv(
     cli(["status", "--workdir", stack.workdir, "-o", "env"]),
@@ -322,6 +331,11 @@ try {
         } else {
           observations.databaseRequests++;
           const endpoint = message.path.split("/").at(-1);
+          if (endpoint === "app_sessions" && state.authReadControl) {
+            state.authReadControl.reads++;
+            if (state.authReadControl.reads === 2)
+              state.authReadControl.onSecond();
+          }
           decision = { kind: "real" };
           if (
             state.fault === endpoint ||
@@ -418,6 +432,11 @@ try {
     status: error.failureKind === "infrastructure" ? "blocked" : "failed",
     category: error.category ?? error.name,
     rawDetailsWithheld: true,
+    infrastructureReason: error.infrastructureReason ?? null,
+    disposableDiagnostics:
+      stack && cleanup.stack === "pending"
+        ? disposableDiagnostics(stack.projectId)
+        : [],
   });
   // Private local debugging only; explicit artifact allowlist excludes work/.
   await mkdir("work", { recursive: true });
@@ -440,7 +459,8 @@ try {
   try {
     await stopApp();
     assert.equal(children.size, 0);
-    cleanup.applicationProcesses = "verified-removed";
+    if (cleanup.applicationProcesses === "pending")
+      cleanup.applicationProcesses = "verified-removed";
   } catch {
     cleanup.applicationProcesses = "failed";
   }

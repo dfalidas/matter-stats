@@ -51,7 +51,10 @@ export function command(binary, args, { cwd = repoRoot, env = sanitizedEnvironme
     const databaseCode = result.stderr.match(/(?:ERROR|FATAL):\s+([0-9A-Z]{5}):/)?.[1] ?? null;
     const missingRelation = result.stderr.match(/relation "([a-z_][a-z0-9_.]{0,127})" does not exist/)?.[1] ?? null;
     const permissionReason = result.stderr.match(/must be owner of (?:schema|table|function|extension) [a-z_][a-z0-9_.]*|must be (?:able to SET ROLE|member of role) "[a-z_][a-z0-9_]*"|permission denied to set parameter "[a-z_][a-z0-9_]*"|permission denied for (?:schema|table|function) [a-z_][a-z0-9_.]*/)?.[0] ?? null;
-    throw Object.assign(new Error(`Disposable ${path.basename(binary)} failed (exit ${result.status}; ${category}; SQLSTATE ${databaseCode ?? "unavailable"}; relation ${missingRelation ?? "unavailable"}; permission ${permissionReason ?? "unavailable"}). Raw output withheld.`), { failureKind: ['disk-capacity','image-pull','timeout','transport','command-unavailable'].includes(category) ? 'infrastructure' : 'assertion-or-suite', category, databaseCode, missingRelation, permissionReason });
+    const infrastructureReason = /port is already allocated|address already in use/i.test(result.stderr) ? 'port-conflict'
+      : /not healthy|unhealthy|not ready/i.test(result.stderr) ? 'service-health'
+      : /permission denied.*docker|cannot connect.*docker/i.test(result.stderr) ? 'docker-access' : null;
+    throw Object.assign(new Error(`Disposable ${path.basename(binary)} failed (exit ${result.status}; ${category}; SQLSTATE ${databaseCode ?? "unavailable"}; relation ${missingRelation ?? "unavailable"}; permission ${permissionReason ?? "unavailable"}). Raw output withheld.`), { failureKind: ['disk-capacity','image-pull','timeout','transport','command-unavailable'].includes(category) || infrastructureReason ? 'infrastructure' : 'assertion-or-suite', category, infrastructureReason, databaseCode, missingRelation, permissionReason });
   }
   return result.stdout;
 }
@@ -69,7 +72,7 @@ function dockerAvailable() {
 
 // Failure-only disposable diagnostics. Never retain raw logs, environment,
 // container identifiers or generated local credentials in evidence artifacts.
-function disposableDiagnostics(projectId) {
+export function disposableDiagnostics(projectId) {
   return ["kong", "rest", "db"].map((component) => {
     const container = `supabase_${component}_${projectId}`;
     const options = { encoding:"utf8", env:sanitizedEnvironment(), timeout:5000, maxBuffer:1024*1024 };
