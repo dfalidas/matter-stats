@@ -95,7 +95,7 @@ export function syntheticMatter(request, state) {
           {
             object: "reading_session",
             id: `task24-import-${offset}`,
-            date: "2025-06-01T10:00:00Z",
+            date: state.importTimestamp,
             seconds_read: 60,
           },
         ],

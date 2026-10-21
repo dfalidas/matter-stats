@@ -15,6 +15,12 @@ export function assertLocalOrigin(value) {
 export function installTransport(config, ipc) {
   const database = assertLocalOrigin(config.database);
   const application = assertLocalOrigin(config.application);
+  const applicationPort = new URL(application).port;
+  const selfOrigins = [
+    application,
+    `http://127.0.0.1:${applicationPort}`,
+    `http://localhost:${applicationPort}`,
+  ];
   const originalFetch = globalThis.fetch;
   let sequence = 0;
   const pending = new Map();
@@ -29,7 +35,7 @@ export function installTransport(config, ipc) {
     const matter =
       url.origin === "https://api.getmatter.com" &&
       url.pathname.startsWith("/public/v1/");
-    if (!matter && ![database, application].includes(url.origin)) {
+    if (!matter && ![database, ...selfOrigins].includes(url.origin)) {
       ipc.send?.({ type: "unexpected-network" });
       throw new Error("Task 24 refused unknown fetch destination");
     }
@@ -48,6 +54,7 @@ export function installTransport(config, ipc) {
         type: "request",
         id,
         matter,
+        database: url.origin === database,
         path: url.pathname,
         method:
           init?.method ?? (input instanceof Request ? input.method : "GET"),

@@ -76,18 +76,25 @@ test("Task 24 process transport never forwards Matter or unknown requests; real 
   });
   assert.equal(actual.length, 1);
   assert.equal(actual[0][1].body, "real");
+  await fetch("http://127.0.0.1:3094/dashboard");
+  assert.equal(
+    actual.length,
+    2,
+    "Next internal redirect fetch uses the exact application port",
+  );
+  await assert.rejects(fetch("http://127.0.0.1:3095/dashboard"), /refused/);
   mode = "fault";
   assert.equal(
     (await fetch("http://127.0.0.1:58421/rest/v1/app_sessions")).status,
     503,
   );
-  assert.equal(actual.length, 1);
+  assert.equal(actual.length, 2);
   mode = "drop-after";
   await assert.rejects(
     fetch("http://127.0.0.1:58421/rest/v1/rpc/commit_matter_page"),
     /persisted response/,
   );
-  assert.equal(actual.length, 2);
+  assert.equal(actual.length, 3);
 });
 
 test("independent fixture states 180 seconds/675 words and excludes exclusive midnight; fractional estimates sum per session", () => {

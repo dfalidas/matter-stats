@@ -177,12 +177,14 @@ export async function runJourneys({
     'history',(select history_status from public.matter_sync_continuation),
     'receipt',(select count(*) from public.matter_page_receipts where stream='recent_sessions'),
     'dirty',(select count(*) from public.matter_dirty_rollups),
-    'rollup',(select coalesce(sum(reading_time_seconds),0) from public.daily_stats where date='2025-06-01')
+    'rollup',(select coalesce(sum(reading_time_seconds),0) from public.daily_stats where date='${state.importDay}')
   )::text;`),
     );
   let capturedAction;
   const manual = async (label) => {
     await goto("/settings");
+    if (label === "Sync Recent Activity")
+      await page.getByLabel("Recent activity window").selectOption("all");
     const next = page.waitForRequest(
       (request) =>
         request.method() === "POST" &&

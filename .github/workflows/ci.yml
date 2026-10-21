@@ -131,6 +131,7 @@ jobs:
             artifacts/task24/**/database.json
             artifacts/task24/**/build.json
             artifacts/task24/**/toolchain.json
+            artifacts/task24/**/fixtures.json
             artifacts/task24/**/journeys.json
             artifacts/task24/**/browser.json
             artifacts/task24/**/network.json

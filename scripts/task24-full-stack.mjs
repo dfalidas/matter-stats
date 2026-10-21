@@ -105,6 +105,7 @@ const children = new Set();
 const observations = {
   matter: [],
   databaseRequests: 0,
+  applicationSelfRequests: 0,
   injectedFaults: 0,
   unexpectedNetwork: 0,
   serverOutputLines: 0,
@@ -277,7 +278,26 @@ try {
   });
   phases.end();
   const origin = "http://localhost:3094";
-  state = { fault: null, hold: false, dropAfter: false };
+  const importTimestamp = new Date(Date.now() - 60_000).toISOString();
+  const importDay = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Athens",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(importTimestamp));
+  state = {
+    fault: null,
+    hold: false,
+    dropAfter: false,
+    importTimestamp,
+    importDay,
+  };
+  save("fixtures", {
+    importTimestamp,
+    importDay,
+    independentSyncReference: { sessions: 19, seconds: 1140, words: 4275 },
+    analyticsSource: "scripts/task24-fixtures.mjs",
+  });
   const startApp = async (version = 1) => {
     await stopApp();
     app = spawn(process.execPath, ["scripts/task24-app.mjs"], {
@@ -328,6 +348,9 @@ try {
             state.fault = null; // One interrupted attempt, never a quota reset.
           } else decision = syntheticMatter(message, state);
           if (state.onMatter) state.onMatter(message);
+        } else if (!message.database) {
+          observations.applicationSelfRequests++;
+          decision = { kind: "real" };
         } else {
           observations.databaseRequests++;
           const endpoint = message.path.split("/").at(-1);
