@@ -142,6 +142,7 @@ jobs:
             artifacts/task24/**/failure.json
             artifacts/task24/**/cleanup.json
             artifacts/task24/**/overview-desktop.png
+            artifacts/task24/**/overview-synced-desktop.png
             artifacts/task24/**/reports-cross-month-desktop.png
             artifacts/task24/**/activity-mobile-final-control.png
             artifacts/task24/**/reports-mobile-three-sessions.png

@@ -49,9 +49,11 @@ export async function runJourneys({
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
     timezoneId: "America/New_York",
+    locale: "en-US",
     reducedMotion: "reduce",
     acceptDownloads: true,
     serviceWorkers: "block",
+    hasTouch: true,
   });
   context.setDefaultTimeout(15000);
   context.setDefaultNavigationTimeout(20000);
@@ -179,6 +181,7 @@ export async function runJourneys({
       sql(`select jsonb_build_object(
     'count',(select count(*) from public.reading_sessions where id like 'task24-import-%'),
     'distinct',(select count(distinct id) from public.reading_sessions where id like 'task24-import-%'),
+    'unlinked',(select count(*) from public.reading_sessions where id like 'task24-import-%' and item_id is null),
     'words',(select coalesce(sum(words_estimated),0) from public.reading_sessions where id like 'task24-import-%'),
     'stream',(select to_jsonb(s) from public.matter_sync_streams s where stream='recent_sessions'),
     'history',(select history_status from public.matter_sync_continuation),
@@ -226,6 +229,7 @@ export async function runJourneys({
     phases.begin("authentication");
     databasePhases.begin("sessions");
     for (const route of [
+      "/",
       "/dashboard",
       "/activity",
       "/articles",
@@ -279,7 +283,7 @@ export async function runJourneys({
         sql(
           "select count(*) from public.app_login_attempts where succeeded=false;",
         ),
-      ) >= 1,
+      ) === 5,
     );
     check(
       "auth: protected pages, missing/malformed/unknown cookie, wrong password and persisted limiter",
@@ -379,6 +383,7 @@ export async function runJourneys({
       ["daily", "2025-12-31", "2025-12-31", "2025-12-31", [1, 4, 1]],
       ["daily", "2026-01-01", "2026-01-01", "2026-01-01", [1, 4, 1]],
       ["daily", "2025-01-04", "2025-01-04", "2025-01-04", [0, 0, 1]],
+      ["daily", "2025-04-01", "2025-04-01", "2025-04-01", [25, 100, 25]],
       ["daily", "2025-01-05", "2025-01-05", "2025-01-05", [0, 0, 0]],
     ]) {
       await goto(`/reports?period=${period}&date=${date}`);
@@ -437,14 +442,33 @@ export async function runJourneys({
         await page.getByLabel("Specific report period").inputValue(),
         selected,
       );
+      if (source.includes("monthly"))
+        await capture("reports-cross-month-desktop");
+      const original = new URL(source, origin).searchParams;
+      await page
+        .getByRole("button", {
+          name: original.get("period") === "yearly" ? "Year" : "Month",
+          exact: true,
+        })
+        .click();
+      await page.waitForURL(
+        (url) => url.searchParams.get("period") === original.get("period"),
+      );
+      assert.equal(
+        await page.getByLabel("Specific report period").inputValue(),
+        original.get("date"),
+      );
       await page.goBack();
-      await page.goForward();
       assert.equal(
         await page.getByLabel("Specific report period").inputValue(),
         selected,
       );
+      await page.goForward();
+      assert.equal(
+        await page.getByLabel("Specific report period").inputValue(),
+        original.get("date"),
+      );
     }
-    await capture("reports-cross-month-desktop");
     check(
       "Reports PR85 successful cross-year/week and cross-month references survive frequency/history/reload with real CSV",
     );
@@ -465,6 +489,12 @@ export async function runJourneys({
     );
     await page.getByRole("link", { name: "Next", exact: true }).click();
     await page.waitForURL("**page=2**");
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector('section[aria-label="Selected day"]')
+          ?.querySelectorAll("article").length === 5,
+    );
     assert.equal(await daily.locator("article").count(), 5);
     assert.match(await daily.innerText(), /≈100 estimated words · 25 sessions/);
     assert.equal(new URL(page.url()).searchParams.get("context"), "keep");
@@ -485,6 +515,9 @@ export async function runJourneys({
       .evaluateAll((links) => links.map((link) => link.getAttribute("href")));
     await page.getByRole("button", { name: "Next", exact: true }).click();
     await page.waitForURL("**page=2**");
+    await page
+      .getByRole("link", { name: "Open Synthetic article 104", exact: true })
+      .waitFor();
     assert.equal(await page.getByRole("row").count(), 6);
     assert.match(await text(), /Synthetic article 104/);
     libraryOrder.push(
@@ -513,6 +546,9 @@ export async function runJourneys({
     await detail.focus();
     await page.keyboard.press("Enter");
     await page.waitForURL("**/articles/task24-item-001");
+    await page
+      .getByText(/Reading sessions are not attributed to this item/)
+      .waitFor();
     assert.match(await text(), /Reading sessions are not attributed/);
     await goto("/articles/task24-item-000");
     assert.match(
@@ -551,6 +587,25 @@ export async function runJourneys({
     ]) {
       await goto(route);
       await safe();
+      if (route.startsWith("/activity")) {
+        await page.getByRole("button", { name: /^2025-04-01,/ }).tap();
+        await page.getByRole("link", { name: "Next", exact: true }).tap();
+        await page.waitForURL("**page=2**");
+        await page.waitForFunction(
+          () =>
+            document
+              .querySelector('section[aria-label="Selected day"]')
+              ?.querySelectorAll("article").length === 5,
+        );
+        assert.equal(
+          await page
+            .getByRole("region", { name: "Selected day" })
+            .locator("article")
+            .count(),
+          5,
+        );
+        assert.match(await text(), /≈100 estimated words · 25 sessions/);
+      }
       const controls = page
         .locator("main")
         .locator("a:visible,button:visible,input:visible,select:visible");
@@ -632,7 +687,26 @@ export async function runJourneys({
       if (request.path.endsWith("/reading_sessions")) releaseObserved();
     };
     const pendingManual = manual("Sync Recent Activity");
-    await observed;
+    let observedTimer;
+    try {
+      await Promise.race([
+        observed,
+        pendingManual.then(() => {
+          throw new Error(
+            "Manual invocation ended before the concurrency gate",
+          );
+        }),
+        new Promise((_, reject) => {
+          observedTimer = setTimeout(
+            () =>
+              reject(new Error("Concurrent invocation coordination timed out")),
+            30000,
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(observedTimer);
+    }
     const competitor = await cron(`Bearer ${credentials.cron}`);
     assert.equal(competitor.body.status, "skipped");
     assert.equal(competitor.body.skipped_reason, "busy");
@@ -656,6 +730,16 @@ export async function runJourneys({
     const actionCookie = (await context.cookies()).find(
       (row) => row.name === cookieName,
     );
+    await page.waitForLoadState("networkidle");
+    let releaseBrowser;
+    const browserGate = new Promise((resolve) => {
+      releaseBrowser = resolve;
+    });
+    const holdBrowser = async (route) => {
+      await browserGate;
+      await route.fallback();
+    };
+    await page.route("**/*", holdBrowser);
     state.authReadControl = {
       reads: 0,
       onActionRead: () =>
@@ -663,16 +747,21 @@ export async function runJourneys({
           `update public.app_sessions set revoked_at=clock_timestamp() where token_hash='${hash(actionCookie.value)}';`,
         ),
     };
-    const unauthorized = await context.request.post(capturedAction.url, {
-      data: capturedAction.body,
-      headers: capturedAction.headers,
-    });
-    assert.match(await unauthorized.text(), /Your session expired/);
-    assert.ok(
-      state.authReadControl.reads >= 1,
-      "the independent action guard must execute",
-    );
-    state.authReadControl = null;
+    try {
+      const unauthorized = await context.request.post(capturedAction.url, {
+        data: capturedAction.body,
+        headers: capturedAction.headers,
+      });
+      assert.match(await unauthorized.text(), /Your session expired/);
+      assert.ok(
+        state.authReadControl.reads >= 1,
+        "the independent action guard must execute",
+      );
+    } finally {
+      state.authReadControl = null;
+      releaseBrowser();
+      await page.unroute("**/*", holdBrowser);
+    }
     assert.equal(sessionState().count, 8);
     assert.equal(sessionState().stream.cursor, checkpoint);
     await login();
@@ -686,12 +775,13 @@ export async function runJourneys({
     assert.notEqual(persisted.stream.cursor, checkpoint);
     assert.equal(persisted.stream.cycle_generation, cycleGeneration);
     await startApp(2);
-    const finalText = await manual("Sync Recent Activity");
+    const finalText = await manual("Start / Resume Session History");
     assert.match(finalText, /invocation finished|enumeration/i);
     persisted = sessionState();
     assert.equal(persisted.count, 19);
     assert.equal(persisted.distinct, 19);
     assert.equal(persisted.words, 4275);
+    assert.equal(persisted.unlinked, 19);
     assert.equal(persisted.rollup, 1140);
     assert.equal(persisted.stream.cycle_active, false);
     assert.equal(persisted.stream.cycle_generation, cycleGeneration);
@@ -702,13 +792,21 @@ export async function runJourneys({
         .map((row) => row.page),
       Array.from({ length: 19 }, (_, i) => i),
     );
-    for (const route of ["/dashboard", "/settings"]) {
+    for (const route of [
+      `/dashboard?start=${state.importDay}&end=${state.importDay}`,
+      "/settings",
+    ]) {
       await goto(route);
       assert.match(await text(), /Sessions completion is recent/);
       assert.match(
         await text(),
         /Metadata: Never completed|Last completed metadata cycle[\s\S]*Never completed/,
       );
+      if (route.startsWith("/dashboard")) {
+        assert.match(await text(), /4,275/);
+        assert.match(await text(), /19 min/);
+        await capture("overview-synced-desktop");
+      }
     }
     check(
       "runtime-completed sessions remain independent of never-completed library metadata",
@@ -720,6 +818,11 @@ export async function runJourneys({
         "select count(*) from public.matter_items where id='task24-imported-item';",
       ),
       "1",
+    );
+    assert.equal(
+      sessionState().unlinked,
+      19,
+      "library metadata does not invent session attribution",
     );
     const historyText = await manual("Start / Resume Session History");
     assert.match(historyText, /history|enumeration/i);
@@ -869,7 +972,10 @@ export async function runJourneys({
     );
     for (const route of ["/dashboard", "/settings"]) {
       await goto(route);
-      assert.match(await text(), /not applied|Updates pending/);
+      assert.match(
+        await text(),
+        /not applied|Updates pending|writer barrier frozen/,
+      );
       await safe();
     }
     check(
