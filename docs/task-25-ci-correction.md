@@ -21,6 +21,9 @@ review. Selected unchanged sanitized JSON is retained under
 the failed outcomes, failure location, browser observations, cleanup and audit.
 No old outcome was overwritten or relabeled as corrective success.
 
+Corrective [PR #89](https://github.com/dfalidas/matter-stats/pull/89) is separate
+from PR #88 and remains draft/open/unmerged.
+
 ## Production audit: supported patch, unchanged policy
 
 Primary sources:
@@ -98,6 +101,21 @@ observable pre-render window from the settled application state. No app route,
 period selection, metric formula, timeout/quota/security/cleanup gate is changed.
 No sleep, blanket retry or skipped journey is added.
 
+**Confirmed in real isolated Supabase:** at corrective head
+`4026895edee072fcb74303d5f1335e26e04f62ca`,
+[CI 40089668257](https://github.com/dfalidas/matter-stats/actions/runs/40089668257)
+recorded the old control value **`2025` after Back returned**, before it settled
+to the exact expected **`2025-01-01`**. The same old-value window was observed
+for month→week (`2025-03` → `2025-03-01`) and Forward. Thus the previous immediate
+assertion was demonstrably too early, rather than evidence of a persistent
+application selection defect. All 12 history transitions passed after the
+condition waits; all **44 journey checks**, **13 harness phases** and **7 real
+SQL/Data API phase groups** passed. Browser page/console/resource/unexpected-
+request counts were zero, real Matter requests zero, all owned cleanup verified.
+[Inspected JSON and ZIP hashes](evidence/task25-ci/verified-4026895/provenance.json)
+are retained at their actual identity. This earlier-head evidence is not a
+substitute for checks on the final documentation-inclusive head.
+
 ## Verification and limits
 
 Local baseline full-stack reproduction was attempted with the unmodified harness
@@ -110,6 +128,17 @@ The owned CLI attempt was terminated; the existing runner recorded
 verified. [Original-identity local evidence](evidence/task25-ci/local/baseline-browser-failure.json)
 is retained; this is not a reproduced history assertion or a local SQL pass.
 No storage-driver, image, CLI, gate or production setting was changed to bypass it.
+
+Local patched-code checks started at `0b92f09`: locked install, route generation,
+typecheck, lint (zero errors, three unchanged Visual Explainer warnings),
+**403/403 tests** (zero failed/skipped/TODO), production build and audit policy
+passed. In CI 40089668257 the `verify` and browser jobs also passed; the independent
+DB job was still in progress when this evidence was recorded. `verify` used merge
+commit `7baca097df8949c2d1be0be57a06e9eb7a702466`, whose tree is identical to head
+4026895 (`b27c66d57049d843f2e0388cc88d44cd2c6d0357`); browser used clean PR head.
+Both CI audit reports contain **zero findings**. No incomplete DB result is
+counted as a pass. Adding this inspected evidence creates a new final head that
+must independently complete all required jobs.
 
 The final corrective head must pass all three unchanged CI jobs: `verify`,
 `Fresh and upgrade database verification`, `Isolated browser and Supabase verification`.
