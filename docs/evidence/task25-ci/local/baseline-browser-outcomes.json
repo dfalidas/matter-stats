@@ -1,0 +1,66 @@
+{
+  "steps": [
+    {
+      "name": "prerequisites",
+      "status": "passed"
+    },
+    {
+      "name": "owned-stack",
+      "status": "blocked",
+      "failureKind": "infrastructure"
+    },
+    {
+      "name": "migrations",
+      "status": "not-run"
+    },
+    {
+      "name": "production-build",
+      "status": "not-run"
+    },
+    {
+      "name": "authentication",
+      "status": "not-run"
+    },
+    {
+      "name": "analytics-csv",
+      "status": "not-run"
+    },
+    {
+      "name": "navigation-library",
+      "status": "not-run"
+    },
+    {
+      "name": "sync-continuation",
+      "status": "not-run"
+    },
+    {
+      "name": "sync-faults",
+      "status": "not-run"
+    },
+    {
+      "name": "truthful-status",
+      "status": "not-run"
+    },
+    {
+      "name": "logout-replay",
+      "status": "not-run"
+    },
+    {
+      "name": "network-audit",
+      "status": "not-run"
+    },
+    {
+      "name": "cleanup",
+      "status": "passed"
+    }
+  ],
+  "counts": {
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0,
+    "blocked": 1,
+    "not-run": 10,
+    "running": 0
+  }
+}
