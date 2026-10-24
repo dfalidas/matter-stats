@@ -1,0 +1,19 @@
+{
+  "matter": {
+    "requests": 0,
+    "paths": []
+  },
+  "databaseRequests": 257,
+  "applicationSelfRequests": 4,
+  "databaseErrorCount": 0,
+  "databaseErrors": [],
+  "matterFaults": {
+    "429": 0,
+    "timeout": 0,
+    "interrupt": 0
+  },
+  "injectedFaults": 10,
+  "unexpectedNetwork": 0,
+  "serverOutputLines": 138,
+  "realMatterRequests": 0
+}
