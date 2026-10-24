@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { expect } from "playwright/test";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { seedSql, expectedRows, sessions } from "./task24-fixtures.mjs";
@@ -458,7 +459,7 @@ export async function runJourneys({
     assert.match(await text(), /3 min/);
     assert.doesNotMatch(await text(), /999,999 estimated words/);
     await capture("overview-desktop");
-    for (const [source, label, period, selected, first, last] of [
+    for (const [source, label, period, selected, first, last, sourceFirst, sourceLast] of [
       [
         "/reports?period=yearly&date=2025",
         "Week",
@@ -466,6 +467,8 @@ export async function runJourneys({
         "2025-01-01",
         "2024-12-30",
         "2025-01-05",
+        "2025-01-01",
+        "2025-12-31",
       ],
       [
         "/reports?period=monthly&date=2025-03",
@@ -474,50 +477,82 @@ export async function runJourneys({
         "2025-03-01",
         "2025-02-24",
         "2025-03-02",
+        "2025-03-01",
+        "2025-03-31",
       ],
     ]) {
-      await goto(source + "&context=keep");
+      const originalUrl = new URL(source + "&context=keep", origin);
+      const weeklyUrl = new URL(originalUrl);
+      weeklyUrl.searchParams.set("period", period);
+      weeklyUrl.searchParams.set("date", selected);
+      const originalPeriod = originalUrl.searchParams.get("period");
+      const originalDate = originalUrl.searchParams.get("date");
+      const assertReport = async (url, value, start, end) => {
+        // App Router history can update the URL before React commits the form.
+        // Wait independently for the exact URL and rendered selection, bounded
+        // by the same action timeout. Never accept either the old or new value.
+        await expect(page).toHaveURL(url.href, { timeout: 15000 });
+        await expect(page.getByLabel("Specific report period")).toHaveValue(
+          value, { timeout: 15000 },
+        );
+        await expect(page.getByRole("button", {
+          name: url.searchParams.get("period") === "weekly" ? "Week"
+            : originalPeriod === "yearly" ? "Year" : "Month",
+          exact: true,
+        })).toHaveAttribute("aria-pressed", "true", { timeout: 15000 });
+        await expect(page.getByRole("heading", {
+          name: `Your ${url.searchParams.get("period")} review`, exact: true,
+        })).toBeVisible({ timeout: 15000 });
+        assert.match(await text(), new RegExp(`${start} – ${end}`));
+        assert.equal(new URL(page.url()).searchParams.get("context"), "keep");
+      };
+      await goto(originalUrl.pathname + originalUrl.search);
       await page.getByRole("button", { name: label, exact: true }).focus();
       await page.keyboard.press("Enter");
-      await page.waitForURL((url) => url.searchParams.get("period") === period);
-      assert.equal(
-        await page.getByLabel("Specific report period").inputValue(),
-        selected,
-      );
-      assert.match(await text(), new RegExp(`${first} – ${last}`));
-      assert.equal(new URL(page.url()).searchParams.get("context"), "keep");
+      await assertReport(weeklyUrl, selected, first, last);
       await exportRows(first, last, `matter-stats-weekly-${first}.csv`);
       await page.reload();
-      assert.equal(
-        await page.getByLabel("Specific report period").inputValue(),
-        selected,
-      );
+      await assertReport(weeklyUrl, selected, first, last);
       if (source.includes("monthly"))
         await capture("reports-cross-month-desktop");
-      const original = new URL(source, origin).searchParams;
       await page
         .getByRole("button", {
-          name: original.get("period") === "yearly" ? "Year" : "Month",
+          name: originalPeriod === "yearly" ? "Year" : "Month",
           exact: true,
         })
         .click();
-      await page.waitForURL(
-        (url) => url.searchParams.get("period") === original.get("period"),
-      );
-      assert.equal(
-        await page.getByLabel("Specific report period").inputValue(),
-        original.get("date"),
-      );
-      await page.goBack();
-      assert.equal(
-        await page.getByLabel("Specific report period").inputValue(),
-        selected,
-      );
-      await page.goForward();
-      assert.equal(
-        await page.getByLabel("Specific report period").inputValue(),
-        original.get("date"),
-      );
+      await assertReport(originalUrl, originalDate, sourceFirst, sourceLast);
+      // Three complete round trips, not retries: every assertion must pass.
+      // Only synthetic report values are recorded, never URLs/cookies/records.
+      for (let round = 1; round <= 3; round++) {
+        for (const direction of ["Back", "Forward"]) {
+          await page.evaluate(() => {
+            window.__task25HistoryControl = null;
+            window.addEventListener("popstate", () => {
+              window.__task25HistoryControl = document.querySelector(
+                'input[aria-label="Specific report period"]',
+              )?.value ?? null;
+            }, { once: true });
+          });
+          if (direction === "Back") await page.goBack();
+          else await page.goForward();
+          const atReturn = await page.getByLabel("Specific report period").inputValue();
+          const atPopstate = await page.evaluate(() => window.__task25HistoryControl);
+          const back = direction === "Back";
+          await assertReport(back ? weeklyUrl : originalUrl,
+            back ? selected : originalDate,
+            back ? first : sourceFirst, back ? last : sourceLast);
+          check(`Reports ${originalPeriod} history ${direction} round ${round}`, {
+            expectedPeriod: back ? period : originalPeriod,
+            expectedDate: back ? selected : originalDate,
+            controlAtPopstate: atPopstate,
+            controlAtNavigationReturn: atReturn,
+            renderedSelectionVerified: true,
+          });
+        }
+        await page.reload();
+        await assertReport(originalUrl, originalDate, sourceFirst, sourceLast);
+      }
     }
     check(
       "Reports PR85 successful cross-year/week and cross-month references survive frequency/history/reload with real CSV",
