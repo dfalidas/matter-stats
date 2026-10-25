@@ -1,0 +1,14 @@
+{
+  "run": "https://github.com/dfalidas/matter-stats/actions/runs/39964474867",
+  "reviewedHead": "73f941eb49da751fa4eabbf08f5bdd3074622aa5",
+  "auditArtifact": {
+    "id": 12505792870,
+    "sha256": "8dd19ed7ec5e0b3dbb104479c266c2b9a191ddf33d41d6be74db3f2643f11c64"
+  },
+  "browserArtifact": {
+    "id": 12506351883,
+    "sha256": "d5699640ddc5f7988d09525f798a1473b74dfbea6f22baa156ed860ee3299a81"
+  },
+  "downloadedAndHashesMatched": true,
+  "selectedSanitizedFilesOnly": true
+}

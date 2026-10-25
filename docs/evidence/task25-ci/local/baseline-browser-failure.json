@@ -1,0 +1,75 @@
+{
+  "status": "blocked",
+  "category": "disk-capacity",
+  "failureLocation": [
+    "task24-full-stack.mjs",
+    "239",
+    "3"
+  ],
+  "rawDetailsWithheld": true,
+  "infrastructureReason": null,
+  "databaseCode": null,
+  "diagnosticStages": [
+    "Starting database"
+  ],
+  "diagnosticWords": [
+    "postgres",
+    "pull",
+    "database"
+  ],
+  "tool": "npx",
+  "operation": "start",
+  "disposableDiagnostics": [
+    {
+      "component": "kong",
+      "stateAvailable": false,
+      "running": false,
+      "outOfMemory": false,
+      "exitCode": null,
+      "logsAvailable": false,
+      "errorCounts": {
+        "upstream": 0,
+        "connectionReset": 0,
+        "processCrash": 0,
+        "databaseError": 0,
+        "workerConnections": 0,
+        "databaseConnections": 0,
+        "postgrest": 0
+      }
+    },
+    {
+      "component": "rest",
+      "stateAvailable": false,
+      "running": false,
+      "outOfMemory": false,
+      "exitCode": null,
+      "logsAvailable": false,
+      "errorCounts": {
+        "upstream": 0,
+        "connectionReset": 0,
+        "processCrash": 0,
+        "databaseError": 0,
+        "workerConnections": 0,
+        "databaseConnections": 0,
+        "postgrest": 0
+      }
+    },
+    {
+      "component": "db",
+      "stateAvailable": false,
+      "running": false,
+      "outOfMemory": false,
+      "exitCode": null,
+      "logsAvailable": false,
+      "errorCounts": {
+        "upstream": 0,
+        "connectionReset": 0,
+        "processCrash": 0,
+        "databaseError": 0,
+        "workerConnections": 0,
+        "databaseConnections": 0,
+        "postgrest": 0
+      }
+    }
+  ]
+}

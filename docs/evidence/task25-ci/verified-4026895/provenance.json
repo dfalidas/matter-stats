@@ -1,0 +1,12 @@
+{
+  "testedHead": "4026895edee072fcb74303d5f1335e26e04f62ca",
+  "run": "https://github.com/dfalidas/matter-stats/actions/runs/40089668257",
+  "auditZipSha256": "ddca0f3abe75ba7e070fd4c0f0ecba61261b31cfd07ced36d19e3552d826efee",
+  "browserZipSha256": "4114426ac6550a3944d6c417184e347deabd0c1a79a83d2bcfe86db0eccd330d",
+  "auditArtifactId": 12558446480,
+  "browserArtifactId": 12558501669,
+  "zipHashesMatchedGitHub": true,
+  "verifyMergeCommit": "7baca097df8949c2d1be0be57a06e9eb7a702466",
+  "headAndMergeTree": "b27c66d57049d843f2e0388cc88d44cd2c6d0357",
+  "scope": "Earlier corrective head: verify and browser jobs passed. Independent DB job was still in progress when recorded. Final-head three-job receipt belongs to PR #89 and Craft; these files are not relabeled as final-head evidence."
+}
