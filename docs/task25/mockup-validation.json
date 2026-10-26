@@ -1,0 +1,32 @@
+{
+  "observedAt": "2026-10-23T13:47:24.350Z",
+  "observations": [
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 1000,
+      "colorScheme": "light",
+      "horizontalOverflow": false,
+      "pageErrors": 0,
+      "scope": "static synthetic document only"
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "colorScheme": "light",
+      "horizontalOverflow": false,
+      "pageErrors": 0,
+      "scope": "static synthetic document only"
+    },
+    {
+      "name": "mobile-dark",
+      "width": 390,
+      "height": 844,
+      "colorScheme": "dark",
+      "horizontalOverflow": false,
+      "pageErrors": 0,
+      "scope": "static synthetic document only"
+    }
+  ]
+}
