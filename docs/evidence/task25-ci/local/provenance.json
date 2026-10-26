@@ -1,0 +1,13 @@
+{
+  "node": "22.23.3",
+  "npm": "10.9.9",
+  "beforeLockIdenticalTo": "32f23cc8260acf9afd90087e28f9dde1993d7ed8",
+  "patchedCodeCommit": "0b92f09",
+  "cache": "fresh task-specific cache",
+  "productionFindings": 0,
+  "fullFindings": 0,
+  "developmentExceptionUnchanged": true,
+  "withdrawnDevelopmentAdvisory": "GHSA-vfj7-8cjw-p6xm",
+  "browserLocal": "blocked during pinned image extraction; no app/browser created",
+  "finalHeadEvidence": "See corrective PR description and Craft final verification receipt"
+}

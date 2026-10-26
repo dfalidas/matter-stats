@@ -1,0 +1,188 @@
+{
+  "status": "failed",
+  "checks": [
+    {
+      "name": "auth: protected pages, missing/malformed/unknown cookie, wrong password and persisted limiter",
+      "status": "passed"
+    },
+    {
+      "name": "auth: limiter/session storage faults are retryable, valid form creates real opaque hashed Secure/HttpOnly/Lax session",
+      "status": "passed"
+    },
+    {
+      "name": "auth: expired/revoked/storage-unavailable/version-invalidated sessions fail closed; isolated version 2 login recovers",
+      "status": "passed"
+    },
+    {
+      "name": "CSV daily 2025-01-02",
+      "status": "passed",
+      "expected": [
+        180,
+        675,
+        3
+      ],
+      "first": "2025-01-02",
+      "last": "2025-01-02",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV monthly 2025-01",
+      "status": "passed",
+      "expected": [
+        420,
+        1575,
+        6
+      ],
+      "first": "2025-01-01",
+      "last": "2025-01-31",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV yearly 2025",
+      "status": "passed",
+      "expected": [
+        514,
+        1936,
+        40
+      ],
+      "first": "2025-01-01",
+      "last": "2025-12-31",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV weekly 2025-01-01",
+      "status": "passed",
+      "expected": [
+        301,
+        1129,
+        6
+      ],
+      "first": "2024-12-30",
+      "last": "2025-01-05",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV weekly 2025-03-01",
+      "status": "passed",
+      "expected": [
+        62,
+        233,
+        2
+      ],
+      "first": "2025-02-24",
+      "last": "2025-03-02",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV weekly 2024-03-01",
+      "status": "passed",
+      "expected": [
+        60,
+        225,
+        1
+      ],
+      "first": "2024-02-26",
+      "last": "2024-03-03",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV daily 2025-03-30",
+      "status": "passed",
+      "expected": [
+        2,
+        8,
+        2
+      ],
+      "first": "2025-03-30",
+      "last": "2025-03-30",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV daily 2025-10-26",
+      "status": "passed",
+      "expected": [
+        2,
+        8,
+        2
+      ],
+      "first": "2025-10-26",
+      "last": "2025-10-26",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV daily 2025-12-31",
+      "status": "passed",
+      "expected": [
+        1,
+        4,
+        1
+      ],
+      "first": "2025-12-31",
+      "last": "2025-12-31",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV daily 2026-01-01",
+      "status": "passed",
+      "expected": [
+        1,
+        4,
+        1
+      ],
+      "first": "2026-01-01",
+      "last": "2026-01-01",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV daily 2025-01-04",
+      "status": "passed",
+      "expected": [
+        0,
+        0,
+        1
+      ],
+      "first": "2025-01-04",
+      "last": "2025-01-04",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV daily 2025-04-01",
+      "status": "passed",
+      "expected": [
+        25,
+        100,
+        25
+      ],
+      "first": "2025-04-01",
+      "last": "2025-04-01",
+      "independentRowsReconciled": true
+    },
+    {
+      "name": "CSV daily 2025-01-05",
+      "status": "passed",
+      "expected": [
+        0,
+        0,
+        0
+      ],
+      "first": "2025-01-05",
+      "last": "2025-01-05",
+      "independentRowsReconciled": true
+    }
+  ],
+  "counts": {
+    "passed": 16,
+    "failed": 1,
+    "skipped": 0,
+    "todo": 0
+  },
+  "failedGroup": "see outcomes.json",
+  "screenshots": [
+    {
+      "filename": "overview-desktop.png",
+      "route": "/dashboard",
+      "width": 1440,
+      "visualInspection": "pending"
+    }
+  ]
+}
