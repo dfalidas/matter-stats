@@ -8,6 +8,30 @@ choices. Its checklist replaces the historical per-task deployment sequences.
 Configuration names match [.env.example](../.env.example); all remain server-only.
 Use CI's Node 22 toolchain and exact `npm ci` lockfile. Local verification:
 
+`package.json` pins the deployment Node major with `engines.node: "22.x"`.
+On Vercel, this field overrides the project's Node.js Version setting. The runtime
+change takes effect on a **new deployment**; editing the repository does not change
+an existing deployment. Keep the existing CI action, browser and database toolchain
+pins unchanged. After review and merge, verify the new production deployment's
+commit and READY status, Node.js 22.x for dashboard, settings and
+`/api/cron/sync-recent-activity`, and each function's Max Duration ≤180s.
+Operator evidence received 2026-10-30 showed Node.js 24.x and displayed Max Duration
+≤180s for all three; it describes the prior deployed runtime, not a Node 22 rollout.
+
+`USE_MOCK_MATTER_API` has no reader or reference in the tracked application,
+scripts, configuration or environment template at the reviewed baseline
+`ed5a4f2`. Dashboard actions and the scheduled cron call `syncMatterData` in
+`lib/matter-sync.ts`, which uses `lib/matter-api.ts`: requests target
+`https://api.getmatter.com/public/v1` and authenticate with the server-only
+`MATTER_API_TOKEN` read by `lib/env.ts`. There is no environment-driven mock branch.
+Consequently, setting `USE_MOCK_MATTER_API` cannot switch ingestion to mocks in
+this code. Its production value was not retrieved and need not be changed for
+this runtime alignment. Confirm the deployed commit before applying this source
+finding to a running deployment; an older deployment may contain different code.
+
+Run the existing checks under Node 22 (the recorded tested toolchain is
+Node 22.23.3/npm 10.9.9):
+
 ```sh
 npm ci
 npx --no-install next typegen
