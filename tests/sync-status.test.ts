@@ -216,3 +216,19 @@ test('actual bounded loader exposes tied runs and failure of either source while
     assert.equal(requests.length, 11);
   }
 });
+
+test('26A continuation distinguishes safe checkpoint, backoff, manual recovery and enumeration',()=>{
+  const i=inputs();i.streams=known([{stream:'recent_sessions',cycle_active:true,cycle_started_at:completed,completed_watermark:completed,retry_at:null,coverage_window:'all',transition_status:'native'}]);
+  const retryText=()=>derive(i).view.details.find(d=>d.label==='Retry / cooldown')!.value;
+  assert.match(retryText(),/safe checkpoint eligible for scheduled continuation/);
+  i.retry=known({nextEligibleAt:'2026-10-15T12:05:00Z',manualRecovery:false,pendingRequests:1});
+  assert.match(retryText(),/waiting for cooldown\/backoff/);assert.doesNotMatch(retryText(),/safe checkpoint/);
+  i.retry=known({nextEligibleAt:'2026-10-15T12:05:00Z',manualRecovery:true,pendingRequests:1});
+  assert.match(retryText(),/Next eligible.*15 Oct 2026, 15:05.*deliberate manual recovery/);
+  i.retry=known({nextEligibleAt:null,manualRecovery:true,pendingRequests:1});
+  assert.match(retryText(),/expiry does not enable automatic recovery/);assert.doesNotMatch(retryText(),/safe checkpoint/);
+  i.continuation=known({history_status:'running',requested_at:completed});
+  assert.match(derive(i).view.details.find(d=>d.label==='Session history intent')!.value,/running/);
+  i.continuation=known({history_status:'complete',requested_at:completed});
+  assert.match(derive(i).view.details.find(d=>d.label==='Session history intent')!.value,/complete.*available-session enumeration only/);
+});

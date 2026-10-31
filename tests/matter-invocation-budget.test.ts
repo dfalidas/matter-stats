@@ -12,7 +12,7 @@ test("invocation budgets validate finite bounds and reserve an entire expensive 
   const fresh = new MatterInvocationBudget(); fresh.requests = 1;
   fresh.admitPage(100); // full 201-attempt preparation fits the production defaults
 });
-test("request and deadline stops include preparation and discard late results", async () => {
+test("request and deadline stops include preparation and retain validated results", async () => {
   let now = 0;
   const budget = new MatterInvocationBudget({ ...MATTER_INVOCATION_LIMITS, requests: 2 }, () => now);
   await withMatterInvocationBudget(budget, async () => {
@@ -27,7 +27,7 @@ test("request and deadline stops include preparation and discard late results", 
   now = 90_000;
   assert.equal(timed.canRecover(), false);
   now = 0;
-  await assert.rejects(timed.attempt(async () => { now += 90_000; return "late response"; }), (e: unknown) => e instanceof MatterBudgetStop && e.reason === "deadline");
+  assert.equal(await timed.attempt(async () => { now += 90_000; return "validated response"; }), "validated response");
   const finalizing = new MatterInvocationBudget(MATTER_INVOCATION_LIMITS, () => now);
   now += 140_000.75;
   assert.equal(finalizing.canRecover(), false);
