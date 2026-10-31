@@ -58,6 +58,8 @@ export async function admitMatterRequest(url: URL, beforeRequest?: () => Promise
     signal?.throwIfAborted();
     getMatterInvocationBudget()?.checkRequest();
     await beforeRequest?.();
+    signal?.throwIfAborted();
+    getMatterInvocationBudget()?.checkRequest();
     const admission = await runtime.store.admit(args);
     if (!admission || typeof admission.admitted !== "boolean") throw new Error("Unverified Matter admission");
     if (admission.admitted) {

@@ -159,15 +159,32 @@ try {
     await resetOwnedCycles();
   }
   for (const endpoint of ["item", "annotations"]) {
-    tick = 0;
+    tick = 0; let interrupted = false; const fetched = [];
     upstream = (url) => {
+      fetched.push(url.pathname);
       if (url.pathname.endsWith("/me")) return Response.json({object:"account",id:"synthetic-account"});
       if (url.pathname.endsWith("/reading_sessions")) return Response.json(page([{ id: `${prefix}-budget`, item_id: fixtureItem.id, date: "2027-03-01T10:00:00Z", seconds_read: 61 }]));
-      if ((endpoint === "item" && url.pathname.endsWith(fixtureItem.id)) || (endpoint === "annotations" && url.pathname.endsWith("/annotations"))) tick = 90000;
+      if (!interrupted && ((endpoint === "item" && url.pathname.endsWith(fixtureItem.id)) || (endpoint === "annotations" && url.pathname.endsWith("/annotations")))) { tick = 90000; interrupted = true; }
       return Response.json(url.pathname.endsWith("/annotations") ? page() : fixtureItem);
     };
     const result = await runtime.syncMatterData("recent_activity_scheduled", {}, deps);
-    assert.equal(result.status,"partial"); assert.equal(result.pagesCommitted,0); await resetOwnedCycles();
+    assert.equal(result.status,"partial"); assert.equal(result.pagesCommitted,0);
+    const work = await read("matter_request_work");
+    const cached = work.find(w=>w.slot==="recent_sessions");
+    assert.ok(Object.values(cached.requests).every(r=>!r.pending && "value" in r));
+    assert.equal(Object.keys(cached.requests).length,endpoint==="item"?2:3);
+    const contract = (await snapshot()).streams.find(s=>s.stream==="recent_sessions");
+    tick=0; fetched.length=0; await requestState.clearQuota();
+    const resumed = await runtime.syncMatterData("recent_activity_scheduled",{},deps);
+    assert.equal(resumed.ok,true); assert.equal(resumed.pagesCommitted,1);
+    assert.ok(!fetched.some(p=>p.endsWith("/reading_sessions")),"retained list is reused");
+    assert.ok(!fetched.some(p=>p.endsWith(fixtureItem.id)),"retained item is reused");
+    assert.equal((await snapshot()).streams.find(s=>s.stream==="recent_sessions").cycle_generation,contract.cycle_generation);
+    assert.equal(await sql(`select count(*) from public.reading_sessions where id='${prefix}-budget';`),"1");
+    tick=0; await requestState.clearQuota();
+    await runtime.syncMatterData("recent_activity_scheduled",{},deps);
+    assert.equal(await sql(`select count(*) from public.reading_sessions where id='${prefix}-budget';`),"1","overlapping continuation never duplicates sessions");
+    await resetOwnedCycles();
   }
   // Fire the actual invocation cancellation timer at a deterministic HTTP
   // barrier. Database calls and shared quota waits retain real timers.
