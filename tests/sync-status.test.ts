@@ -218,7 +218,7 @@ test('actual bounded loader exposes tied runs and failure of either source while
 });
 
 test('26A continuation distinguishes safe checkpoint, backoff, manual recovery and enumeration',()=>{
-  const i=inputs();i.streams=known([{stream:'recent_sessions',cycle_active:true,cycle_started_at:completed,completed_watermark:completed,retry_at:null,coverage_window:'all',transition_status:'native'}]);
+  const i=inputs();if(i.streams.state==='known') i.streams.value[0]={...i.streams.value[0],cycle_active:true,cycle_started_at:completed,coverage_window:'all'};
   const retryText=()=>derive(i).view.details.find(d=>d.label==='Retry / cooldown')!.value;
   assert.match(retryText(),/safe checkpoint eligible for scheduled continuation/);
   i.retry=known({nextEligibleAt:'2026-10-15T12:05:00Z',manualRecovery:false,pendingRequests:1});
