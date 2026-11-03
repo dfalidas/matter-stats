@@ -1,0 +1,118 @@
+{
+  "ghsa_id": "GHSA-g3hv-75wg-m249",
+  "cve_id": "CVE-2026-118764",
+  "url": "https://api.github.com/repos/isaacs/minimatch/security-advisories/GHSA-g3hv-75wg-m249",
+  "html_url": "https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249",
+  "summary": "denial of service via globparts amplification",
+  "description": "minimatch 10.2.6 contains an attacker-controlled pattern amplification in firstPhasePreProcess() when optimizationLevel >= 2.\r\n\r\nresearcher: Reid Downing (b1nv0id)\r\nfiles: \r\nsrc/index.ts: 690-770\r\nsrc/index.ts: 780-796\r\nissue:\r\ninput-controlled growth of globParts during first-phase preprocessing, followed by quadratic second-phase processing.\r\n\r\nthe **/../ transformation clones a globparts entry and appends the clone to the same globparts array:\r\n\r\nparts.splice(gs, 1)\r\nconst other = parts.slice(0)\r\nother[gs] = '**'\r\nglobParts.push(other)\r\n\r\nthis occurs inside a do...while (didSomething) fixpoint loop, allowing generated entries to be processed again.\r\n\r\nthe expanded globparts array is subsequently processed by secondPhasePreProcess(), which performs pairwise comparisons:\r\n\r\nfor (let i = 0; i < globParts.length - 1; i++) {\r\n  for (let j = i + 1; j < globParts.length; j++) {\r\n    this.partsMatch(...)\r\n  }\r\n}\r\n\r\nan attacker who can supply a glob pattern can therefore cause additional pattern entries to be generated during preprocessing, followed by quadratic pairwise processing, resulting in excessive cpu and memory consumption.\r\n",
+  "severity": "medium",
+  "author": null,
+  "publisher": {
+    "login": "isaacs",
+    "id": 9287,
+    "node_id": "MDQ6VXNlcjkyODc=",
+    "avatar_url": "https://avatars.githubusercontent.com/u/9287?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/isaacs",
+    "html_url": "https://github.com/isaacs",
+    "followers_url": "https://api.github.com/users/isaacs/followers",
+    "following_url": "https://api.github.com/users/isaacs/following{/other_user}",
+    "gists_url": "https://api.github.com/users/isaacs/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/isaacs/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/isaacs/subscriptions",
+    "organizations_url": "https://api.github.com/users/isaacs/orgs",
+    "repos_url": "https://api.github.com/users/isaacs/repos",
+    "events_url": "https://api.github.com/users/isaacs/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/isaacs/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  },
+  "identifiers": [
+    {
+      "value": "GHSA-g3hv-75wg-m249",
+      "type": "GHSA"
+    },
+    {
+      "value": "CVE-2026-118764",
+      "type": "CVE"
+    }
+  ],
+  "state": "published",
+  "created_at": null,
+  "updated_at": "2026-10-29T17:05:52Z",
+  "published_at": "2026-10-27T22:23:27Z",
+  "closed_at": null,
+  "withdrawn_at": null,
+  "submission": null,
+  "vulnerabilities": [
+    {
+      "package": {
+        "ecosystem": "",
+        "name": ""
+      },
+      "vulnerable_version_range": "10.2.6",
+      "patched_versions": "11.0.1",
+      "vulnerable_functions": [
+
+      ]
+    }
+  ],
+  "cvss_severities": {
+    "cvss_v3": {
+      "vector_string": null,
+      "score": null
+    },
+    "cvss_v4": {
+      "vector_string": null,
+      "score": null
+    }
+  },
+  "cwes": [
+
+  ],
+  "cwe_ids": [
+
+  ],
+  "credits": [
+    {
+      "login": "b1nv0id",
+      "type": "reporter"
+    }
+  ],
+  "credits_detailed": [
+    {
+      "user": {
+        "login": "b1nv0id",
+        "id": 194707351,
+        "node_id": "U_kgDOC5r_lw",
+        "avatar_url": "https://avatars.githubusercontent.com/u/194707351?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/b1nv0id",
+        "html_url": "https://github.com/b1nv0id",
+        "followers_url": "https://api.github.com/users/b1nv0id/followers",
+        "following_url": "https://api.github.com/users/b1nv0id/following{/other_user}",
+        "gists_url": "https://api.github.com/users/b1nv0id/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/b1nv0id/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/b1nv0id/subscriptions",
+        "organizations_url": "https://api.github.com/users/b1nv0id/orgs",
+        "repos_url": "https://api.github.com/users/b1nv0id/repos",
+        "events_url": "https://api.github.com/users/b1nv0id/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/b1nv0id/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "type": "reporter",
+      "state": "accepted"
+    }
+  ],
+  "collaborating_users": null,
+  "collaborating_teams": null,
+  "private_fork": null,
+  "comments": 2,
+  "cvss": {
+    "vector_string": null,
+    "score": null
+  }
+}

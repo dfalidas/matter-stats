@@ -1,0 +1,18 @@
+matter-stats@0.1.0 /workspace/matter-stats
+├─┬ @eslint/eslintrc@3.3.5
+│ └── minimatch@3.1.5
+├─┬ eslint-config-next@15.5.28
+│ ├─┬ @typescript-eslint/parser@8.59.3
+│ │ └─┬ @typescript-eslint/typescript-estree@8.59.3
+│ │   └── minimatch@10.2.5
+│ ├─┬ eslint-plugin-import@2.32.0
+│ │ └── minimatch@3.1.5 deduped
+│ ├─┬ eslint-plugin-jsx-a11y@6.10.2
+│ │ └── minimatch@3.1.5 deduped
+│ └─┬ eslint-plugin-react@7.37.5
+│   └── minimatch@3.1.5 deduped
+└─┬ eslint@9.39.4
+  ├─┬ @eslint/config-array@0.21.2
+  │ └── minimatch@3.1.5 deduped
+  └── minimatch@3.1.5 deduped
+
