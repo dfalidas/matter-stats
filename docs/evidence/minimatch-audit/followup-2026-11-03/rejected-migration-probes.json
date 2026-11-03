@@ -1,0 +1,25 @@
+{
+  "baselineTestedSha": "97447f9ab4e5e539ece76593bcc4eb795584f3f8",
+  "modernReactPreset": {
+    "eslint": "10.14.0",
+    "plugin": "@eslint-react/eslint-plugin@5.28.8",
+    "result": "rejected",
+    "reason": "React.createClass and React.PropTypes produce legacy react/no-deprecated errors but no candidate recommended-preset diagnostic; lifecycle and valid component controls also checked",
+    "details": "react-parity-probe.json"
+  },
+  "importXOverride": {
+    "consumer": "eslint-plugin-import-x@4.17.1",
+    "minimatch": "11.0.1",
+    "auditPackageFindings": 0,
+    "productionPackageFindings": 0,
+    "lintExit": 2,
+    "result": "rejected",
+    "reason": "ESM bootstrap SyntaxError: The requested module 'minimatch' does not provide an export named 'makeRe'",
+    "publishedPatchedVersionsChecked": ["11.0.1", "11.0.2", "11.0.3", "11.0.4"],
+    "makeReNamedExportInCheckedVersions": false
+  },
+  "coreGuardPrototype": {
+    "result": "corrected before adoption",
+    "reason": "no-restricted-imports with importNames also prohibited valid namespace imports; replaced with supported ImportSpecifier syntax selectors and retained namespace positive controls"
+  }
+}
