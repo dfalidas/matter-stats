@@ -175,3 +175,45 @@ audit and fresh/upgrade/browser CI at the actual combined head. #91's historical
 No #91 functional change, framework upgrade, merge, manual deployment, production
 migration, real Matter sync or production data/configuration action is included.
 Existing CI database migrations run only in disposable synthetic test resources.
+
+### Exact-commit local result
+
+Clean checkout **3955b385b286de694873ac87b9c996b024f665bc**, Node **22.23.4**,
+npm **10.9.9**, isolated writable task cache. Install/build never overlapped.
+
+| Required check | Result at that SHA |
+| --- | --- |
+| npm ci | PASS |
+| Next route type generation | PASS |
+| typecheck | PASS |
+| ESLint + native React/import lint | PASS, same 3 existing warnings / 0 errors |
+| Full npm test | **412/412 PASS**, 0 failed/cancelled/skipped/TODO |
+| Production build, including full lint gate and Next's lint/types | PASS |
+| Standalone focused compatibility suite | **9/9 groups PASS** |
+| CJS/ESM/class/glob/parser projectService probe | PASS |
+| Unchanged audit:ci | **PASS: full 0 package findings / 0 unique advisories; production 0 / 0** |
+| New lint dependency/peer graph | PASS; only ESLint 10.14.0, no invalid/missing peers |
+| git diff --check | PASS |
+
+[Command exit/timing/SHA records](evidence/minimatch-audit/followup-2026-11-03/local-migration-results.json),
+[full audit](evidence/minimatch-audit/followup-2026-11-03/final-full.json),
+[production audit](evidence/minimatch-audit/followup-2026-11-03/final-production.json).
+The final documentation/evidence commit changes none of those executable checks;
+CI nevertheless reruns all workflow gates at its actual final head/merge SHA.
+
+An **additional** full `npm ls --all --json` inventory returns exit 1, both in
+this candidate and a separately installed/built clean legacy **97447f9** checkout,
+before and after build. Identical three pre-existing entries: extraneous
+@emnapi/runtime 1.11.3 and @img/sharp-wasm32 0.35.5; postcss-selector-parser 7.1.6
+reported against postcss-nested's ^6.1.1 under the existing Tailwind override.
+All four relevant lock entries are unchanged. The required CSS/native compatibility
+tests and builds pass. This inventory failure is retained, not relabeled as a pass;
+no old override was changed to hide it. The separately scoped new lint/peer check
+returns 0 with no invalid/missing peers.
+[Baseline/candidate comparison](evidence/minimatch-audit/followup-2026-11-03/inventory-comparison.json).
+
+The 255 frozen baseline controls can be independently replayed with
+`node docs/evidence/minimatch-audit/followup-2026-11-03/verify-baseline-oracles.mjs <legacy-checkout>`
+after npm ci in the old checkout at 97447f9. [Replay identity/result](evidence/minimatch-audit/followup-2026-11-03/baseline-oracle-replay.json).
+The modern-preset rejection probe likewise requires that legacy checkout as its
+first argument and the separately installed candidate packages as its second.
