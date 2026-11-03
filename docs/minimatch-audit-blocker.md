@@ -1,5 +1,7 @@
 # PR #91 dependency audit investigation (2026-11-03)
 
+Current follow-up: [fresh source research, migration parity failures, options and compatibility guards](minimatch-audit-followup.md). The original results below refer to reviewed head a986b5cade8647f421f935553a6c56b016e2209b; they remain historical evidence, not a claim that the blocker is resolved.
+
 ## Baseline and policy
 
 Main is `c7ac54a81f9eddeae3a3d14bc398e68437be40cf`; PR #91 remains

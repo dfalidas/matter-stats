@@ -1,0 +1,23 @@
+{
+  "version": "1.91.0",
+  "source": "published configuration_schema.json",
+  "reactRules": {
+    "react/display-name": true,
+    "react/jsx-key": true,
+    "react/jsx-no-comment-textnodes": true,
+    "react/jsx-no-duplicate-props": true,
+    "react/jsx-no-undef": true,
+    "react/jsx-uses-react": false,
+    "react/jsx-uses-vars": false,
+    "react/no-children-prop": true,
+    "react/no-danger-with-children": true,
+    "react/no-deprecated": false,
+    "react/no-direct-mutation-state": true,
+    "react/no-find-dom-node": true,
+    "react/no-is-mounted": true,
+    "react/no-render-return-value": true,
+    "react/no-string-refs": true,
+    "react/no-unescaped-entities": true,
+    "react/require-render-return": true
+  }
+}
