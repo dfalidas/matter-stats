@@ -470,6 +470,16 @@ export async function runJourneys({
         ),
         totals,
       );
+      if (["monthly", "yearly"].includes(period)) {
+        const verifyCards = async () => {
+          for (const [label, value] of [["Sessions", String(totals[2])], ["Active days", String(rawPeriod[3])], ["Estimated words", `≈${totals[1].toLocaleString("en-US")}`]]) {
+            await expect(page.getByText(label, { exact: true }).locator("..").getByText(value, { exact: true })).toBeVisible();
+          }
+        };
+        await verifyCards();
+        await goto(`/dashboard?start=${first}&end=${last}`);
+        await verifyCards();
+      }
       check(`CSV ${period} ${date}`, {
         expected: totals,
         first,
