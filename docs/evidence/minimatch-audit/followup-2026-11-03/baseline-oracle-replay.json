@@ -1,0 +1,8 @@
+{
+  "testedSha": "97447f9ab4e5e539ece76593bcc4eb795584f3f8",
+  "reactPairs": 116,
+  "importCases": 11,
+  "scopeCases": 12,
+  "controls": 255,
+  "result": "passed"
+}

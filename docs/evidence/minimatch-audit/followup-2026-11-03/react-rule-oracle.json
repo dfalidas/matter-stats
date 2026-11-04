@@ -1,0 +1,1761 @@
+{
+  "testedSha": "97447f9ab4e5e539ece76593bcc4eb795584f3f8",
+  "node": "v22.23.4",
+  "cases": [
+    {
+      "rule": "react/display-name",
+      "invalid": "export default () => <div/>;",
+      "valid": "export default function Example(){return <div/>;}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/display-name",
+            "severity": 2,
+            "message": "Component definition is missing display name"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/jsx-key",
+      "invalid": "const view = [<span/>];",
+      "valid": "const view = [<span key=\"one\"/>];",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/jsx-key",
+            "severity": 2,
+            "message": "Missing \"key\" prop for element in array"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/jsx-no-comment-textnodes",
+      "invalid": "const view = <div>// comment</div>;",
+      "valid": "const view = <div>{/* comment */}</div>;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/jsx-no-comment-textnodes",
+            "severity": 2,
+            "message": "Comments inside children section of tag should be placed inside braces"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/jsx-no-duplicate-props",
+      "invalid": "const view = <div title=\"a\" title=\"b\"/>;",
+      "valid": "const view = <div title=\"a\"/>;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/jsx-no-duplicate-props",
+            "severity": 2,
+            "message": "No duplicate props allowed"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/jsx-no-undef",
+      "invalid": "const view = <Missing/>;",
+      "valid": "const Known = () => null; const view = <Known/>;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/jsx-no-undef",
+            "severity": 2,
+            "message": "'Missing' is not defined."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-children-prop",
+      "invalid": "const view = <div children=\"text\"/>;",
+      "valid": "const view = <div>text</div>;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-children-prop",
+            "severity": 2,
+            "message": "Do not pass children as props. Instead, nest children between the opening and closing tags."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-danger-with-children",
+      "invalid": "const view = <div dangerouslySetInnerHTML={{__html:\"x\"}}>text</div>;",
+      "valid": "const view = <div dangerouslySetInnerHTML={{__html:\"x\"}}/>;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-danger-with-children",
+            "severity": 2,
+            "message": "Only set one of `children` or `props.dangerouslySetInnerHTML`"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-direct-mutation-state",
+      "invalid": "class Example extends React.Component { method(){this.state.value=1;} render(){return <div/>;} }",
+      "valid": "class Example extends React.Component { method(){this.setState({value:1});} render(){return <div/>;} }",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-direct-mutation-state",
+            "severity": 2,
+            "message": "Do not mutate state directly. Use setState()."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-find-dom-node",
+      "invalid": "ReactDOM.findDOMNode(element);",
+      "valid": "ReactDOM.createRoot(element);",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-find-dom-node",
+            "severity": 2,
+            "message": "Do not use findDOMNode. It doesn’t work with function components and is deprecated in StrictMode. See https://reactjs.org/docs/react-dom.html#finddomnode"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-is-mounted",
+      "invalid": "class Example extends React.Component { method(){return this.isMounted();} render(){return <div/>;} }",
+      "valid": "class Example extends React.Component { method(){return true;} render(){return <div/>;} }",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-is-mounted",
+            "severity": 2,
+            "message": "Do not use isMounted"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-render-return-value",
+      "invalid": "const instance = ReactDOM.render(<div/>, container);",
+      "valid": "ReactDOM.render(<div/>, container);",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-render-return-value",
+            "severity": 2,
+            "message": "Do not depend on the return value from ReactDOM.render"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-string-refs",
+      "invalid": "class Example extends React.Component {render(){return <div ref=\"legacy\"/>;}}",
+      "valid": "class Example extends React.Component {render(){return <div ref={this.ref}/>;}}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-string-refs",
+            "severity": 2,
+            "message": "Using string literals in ref attributes is deprecated."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-unescaped-entities",
+      "invalid": "const view = <div>don't</div>;",
+      "valid": "const view = <div>don&apos;t</div>;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-unescaped-entities",
+            "severity": 2,
+            "message": "`'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/require-render-return",
+      "invalid": "class Example extends React.Component {render(){<div/>;}}",
+      "valid": "class Example extends React.Component {render(){return <div/>;}}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/require-render-return",
+            "severity": 2,
+            "message": "Your render method should have a return statement"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/jsx-pascal-case",
+      "invalid": "const view = <Denied_component/>;",
+      "valid": "const view = <Allowed_component/>;",
+      "options": {
+        "ignore": [
+          "Allowed_*"
+        ]
+      },
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/jsx-pascal-case",
+            "severity": 2,
+            "message": "Imported JSX component Denied_component must be in PascalCase"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-unstable-nested-components",
+      "invalid": "function Example(){return <Wrapper footer={() => <div/>}/>;}",
+      "valid": "function Example(){return <Wrapper renderFooter={() => <div/>}/>;}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-unstable-nested-components",
+            "severity": 2,
+            "message": "Do not define components during render. React will see a new component type on every render and destroy the entire subtree’s DOM nodes and state (https://reactjs.org/docs/reconciliation.html#elements-of-different-types). Instead, move this component definition out of the parent component “Example” and pass data as props. If you want to allow component creation in props, set allowAsProps option to true."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.renderComponent;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderComponent is deprecated since React 0.12.0, use React.render instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.renderComponentToString;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderComponentToString is deprecated since React 0.12.0, use React.renderToString instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.renderComponentToStaticMarkup;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderComponentToStaticMarkup is deprecated since React 0.12.0, use React.renderToStaticMarkup instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.isValidComponent;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.isValidComponent is deprecated since React 0.12.0, use React.isValidElement instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.isValidClass;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.isValidClass is deprecated since React 0.12.0"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.render;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.render is deprecated since React 0.14.0, use ReactDOM.render instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.unmountComponentAtNode;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.unmountComponentAtNode is deprecated since React 0.14.0, use ReactDOM.unmountComponentAtNode instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.findDOMNode;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.findDOMNode is deprecated since React 0.14.0, use ReactDOM.findDOMNode instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.renderToString;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderToString is deprecated since React 0.14.0, use ReactDOMServer.renderToString instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.renderToStaticMarkup;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderToStaticMarkup is deprecated since React 0.14.0, use ReactDOMServer.renderToStaticMarkup instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.createClass;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.PropTypes;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.DOM;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.DOM is deprecated since React 15.6.0, use the npm module react-dom-factories instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "ReactPerf.printDOM;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactPerf.printDOM is deprecated since React 15.0.0, use ReactPerf.printOperations instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "ReactPerf.getMeasurementsSummaryMap;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactPerf.getMeasurementsSummaryMap is deprecated since React 15.0.0, use ReactPerf.getWasted instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "Perf.printDOM;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "Perf.printDOM is deprecated since React 15.0.0, use Perf.printOperations instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "Perf.getMeasurementsSummaryMap;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "Perf.getMeasurementsSummaryMap is deprecated since React 15.0.0, use Perf.getWasted instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "ReactDOM.render;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "ReactDOM.hydrate;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOM.hydrate is deprecated since React 18.0.0, use hydrateRoot instead, see https://reactjs.org/link/switch-to-createroot"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "ReactDOM.unmountComponentAtNode;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOM.unmountComponentAtNode is deprecated since React 18.0.0, use root.unmount instead, see https://reactjs.org/link/switch-to-createroot"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "ReactDOMServer.renderToNodeStream;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.PropTypes.component;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.PropTypes.component is deprecated since React 0.12.0, use React.PropTypes.element instead"
+          },
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.PropTypes.renderable;",
+      "valid": "const value = React.createElement;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.PropTypes.renderable is deprecated since React 0.12.0, use React.PropTypes.node instead"
+          },
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.addons.classSet;",
+      "valid": "const value = React.Children;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.addons.classSet is deprecated since React 0.13.0, use the npm module classnames instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.addons.cloneWithProps;",
+      "valid": "const value = React.Children;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.addons.cloneWithProps is deprecated since React 0.13.0, use React.cloneElement instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.addons.LinkedStateMixin;",
+      "valid": "const value = React.Children;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.addons.LinkedStateMixin is deprecated since React 15.0.0"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "React.addons.TestUtils;",
+      "valid": "const value = React.Children;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.addons.TestUtils is deprecated since React 15.5.0, use ReactDOM.TestUtils instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "function example(){return this.transferPropsTo({});}",
+      "valid": "function example(){return {...this.props};}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "this.transferPropsTo is deprecated since React 0.12.0, use spread operator ({...}) instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {renderComponent as legacy} from 'react';",
+      "valid": "import * as supported from 'react';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderComponent is deprecated since React 0.12.0, use React.render instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {renderComponent: legacy}=require('react');",
+      "valid": "const supported=require('react');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderComponent is deprecated since React 0.12.0, use React.render instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {renderComponent: legacy}=React;",
+      "valid": "const supported=React;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderComponent is deprecated since React 0.12.0, use React.render instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {renderComponentToString as legacy} from 'react';",
+      "valid": "import * as supported from 'react';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderComponentToString is deprecated since React 0.12.0, use React.renderToString instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {renderComponentToString: legacy}=require('react');",
+      "valid": "const supported=require('react');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderComponentToString is deprecated since React 0.12.0, use React.renderToString instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {renderComponentToString: legacy}=React;",
+      "valid": "const supported=React;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderComponentToString is deprecated since React 0.12.0, use React.renderToString instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {renderComponentToStaticMarkup as legacy} from 'react';",
+      "valid": "import * as supported from 'react';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderComponentToStaticMarkup is deprecated since React 0.12.0, use React.renderToStaticMarkup instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {renderComponentToStaticMarkup: legacy}=require('react');",
+      "valid": "const supported=require('react');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderComponentToStaticMarkup is deprecated since React 0.12.0, use React.renderToStaticMarkup instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {renderComponentToStaticMarkup: legacy}=React;",
+      "valid": "const supported=React;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderComponentToStaticMarkup is deprecated since React 0.12.0, use React.renderToStaticMarkup instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {isValidComponent as legacy} from 'react';",
+      "valid": "import * as supported from 'react';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.isValidComponent is deprecated since React 0.12.0, use React.isValidElement instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {isValidComponent: legacy}=require('react');",
+      "valid": "const supported=require('react');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.isValidComponent is deprecated since React 0.12.0, use React.isValidElement instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {isValidComponent: legacy}=React;",
+      "valid": "const supported=React;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.isValidComponent is deprecated since React 0.12.0, use React.isValidElement instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {isValidClass as legacy} from 'react';",
+      "valid": "import * as supported from 'react';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.isValidClass is deprecated since React 0.12.0"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {isValidClass: legacy}=require('react');",
+      "valid": "const supported=require('react');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.isValidClass is deprecated since React 0.12.0"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {isValidClass: legacy}=React;",
+      "valid": "const supported=React;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.isValidClass is deprecated since React 0.12.0"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {render as legacy} from 'react';",
+      "valid": "import * as supported from 'react';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.render is deprecated since React 0.14.0, use ReactDOM.render instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {render: legacy}=require('react');",
+      "valid": "const supported=require('react');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.render is deprecated since React 0.14.0, use ReactDOM.render instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {render: legacy}=React;",
+      "valid": "const supported=React;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.render is deprecated since React 0.14.0, use ReactDOM.render instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {unmountComponentAtNode as legacy} from 'react';",
+      "valid": "import * as supported from 'react';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.unmountComponentAtNode is deprecated since React 0.14.0, use ReactDOM.unmountComponentAtNode instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {unmountComponentAtNode: legacy}=require('react');",
+      "valid": "const supported=require('react');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.unmountComponentAtNode is deprecated since React 0.14.0, use ReactDOM.unmountComponentAtNode instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {unmountComponentAtNode: legacy}=React;",
+      "valid": "const supported=React;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.unmountComponentAtNode is deprecated since React 0.14.0, use ReactDOM.unmountComponentAtNode instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {findDOMNode as legacy} from 'react';",
+      "valid": "import * as supported from 'react';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.findDOMNode is deprecated since React 0.14.0, use ReactDOM.findDOMNode instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {findDOMNode: legacy}=require('react');",
+      "valid": "const supported=require('react');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.findDOMNode is deprecated since React 0.14.0, use ReactDOM.findDOMNode instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {findDOMNode: legacy}=React;",
+      "valid": "const supported=React;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.findDOMNode is deprecated since React 0.14.0, use ReactDOM.findDOMNode instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {renderToString as legacy} from 'react';",
+      "valid": "import * as supported from 'react';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderToString is deprecated since React 0.14.0, use ReactDOMServer.renderToString instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {renderToString: legacy}=require('react');",
+      "valid": "const supported=require('react');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderToString is deprecated since React 0.14.0, use ReactDOMServer.renderToString instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {renderToString: legacy}=React;",
+      "valid": "const supported=React;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderToString is deprecated since React 0.14.0, use ReactDOMServer.renderToString instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {renderToStaticMarkup as legacy} from 'react';",
+      "valid": "import * as supported from 'react';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderToStaticMarkup is deprecated since React 0.14.0, use ReactDOMServer.renderToStaticMarkup instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {renderToStaticMarkup: legacy}=require('react');",
+      "valid": "const supported=require('react');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderToStaticMarkup is deprecated since React 0.14.0, use ReactDOMServer.renderToStaticMarkup instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {renderToStaticMarkup: legacy}=React;",
+      "valid": "const supported=React;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.renderToStaticMarkup is deprecated since React 0.14.0, use ReactDOMServer.renderToStaticMarkup instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {createClass as legacy} from 'react';",
+      "valid": "import * as supported from 'react';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {createClass: legacy}=require('react');",
+      "valid": "const supported=require('react');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {createClass: legacy}=React;",
+      "valid": "const supported=React;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {PropTypes as legacy} from 'react';",
+      "valid": "import * as supported from 'react';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {PropTypes: legacy}=require('react');",
+      "valid": "const supported=require('react');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {PropTypes: legacy}=React;",
+      "valid": "const supported=React;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {DOM as legacy} from 'react';",
+      "valid": "import * as supported from 'react';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.DOM is deprecated since React 15.6.0, use the npm module react-dom-factories instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {DOM: legacy}=require('react');",
+      "valid": "const supported=require('react');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.DOM is deprecated since React 15.6.0, use the npm module react-dom-factories instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {DOM: legacy}=React;",
+      "valid": "const supported=React;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "React.DOM is deprecated since React 15.6.0, use the npm module react-dom-factories instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {printDOM as legacy} from 'react-addons-perf';",
+      "valid": "import * as supported from 'react-addons-perf';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactPerf.printDOM is deprecated since React 15.0.0, use ReactPerf.printOperations instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {printDOM: legacy}=require('react-addons-perf');",
+      "valid": "const supported=require('react-addons-perf');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactPerf.printDOM is deprecated since React 15.0.0, use ReactPerf.printOperations instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {printDOM: legacy}=ReactPerf;",
+      "valid": "const supported=ReactPerf;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactPerf.printDOM is deprecated since React 15.0.0, use ReactPerf.printOperations instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {getMeasurementsSummaryMap as legacy} from 'react-addons-perf';",
+      "valid": "import * as supported from 'react-addons-perf';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactPerf.getMeasurementsSummaryMap is deprecated since React 15.0.0, use ReactPerf.getWasted instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {getMeasurementsSummaryMap: legacy}=require('react-addons-perf');",
+      "valid": "const supported=require('react-addons-perf');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactPerf.getMeasurementsSummaryMap is deprecated since React 15.0.0, use ReactPerf.getWasted instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {getMeasurementsSummaryMap: legacy}=ReactPerf;",
+      "valid": "const supported=ReactPerf;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactPerf.getMeasurementsSummaryMap is deprecated since React 15.0.0, use ReactPerf.getWasted instead"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {render as legacy} from 'react-dom';",
+      "valid": "import * as supported from 'react-dom';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {render: legacy}=require('react-dom');",
+      "valid": "const supported=require('react-dom');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {render: legacy}=ReactDOM;",
+      "valid": "const supported=ReactDOM;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {hydrate as legacy} from 'react-dom';",
+      "valid": "import * as supported from 'react-dom';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOM.hydrate is deprecated since React 18.0.0, use hydrateRoot instead, see https://reactjs.org/link/switch-to-createroot"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {hydrate: legacy}=require('react-dom');",
+      "valid": "const supported=require('react-dom');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOM.hydrate is deprecated since React 18.0.0, use hydrateRoot instead, see https://reactjs.org/link/switch-to-createroot"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {hydrate: legacy}=ReactDOM;",
+      "valid": "const supported=ReactDOM;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOM.hydrate is deprecated since React 18.0.0, use hydrateRoot instead, see https://reactjs.org/link/switch-to-createroot"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {unmountComponentAtNode as legacy} from 'react-dom';",
+      "valid": "import * as supported from 'react-dom';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOM.unmountComponentAtNode is deprecated since React 18.0.0, use root.unmount instead, see https://reactjs.org/link/switch-to-createroot"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {unmountComponentAtNode: legacy}=require('react-dom');",
+      "valid": "const supported=require('react-dom');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOM.unmountComponentAtNode is deprecated since React 18.0.0, use root.unmount instead, see https://reactjs.org/link/switch-to-createroot"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {unmountComponentAtNode: legacy}=ReactDOM;",
+      "valid": "const supported=ReactDOM;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOM.unmountComponentAtNode is deprecated since React 18.0.0, use root.unmount instead, see https://reactjs.org/link/switch-to-createroot"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "import {renderToNodeStream as legacy} from 'react-dom/server';",
+      "valid": "import * as supported from 'react-dom/server';",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {renderToNodeStream: legacy}=require('react-dom/server');",
+      "valid": "const supported=require('react-dom/server');",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "const {renderToNodeStream: legacy}=ReactDOMServer;",
+      "valid": "const supported=ReactDOMServer;",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream"
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "class Example extends React.Component{componentWillMount(){ }render(){return <div/>;}}",
+      "valid": "class Example extends React.Component{componentDidMount(){}render(){return <div/>;}}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "class Example extends React.PureComponent{componentWillMount(){ }render(){return <div/>;}}",
+      "valid": "class Example extends React.PureComponent{componentDidMount(){}render(){return <div/>;}}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "class Example extends Component{componentWillMount(){ }render(){return <div/>;}}",
+      "valid": "class Example extends Component{componentDidMount(){}render(){return <div/>;}}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "class Example extends PureComponent{componentWillMount(){ }render(){return <div/>;}}",
+      "valid": "class Example extends PureComponent{componentDidMount(){}render(){return <div/>;}}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "/** @extends React.Component */ class Example {componentWillMount(){} render(){return <div/>;}}",
+      "valid": "class Example {componentDidMount(){} }",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "class Example extends React.Component{componentWillReceiveProps(){ }render(){return <div/>;}}",
+      "valid": "class Example extends React.Component{componentDidMount(){}render(){return <div/>;}}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "class Example extends React.PureComponent{componentWillReceiveProps(){ }render(){return <div/>;}}",
+      "valid": "class Example extends React.PureComponent{componentDidMount(){}render(){return <div/>;}}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "class Example extends Component{componentWillReceiveProps(){ }render(){return <div/>;}}",
+      "valid": "class Example extends Component{componentDidMount(){}render(){return <div/>;}}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "class Example extends PureComponent{componentWillReceiveProps(){ }render(){return <div/>;}}",
+      "valid": "class Example extends PureComponent{componentDidMount(){}render(){return <div/>;}}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "/** @extends React.Component */ class Example {componentWillReceiveProps(){} render(){return <div/>;}}",
+      "valid": "class Example {componentDidMount(){} }",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "class Example extends React.Component{componentWillUpdate(){ }render(){return <div/>;}}",
+      "valid": "class Example extends React.Component{componentDidMount(){}render(){return <div/>;}}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "class Example extends React.PureComponent{componentWillUpdate(){ }render(){return <div/>;}}",
+      "valid": "class Example extends React.PureComponent{componentDidMount(){}render(){return <div/>;}}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "class Example extends Component{componentWillUpdate(){ }render(){return <div/>;}}",
+      "valid": "class Example extends Component{componentDidMount(){}render(){return <div/>;}}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "class Example extends PureComponent{componentWillUpdate(){ }render(){return <div/>;}}",
+      "valid": "class Example extends PureComponent{componentDidMount(){}render(){return <div/>;}}",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+          }
+        ],
+        "valid": []
+      }
+    },
+    {
+      "rule": "react/no-deprecated",
+      "invalid": "/** @extends React.Component */ class Example {componentWillUpdate(){} render(){return <div/>;}}",
+      "valid": "class Example {componentDidMount(){} }",
+      "baseline": {
+        "invalid": [
+          {
+            "rule": "react/no-deprecated",
+            "severity": 2,
+            "message": "componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+          }
+        ],
+        "valid": []
+      }
+    }
+  ]
+}

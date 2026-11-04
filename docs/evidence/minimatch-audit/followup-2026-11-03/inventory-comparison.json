@@ -1,0 +1,36 @@
+{
+  "baselineBefore": {
+    "exit": 1,
+    "problems": [
+      "@emnapi/runtime@1.11.3",
+      "@img/sharp-wasm32@0.35.5",
+      "postcss-selector-parser@7.1.6"
+    ]
+  },
+  "baselineAfter": {
+    "exit": 1,
+    "problems": [
+      "@emnapi/runtime@1.11.3",
+      "@img/sharp-wasm32@0.35.5",
+      "postcss-selector-parser@7.1.6"
+    ]
+  },
+  "candidate": {
+    "exit": 1,
+    "problems": [
+      "@emnapi/runtime@1.11.3",
+      "@img/sharp-wasm32@0.35.5",
+      "postcss-selector-parser@7.1.6"
+    ]
+  },
+  "baselineSha": "97447f9ab4e5e539ece76593bcc4eb795584f3f8",
+  "candidateSha": "3955b385b286de694873ac87b9c996b024f665bc",
+  "lintPeerCheck": {
+    "command": "npm ls eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin eslint-plugin-react-hooks eslint-plugin-jsx-a11y-x oxlint globals --all --json",
+    "exit": 0,
+    "resolvedEslintVersions": [
+      "10.14.0"
+    ],
+    "invalidOrMissingPeerNodes": 0
+  }
+}
