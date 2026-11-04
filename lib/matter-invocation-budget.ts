@@ -49,6 +49,9 @@ export class MatterInvocationBudget {
   checkRequest() {
     this.check();
     if (this.requests >= this.limits.requests) throw new MatterBudgetStop("requests");
+    // Admission is a bounded 10s database request. Leave a complete attempt
+    // inside the upstream window before consuming a durable reservation.
+    if (this.clock() - this.started + 10_000 + this.limits.requestMs >= this.limits.upstreamMs) throw new MatterBudgetStop("deadline");
   }
   checkWait(ms: number) {
     this.checkRequest();
@@ -57,20 +60,19 @@ export class MatterInvocationBudget {
   async attempt<T>(work: (signal: AbortSignal) => Promise<T>): Promise<T> {
     this.check();
     if (this.requests >= this.limits.requests) throw new MatterBudgetStop("requests");
+    if (this.clock() - this.started + this.limits.requestMs > this.limits.upstreamMs) throw new MatterBudgetStop("deadline");
     this.requests++;
     const controller = new AbortController();
-    const remaining = this.limits.upstreamMs - (this.clock() - this.started);
-    const reason = remaining <= this.limits.requestMs ? "deadline" : "timeout";
-    const timer = setTimeout(() => controller.abort(new MatterBudgetStop(reason)), Math.min(remaining, this.limits.requestMs));
+    const timer = setTimeout(() => controller.abort(new MatterBudgetStop("timeout")), this.limits.requestMs);
     let onAbort: () => void = () => {};
     try {
       const aborted = new Promise<never>((_, reject) => {
         onAbort = () => reject(controller.signal.reason);
         controller.signal.addEventListener("abort", onAbort, { once: true });
       });
-      const value = await Promise.race([work(controller.signal), aborted]);
-      this.check();
-      return value;
+      // A validated result must reach fenced finalization even at the boundary.
+      // The existing total-time margin bounds finalization, logging and release.
+      return await Promise.race([work(controller.signal), aborted]);
     } finally {
       clearTimeout(timer);
       controller.signal.removeEventListener("abort", onAbort);

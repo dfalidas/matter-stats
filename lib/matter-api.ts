@@ -247,6 +247,9 @@ export async function matterFetch<T>(path: string, options: MatterFetchOptions =
     const readResponse = async (signal?: AbortSignal): Promise<T> => {
       fetchOptions.signal?.throwIfAborted();
       await beforeRequest?.();
+      // A timed-out lease renewal must never start HTTP after the race ended.
+      signal?.throwIfAborted();
+      fetchOptions.signal?.throwIfAborted();
       let response: Response;
       try { response = await fetch(url, {
         ...fetchOptions,

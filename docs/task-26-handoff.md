@@ -24,6 +24,11 @@ Current library metadata does not prove previous library membership. Missing ses
 
 ## Continuation and diagnostics
 
+See [Task 26A budget continuation](task-26a-validation.md) for the narrowly scoped
+admission/finalization correction and its limits. Safe budget pauses retain
+preparation for eligible scheduled continuation; pre-existing unknown requests
+still require deliberate eligible manual recovery.
+
 Daily cron remains **06:00 UTC** (`0 6 * * *`, local time changes with DST). It resumes recent sessions, queued/running history and active library work under the same single-account lease and durable fair stream turn. Browser need not remain open. Optional authorized manual continuations accelerate eligible work; use one at a time and allow natural cooldowns. No parallel importer, rapid polling loop, quota increase, schedule change or cursor reset.
 
 Preserve **8 committed pages / 224 HTTP attempts / 90s upstream preparation / 150s invocation / 10s attempt and database HTTP / 180s ingress**. Shared quotas remain 120 GET/minute, 5 requests/second and 20 markdown GET/minute; upstream feedback may tighten them. Three-attempt transient chains, bounded backoff/waiting, 429 cooldown, durable preparation and deliberate eligible recovery remain unchanged. Expired exhaustion does not auto-reset; manual recovery is deliberate, after the existing 15-minute eligibility and diagnosis, preserving the page contract and prior successful preparation.

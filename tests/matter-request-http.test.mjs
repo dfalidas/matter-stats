@@ -23,16 +23,18 @@ function harness() {
    events.push(["admit",args.p_slot,args.p_markdown]); const key=args.p_slot+args.p_key;let r=entries.get(key)??{attempts:0};
    if(args.p_recover && (r.protocol || (r.status && ![403,404].includes(r.status))) && now>=r.next) r={attempts:0};
    if("value" in r || "status" in r || "protocol" in r) return { admitted:false,reason:"cached",entry:r };
+   if(r.pending && !(args.p_recover && now>=r.next)) return { admitted:false,reason:"exhausted",next_at:new Date(r.next).toISOString() };
    if(r.attempts>=3 && !(args.p_recover && now>=r.next)) return { admitted:false,reason:"exhausted",next_at:new Date(r.next).toISOString() };
    if(now<cooldown) return { admitted:false,reason:"quota",next_at:new Date(cooldown).toISOString() };
    if(now<(r.next??0)) return { admitted:false,reason:"retry",next_at:new Date(r.next).toISOString() };
-   const attempt=r.attempts>=3?1:r.attempts+1,sequence=String(++seq); entries.set(key,{attempts:attempt,next:now+900000,sequence});
+   const attempt=r.attempts>=3?1:r.attempts+1,sequence=String(++seq); entries.set(key,{attempts:attempt,next:now+900000,sequence,pending:true});
    return { admitted:true,sequence,attempt };
   },
   feedback:async(args)=>{events.push(["feedback",args]); if(args.p_cooldown) cooldown=Math.max(cooldown,Date.parse(args.p_cooldown));},
   finish:async(args)=>{
    events.push(["finish",args.p_entry]);const key=args.p_slot+args.p_key,r=entries.get(key),entry=args.p_entry;
    assert.equal(args.p_sequence,r.sequence,"outcome uses the reserved sequence");
+   delete r.pending;
    if("transient_delay_ms" in entry) r.next=now+(r.attempts>=3?900000:entry.transient_delay_ms);
    else if(entry.quota) {r.next=now+(r.attempts>=3?900000:0);}
    else if(args.p_slot==="bootstrap" && "value" in entry) entries.delete(key);
@@ -172,4 +174,60 @@ test("P1: cached rejection cannot write after lease loss or an unverifiable sequ
    assert.equal(entry.protocol,undefined);assert.equal(requests,1);assert.equal(h.events.filter(e=>e[0]==="finish").length,writes);
   });
  }
+});
+
+test("26A: lease renewal consuming the residual budget must stop before reservation",async(t)=>{
+ const h=harness();let now=0,requests=0;
+ const budget=new MatterInvocationBudget(undefined,()=>now);
+ await synthetic(t,async()=>{requests++;return Response.json(page());},async()=>{
+  now=69_999;
+  await assert.rejects(h.run(()=>api.listMatterItems({},async()=>{now=90_000;}),budget),/deadline/);
+  assert.equal(h.events.filter(e=>e[0]==="admit").length,0);
+  assert.equal(h.entries.size,0);assert.equal(requests,0);
+ });
+});
+test("26A: validated response at the deadline is finalized and reused by scheduled continuation",async(t)=>{
+ const h=harness();let now=0,requests=0;
+ const budget=new MatterInvocationBudget(undefined,()=>now);
+ await synthetic(t,async()=>{requests++;now=90_000;return Response.json(page());},async()=>{
+  await h.run(()=>coordinator.withMatterRequestContext({slot:"library_items",recover:false},()=>api.listMatterItems()),budget);
+  const entry=[...h.entries.values()][0];assert.deepEqual(entry.value,page());assert.equal(entry.attempts,1);
+  await h.run(()=>coordinator.withMatterRequestContext({slot:"library_items",recover:false},()=>api.listMatterItems()));
+  assert.equal(requests,1,"fresh scheduled context reuses successful preparation");
+ });
+});
+
+test("26A: residual time refuses reservation even before the deadline",async(t)=>{
+ const h=harness();let now=0;
+ const budget=new MatterInvocationBudget(undefined,()=>now);
+ await synthetic(t,()=>{throw new Error("must not fetch");},async()=>{
+  now=70_000;
+  await assert.rejects(h.run(()=>api.listMatterItems(),budget),/deadline/);
+  assert.equal(h.entries.size,0);assert.equal(budget.requests,0);
+ });
+});
+test("26A: lost lease, cancellation and ambiguous finalization remain blocked after eligibility",async(t)=>{
+ for(const failure of ["lease","cancel","database"]) {
+  const h=harness();let requests=0,renewals=0;const abort=new AbortController();
+  const context=work=>coordinator.withMatterRequestContext({slot:"library_items",recover:false},work);
+  const before=async()=>{if(failure==="lease" && ++renewals===2) throw new Error("lost lease");};
+  if(failure==="database")h.runtime.store.finish=async()=>{throw new Error("ambiguous database");};
+  await synthetic(t,async()=>{requests++;if(failure==="cancel")abort.abort(new Error("cancelled"));return Response.json(page());},async()=>{
+   await assert.rejects(h.run(()=>context(()=>api.matterFetch("/items",{beforeRequest:before,signal:abort.signal}))));
+   const entry=[...h.entries.values()][0];assert.equal(entry.pending,true);assert.equal(entry.attempts,1);
+   h.advance(900001);
+   await assert.rejects(h.run(()=>context(()=>api.listMatterItems())),/exhausted/);
+   assert.equal(requests,failure==="lease"?0:1);
+  });
+ }
+});
+test("26A: timed-out renewal cannot launch late upstream work",async(t)=>{
+ const h=harness();let renewals=0,release,requests=0;
+ const budget=new MatterInvocationBudget({...require(path.join(root,".test-build/lib/matter-invocation-budget.js")).MATTER_INVOCATION_LIMITS,requestMs:5,requests:1});
+ await synthetic(t,async()=>{requests++;return Response.json(page());},async()=>{
+  const work=h.run(()=>api.listMatterItems({},async()=>{if(++renewals===2)await new Promise(resolve=>{release=resolve;});}),budget);
+  await assert.rejects(work,/requests/);
+  const before=requests; release(); await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(requests,before,"expired work cannot fetch after renewal resolves");
+ });
 });

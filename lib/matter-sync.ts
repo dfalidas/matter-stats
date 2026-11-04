@@ -336,7 +336,7 @@ async function runMatterInvocation(mode: MatterSyncMode, options: { recentActivi
       message: buildMatterSyncMessage(counts, hasMore, explicitHistory ? "backfill_sessions" : mode, {
         sessionsReturned: diagnostics.sessionsReturned, sessionsSkipped: diagnostics.sessionsSkipped,
         sessionsWithoutLinkedItem: diagnostics.sessionsWithoutLinkedItem,
-      }) + (stop ? ` Invocation ${stop.reason} budget reached; the last committed checkpoint is retained.` : ""),
+      }) + (stop ? ` Invocation ${stop.reason} budget reached; paused at the retained checkpoint for eligible scheduled continuation. Execution time is not guaranteed.` : ""),
     };
   } catch (error) {
     const rateLimitedUntil = error instanceof MatterRequestDeferred && error.reason === "quota" ? error.nextAt : getRateLimitedUntil(error, deps.now());
