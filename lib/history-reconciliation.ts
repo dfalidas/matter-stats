@@ -24,7 +24,7 @@ export async function reconcileHistory(client: MatterStatsSupabaseClient, period
   const dated = before.filter(r => r.started_at && new Date(r.started_at) >= range.start && new Date(r.started_at) < range.end);
   const day = (timestamp: string | Date) => new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(timestamp));
   const seconds = (r: Raw) => r.duration_seconds ?? 0;
-  const expected: Totals = { sessions: dated.length, seconds: dated.reduce((n,r)=>n+seconds(r),0), words: dated.reduce((n,r)=>n+Math.round(seconds(r)*225/60),0), activeDays: new Set(dated.filter(r=>seconds(r)>0).map(r=>day(r.started_at!))).size };
+  const expected: Totals = { sessions: dated.length, seconds: dated.reduce((n,r)=>n+seconds(r),0), words: dated.reduce((n,r)=>n+Math.round(seconds(r)/60*225),0), activeDays: new Set(dated.filter(r=>seconds(r)>0).map(r=>day(r.started_at!))).size };
   const first = day(range.start);
   const last = day(new Date(range.end.getTime()-1));
   const overview = (await getOverviewReadingMetrics(client,"month",first,last,now,timezone)).metrics;
