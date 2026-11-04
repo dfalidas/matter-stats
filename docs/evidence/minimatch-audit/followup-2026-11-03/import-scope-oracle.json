@@ -1,0 +1,230 @@
+{
+  "testedSha": "97447f9ab4e5e539ece76593bcc4eb795584f3f8",
+  "imports": [
+    {
+      "name": "object",
+      "code": "export default {};",
+      "expected": true,
+      "messages": [
+        {
+          "rule": "import/no-anonymous-default-export",
+          "severity": 1
+        }
+      ]
+    },
+    {
+      "name": "array",
+      "code": "export default [];",
+      "expected": true,
+      "messages": [
+        {
+          "rule": "import/no-anonymous-default-export",
+          "severity": 1
+        }
+      ]
+    },
+    {
+      "name": "arrow",
+      "code": "export default () => null;",
+      "expected": true,
+      "messages": [
+        {
+          "rule": "import/no-anonymous-default-export",
+          "severity": 1
+        }
+      ]
+    },
+    {
+      "name": "function",
+      "code": "export default function(){}",
+      "expected": true,
+      "messages": [
+        {
+          "rule": "import/no-anonymous-default-export",
+          "severity": 1
+        }
+      ]
+    },
+    {
+      "name": "class",
+      "code": "export default class {}",
+      "expected": true,
+      "messages": [
+        {
+          "rule": "import/no-anonymous-default-export",
+          "severity": 1
+        }
+      ]
+    },
+    {
+      "name": "literal",
+      "code": "export default 1;",
+      "expected": true,
+      "messages": [
+        {
+          "rule": "import/no-anonymous-default-export",
+          "severity": 1
+        }
+      ]
+    },
+    {
+      "name": "call",
+      "code": "export default factory();",
+      "expected": false,
+      "messages": []
+    },
+    {
+      "name": "new",
+      "code": "export default new Factory();",
+      "expected": true,
+      "messages": [
+        {
+          "rule": "import/no-anonymous-default-export",
+          "severity": 1
+        }
+      ]
+    },
+    {
+      "name": "identifier",
+      "code": "const value={};export default value;",
+      "expected": false,
+      "messages": []
+    },
+    {
+      "name": "named-function",
+      "code": "export default function Example(){}",
+      "expected": false,
+      "messages": []
+    },
+    {
+      "name": "named-class",
+      "code": "export default class Example {}",
+      "expected": false,
+      "messages": []
+    }
+  ],
+  "scope": [
+    {
+      "filename": "scope-fixture.js",
+      "name": "react-used",
+      "code": "import React from 'react';export function Example(){return <div/>;}",
+      "unused": false,
+      "messages": []
+    },
+    {
+      "filename": "scope-fixture.js",
+      "name": "react-unused",
+      "code": "import React from 'react';export function Example(){return null;}",
+      "unused": true,
+      "messages": [
+        {
+          "rule": "@typescript-eslint/no-unused-vars",
+          "severity": 1
+        }
+      ]
+    },
+    {
+      "filename": "scope-fixture.js",
+      "name": "component-used",
+      "code": "const Used = () => null;export function Example(){return <Used/>;}",
+      "unused": false,
+      "messages": []
+    },
+    {
+      "filename": "scope-fixture.js",
+      "name": "component-unused",
+      "code": "const Unused = () => null;export function Example(){return <div/>;}",
+      "unused": true,
+      "messages": [
+        {
+          "rule": "@typescript-eslint/no-unused-vars",
+          "severity": 1
+        }
+      ]
+    },
+    {
+      "filename": "scope-fixture.js",
+      "name": "namespace-used",
+      "code": "const Namespace = {Child:()=>null};export function Example(){return <Namespace.Child/>;}",
+      "unused": false,
+      "messages": []
+    },
+    {
+      "filename": "scope-fixture.js",
+      "name": "node-browser-globals",
+      "code": "export function Example(){return <><Buffer.Component/><window.Component/></>;}",
+      "unused": true,
+      "messages": [
+        {
+          "rule": "react/jsx-no-undef",
+          "severity": 2
+        },
+        {
+          "rule": "react/jsx-no-undef",
+          "severity": 2
+        }
+      ]
+    },
+    {
+      "filename": "scope-fixture.tsx",
+      "name": "react-used",
+      "code": "import React from 'react';export function Example(){return <div/>;}",
+      "unused": false,
+      "messages": []
+    },
+    {
+      "filename": "scope-fixture.tsx",
+      "name": "react-unused",
+      "code": "import React from 'react';export function Example(){return null;}",
+      "unused": true,
+      "messages": [
+        {
+          "rule": "@typescript-eslint/no-unused-vars",
+          "severity": 1
+        }
+      ]
+    },
+    {
+      "filename": "scope-fixture.tsx",
+      "name": "component-used",
+      "code": "const Used = () => null;export function Example(){return <Used/>;}",
+      "unused": false,
+      "messages": []
+    },
+    {
+      "filename": "scope-fixture.tsx",
+      "name": "component-unused",
+      "code": "const Unused = () => null;export function Example(){return <div/>;}",
+      "unused": true,
+      "messages": [
+        {
+          "rule": "@typescript-eslint/no-unused-vars",
+          "severity": 1
+        }
+      ]
+    },
+    {
+      "filename": "scope-fixture.tsx",
+      "name": "namespace-used",
+      "code": "const Namespace = {Child:()=>null};export function Example(){return <Namespace.Child/>;}",
+      "unused": false,
+      "messages": []
+    },
+    {
+      "filename": "scope-fixture.tsx",
+      "name": "node-browser-globals",
+      "code": "export function Example(){return <><Buffer.Component/><window.Component/></>;}",
+      "unused": true,
+      "messages": [
+        {
+          "rule": "react/jsx-no-undef",
+          "severity": 2
+        },
+        {
+          "rule": "react/jsx-no-undef",
+          "severity": 2
+        }
+      ]
+    }
+  ]
+}

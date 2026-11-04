@@ -1,0 +1,98 @@
+{
+  "ghsa_id": "GHSA-g3hv-75wg-m249",
+  "cve_id": "CVE-2026-118764",
+  "url": "https://api.github.com/advisories/GHSA-g3hv-75wg-m249",
+  "html_url": "https://github.com/advisories/GHSA-g3hv-75wg-m249",
+  "summary": "minimatch has potential denial of service via globparts amplification",
+  "description": "minimatch 10.2.6 contains an attacker-controlled pattern amplification in firstPhasePreProcess() when optimizationLevel >= 2.\n\nresearcher: Reid Downing (b1nv0id)\nfiles: \n\n- src/index.ts: 690-770\n- src/index.ts: 780-796\n\nissue:\ninput-controlled growth of globParts during first-phase preprocessing, followed by quadratic second-phase processing.\n\nthe **/../ transformation clones a globparts entry and appends the clone to the same globparts array:\n```\nparts.splice(gs, 1)\nconst other = parts.slice(0)\nother[gs] = '**'\nglobParts.push(other)\n```\nthis occurs inside a do...while (didSomething) fixpoint loop, allowing generated entries to be processed again.\n\nthe expanded globparts array is subsequently processed by secondPhasePreProcess(), which performs pairwise comparisons:\n```\nfor (let i = 0; i < globParts.length - 1; i++) {\n  for (let j = i + 1; j < globParts.length; j++) {\n    this.partsMatch(...)\n  }\n}\n```\nan attacker who can supply a glob pattern can therefore cause additional pattern entries to be generated during preprocessing, followed by quadratic pairwise processing, resulting in excessive cpu and memory consumption.",
+  "type": "reviewed",
+  "severity": "medium",
+  "repository_advisory_url": "https://api.github.com/repos/isaacs/minimatch/security-advisories/GHSA-g3hv-75wg-m249",
+  "source_code_location": "https://github.com/isaacs/minimatch",
+  "identifiers": [
+    {
+      "value": "GHSA-g3hv-75wg-m249",
+      "type": "GHSA"
+    },
+    {
+      "value": "CVE-2026-118764",
+      "type": "CVE"
+    }
+  ],
+  "references": [
+    "https://github.com/isaacs/minimatch/security/advisories/GHSA-g3hv-75wg-m249",
+    "https://nvd.nist.gov/vuln/detail/CVE-2026-118764",
+    "https://github.com/isaacs/minimatch/commit/77a0f5c4b80bdc641c3c930a1d9edf5ad2db57f8",
+    "https://github.com/isaacs/minimatch/releases/tag/v11.0.1",
+    "https://github.com/advisories/GHSA-g3hv-75wg-m249"
+  ],
+  "published_at": "2026-10-30T23:09:55Z",
+  "updated_at": "2026-10-30T23:09:56Z",
+  "github_reviewed_at": "2026-10-30T23:09:55Z",
+  "nvd_published_at": "2026-10-29T17:18:07Z",
+  "withdrawn_at": null,
+  "vulnerabilities": [
+    {
+      "package": {
+        "ecosystem": "npm",
+        "name": "minimatch"
+      },
+      "vulnerable_version_range": "< 11.0.1",
+      "first_patched_version": "11.0.1",
+      "vulnerable_functions": [
+
+      ]
+    }
+  ],
+  "cvss_severities": {
+    "cvss_v3": {
+      "vector_string": null,
+      "score": 0.0
+    },
+    "cvss_v4": {
+      "vector_string": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:L/SC:N/SI:N/SA:N",
+      "score": 6.9
+    }
+  },
+  "cwes": [
+    {
+      "cwe_id": "CWE-405",
+      "name": "Asymmetric Resource Consumption (Amplification)"
+    }
+  ],
+  "credits": [
+    {
+      "user": {
+        "login": "b1nv0id",
+        "id": 194707351,
+        "node_id": "U_kgDOC5r_lw",
+        "avatar_url": "https://avatars.githubusercontent.com/u/194707351?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/b1nv0id",
+        "html_url": "https://github.com/b1nv0id",
+        "followers_url": "https://api.github.com/users/b1nv0id/followers",
+        "following_url": "https://api.github.com/users/b1nv0id/following{/other_user}",
+        "gists_url": "https://api.github.com/users/b1nv0id/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/b1nv0id/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/b1nv0id/subscriptions",
+        "organizations_url": "https://api.github.com/users/b1nv0id/orgs",
+        "repos_url": "https://api.github.com/users/b1nv0id/repos",
+        "events_url": "https://api.github.com/users/b1nv0id/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/b1nv0id/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "type": "reporter"
+    }
+  ],
+  "comments": 2,
+  "cvss": {
+    "vector_string": null,
+    "score": null
+  },
+  "epss": {
+    "percentage": 0.00291,
+    "percentile": 0.21741
+  }
+}

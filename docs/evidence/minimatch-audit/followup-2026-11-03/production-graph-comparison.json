@@ -1,0 +1,14 @@
+{
+  "baselineSha": "97447f9ab4e5e539ece76593bcc4eb795584f3f8",
+  "comparison": "all declared production roots and recursively resolved normal/optional edges",
+  "normalizedEdges": 210,
+  "identicalVersionsResolvedAndIntegrities": true,
+  "normalizedGraphSha256": "30e7ccdd0ba2ff96452d60601b7e106270073f23f1bd448609823eada0e73259",
+  "nextCaniuseLite": {
+    "beforePath": "node_modules/caniuse-lite",
+    "afterPath": "node_modules/next/node_modules/caniuse-lite",
+    "version": "1.0.30001792"
+  },
+  "reviewedBaselineSha": "a986b5cade8647f421f935553a6c56b016e2209b",
+  "candidateLockSemanticSha256": "d914e0856c919a5762771302d5e2b63eb480c378cedd9d8f6355ef57fe8fb03a"
+}

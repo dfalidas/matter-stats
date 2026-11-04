@@ -4,15 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run lint && next build",
     "start": "next start",
-    "lint": "eslint .",
+    "lint": "eslint . && npm run lint:react-imports",
     "typecheck": "tsc --noEmit",
     "test": "tsc -p tests/tsconfig.json && node --test .test-build/tests/*.test.js tests/*.test.mjs && node scripts/test-disposable-db.mjs",
     "audit:ci": "node scripts/audit-policy.mjs",
     "test:security-db": "node tests/integration/supabase-security.mjs",
     "test:stabilization-db": "node scripts/stabilization-db-orchestrator.mjs",
-    "test:full-stack": "node scripts/task24-full-stack.mjs"
+    "test:full-stack": "node scripts/task24-full-stack.mjs",
+    "lint:react-imports": "oxlint -c oxlint.config.json ."
   },
   "dependencies": {
     "@radix-ui/react-separator": "^1.1.0",
@@ -32,17 +33,22 @@
     "tailwind-merge": "^2.5.5"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.1",
     "@types/node": "^22.15.17",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
-    "eslint": "^9.26.0",
-    "eslint-config-next": "^15.5.28",
+    "eslint": "10.14.0",
     "playwright": "1.64.1",
     "postcss": "8.5.23",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "@next/eslint-plugin-next": "15.5.28",
+    "@typescript-eslint/parser": "8.59.3",
+    "@typescript-eslint/eslint-plugin": "8.59.3",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-jsx-a11y-x": "0.2.0",
+    "globals": "14.0.0",
+    "oxlint": "1.91.0"
   },
   "engines": {
     "node": "22.x"
@@ -53,6 +59,18 @@
     "tailwindcss": {
       ".": "$tailwindcss",
       "postcss-selector-parser": "7.1.6"
+    },
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.1"
+    },
+    "eslint": {
+      "minimatch": "11.0.1"
+    },
+    "@eslint/config-array": {
+      "minimatch": "11.0.1"
+    },
+    "eslint-plugin-jsx-a11y-x": {
+      "minimatch": "11.0.1"
     }
   }
 }

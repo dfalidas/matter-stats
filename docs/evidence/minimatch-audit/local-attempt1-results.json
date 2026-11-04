@@ -1,0 +1,47 @@
+[
+  {
+    "step": "toolchain",
+    "exit": 0,
+    "seconds": 0.0
+  },
+  {
+    "step": "npm",
+    "exit": 0,
+    "seconds": 0.06
+  },
+  {
+    "step": "compatibility",
+    "exit": 0,
+    "seconds": 0.51
+  },
+  {
+    "step": "route-types",
+    "exit": 0,
+    "seconds": 0.49
+  },
+  {
+    "step": "typecheck",
+    "exit": 0,
+    "seconds": 4.05
+  },
+  {
+    "step": "lint",
+    "exit": 0,
+    "seconds": 3.85
+  },
+  {
+    "step": "tests",
+    "exit": 0,
+    "seconds": 57.82
+  },
+  {
+    "step": "build",
+    "exit": 1,
+    "seconds": 22.03
+  },
+  {
+    "step": "audit",
+    "exit": 1,
+    "seconds": 2.97
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "legacy-v8": "8.0.7",
+  "legacy-v7": "7.4.9",
+  "legacy-v6": "6.2.3",
+  "legacy-v5": "5.1.9",
+  "legacy-v4": "4.2.6",
+  "legacy-v3": "3.1.5",
+  "legacy-v9": "9.0.9",
+  "latest": "11.0.4"
+}

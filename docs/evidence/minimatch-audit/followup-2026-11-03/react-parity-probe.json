@@ -1,0 +1,38 @@
+{
+  "createClass": {
+    "legacy": [
+      {
+        "rule": "react/no-deprecated",
+        "message": "React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead"
+      }
+    ],
+    "modern": []
+  },
+  "propTypes": {
+    "legacy": [
+      {
+        "rule": "react/no-deprecated",
+        "message": "React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead"
+      }
+    ],
+    "modern": []
+  },
+  "lifecycle": {
+    "legacy": [
+      {
+        "rule": "react/no-deprecated",
+        "message": "componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."
+      }
+    ],
+    "modern": [
+      {
+        "rule": "@eslint-react/no-component-will-mount",
+        "message": "[Deprecated] Use 'UNSAFE_componentWillMount' instead."
+      }
+    ]
+  },
+  "valid": {
+    "legacy": [],
+    "modern": []
+  }
+}
