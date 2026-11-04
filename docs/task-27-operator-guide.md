@@ -70,3 +70,28 @@ available-stream completion, and session/item attribution. Task 26 must document
 agreed stream exhaustion and successful subsequent incremental operation before
 a final reconciliation on then-current data. Neither synthetic success nor matching
 screens proves full account history. Task 28 remains conditional and unauthorized.
+
+## Optional authorized read-only invocation
+
+Only use an already authorized server environment; retain the aggregate JSON
+privately. Compilation alone does not contact any database. The invocation does
+read the configured database, so do not run it with an unintended environment.
+
+```sh
+npx tsc -p tests/tsconfig.json
+APP_TIMEZONE=Europe/Athens node - <<'JS'
+const { createClient } = require('@supabase/supabase-js');
+const { reconcileHistory } = require('./.test-build/lib/history-reconciliation.js');
+const client = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { persistSession: false, autoRefreshToken: false } });
+(async () => {
+  for (const period of ['2024-02', '2024']) { // Replace with agreed completed months/years.
+    console.log(JSON.stringify(await reconcileHistory(client, period), null, 2));
+  }
+})().catch(() => { console.error('Reconciliation failed; no empty-result inference'); process.exitCode = 1; });
+JS
+```
+
+Do not infer a common snapshot across periods. The tool issues SELECT requests
+only. The global quality counts include undated sessions which cannot be assigned
+to any month/year. This invocation was not executed against production in Task 27.
