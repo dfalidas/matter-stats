@@ -400,6 +400,21 @@ export async function runJourneys({
       seconds: sessions.reduce((n, r) => n + r.seconds, 0),
       unlinked: sessions.length,
     });
+    // Task 27: real schema rejects impossible stored inputs; nullable fields
+    // remain representable and are reported separately from dated analytics.
+    sql(`do $$ begin
+      begin
+        insert into public.reading_sessions(id,duration_seconds) values ('task27-negative',-1);
+        raise exception 'negative accepted';
+      exception when check_violation then null; end;
+      begin
+        insert into public.reading_sessions(id) select id from public.reading_sessions limit 1;
+        raise exception 'duplicate accepted';
+      exception when unique_violation then null; end;
+      insert into public.reading_sessions(id,started_at,duration_seconds) values ('task27-null',null,null);
+      if not exists(select 1 from public.reading_sessions where id='task27-null' and started_at is null and duration_seconds is null) then raise exception 'nullable contract'; end if;
+      delete from public.reading_sessions where id='task27-null';
+    end $$;`);
     const exportRows = async (first, last, expectedName) => {
       const promise = page.waitForEvent("download");
       await page
@@ -439,6 +454,14 @@ export async function runJourneys({
     ]) {
       await goto(`/reports?period=${period}&date=${date}`);
       const reference = period === "weekly" ? first : date;
+      const rawPeriod = JSON.parse(sql(`select jsonb_build_array(
+        coalesce(sum(duration_seconds),0),
+        coalesce(sum(round(duration_seconds::numeric / 60 * 225)),0), count(*),
+        count(distinct (started_at at time zone 'Europe/Athens')::date) filter(where duration_seconds > 0)
+      )::text from public.reading_sessions where started_at >= '${first}'::date::timestamp at time zone 'Europe/Athens'
+        and started_at < ('${last}'::date + 1)::timestamp at time zone 'Europe/Athens';`));
+      assert.deepEqual(rawPeriod.slice(0,3), totals);
+      assert.equal(rawPeriod[3], expectedRows(first,last).filter(r=>r[1]>0).length);
       assert.deepEqual(
         await exportRows(
           first,
@@ -452,6 +475,8 @@ export async function runJourneys({
         first,
         last,
         independentRowsReconciled: true,
+        timezone: "Europe/Athens", filters: "[local start, next local midnight); all linkage states",
+        source: "raw SQL / downloaded Reports CSV", actual: rawPeriod.slice(0,3), difference: [0,0,0], activeDays: rawPeriod[3],
       });
     }
     await goto("/dashboard?start=2025-01-02&end=2025-01-02");
