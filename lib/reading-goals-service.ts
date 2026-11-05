@@ -9,7 +9,7 @@ export async function loadReadingGoals(client: MatterStatsSupabaseClient, now: D
   const reads = [...periods].reverse().map(async period => {
     try {
       const rows = await context.sessions(period.startUtc, now, "streak");
-      return { type: period.type, seconds: rows.reduce((sum, row) => sum + (Number.isFinite(row.duration_seconds) ? Math.max(0, Math.trunc(row.duration_seconds!)) : 0), 0) };
+      return { type: period.type, seconds: rows.reduce((sum, row) => sum + (Number.isFinite(row.duration_seconds) ? Math.max(0, Math.round(row.duration_seconds!)) : 0), 0) };
     } catch { return { type: period.type, seconds: null }; }
   });
   return Promise.all(periods.map(async period => {

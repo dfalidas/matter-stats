@@ -83,12 +83,13 @@ test("goal actuals use complete capped raw pagination and the captured-now cutof
 
   const now = new Date("2026-11-05T10:00Z");
   const rows = Array.from({length: 1003},(_,i)=>({id:`s-${String(i).padStart(5,"0")}`,started_at:"2026-11-03T10:00:00Z",duration_seconds:7}));
+  rows.push({id:"canonical-round",started_at:"2026-11-03T12:00:00Z",duration_seconds:1.6});
   rows.push({id:"boundary",started_at:now.toISOString(),duration_seconds:999},{id:"old",started_at:"2026-11-01T21:59:59Z",duration_seconds:11});
   const {client:raw}=cappedPostgrest({reading_sessions:rows}, {cap:31});
   const client={from:(table:string)=>table==="reading_goals"?{select:()=>({eq:(_key:string,type:string)=>({eq:()=>({maybeSingle:async()=>({data:{type,period_start:type==="weekly"?"2026-11-02":"2026-01-01",target_seconds:3600,enabled:true},error:null})})})})}:raw.from(table as "reading_sessions")} as unknown as MatterStatsSupabaseClient;
   const result=await loadReadingGoals(client,now);
-  assert.equal(result[0].progress?.actualSeconds,7021);
-  assert.equal(result[1].progress?.actualSeconds,7032);
+  assert.equal(result[0].progress?.actualSeconds,7023);
+  assert.equal(result[1].progress?.actualSeconds,7034);
 });
 
 test("analytics outage preserves a configured goal with unavailable progress",async()=>{
