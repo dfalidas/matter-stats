@@ -1,3 +1,4 @@
+import { cappedPostgrest } from "./fixtures/capped-postgrest";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { currentGoalPeriod, goalProgress, parseGoalHours, remainingCalendarDays } from "../lib/reading-goals";
@@ -79,7 +80,7 @@ test("goal read failure cannot become missing goal or zero activity",async()=>{
 });
 
 test("goal actuals use complete capped raw pagination and the captured-now cutoff", async () => {
-  const { cappedPostgrest } = await import("./fixtures/capped-postgrest");
+
   const now = new Date("2026-11-05T10:00Z");
   const rows = Array.from({length: 1003},(_,i)=>({id:`s-${String(i).padStart(5,"0")}`,started_at:"2026-11-03T10:00:00Z",duration_seconds:7}));
   rows.push({id:"boundary",started_at:now.toISOString(),duration_seconds:999},{id:"old",started_at:"2026-11-01T21:59:59Z",duration_seconds:11});
