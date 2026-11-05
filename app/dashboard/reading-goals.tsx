@@ -1,5 +1,6 @@
 "use client";
 import { useActionState, useState } from "react";
+import { goalHoursInput } from "@/lib/reading-goals";
 import { saveReadingGoal } from "./goal-actions";
 import type { loadReadingGoals } from "@/lib/reading-goals-service";
 
@@ -19,7 +20,7 @@ function GoalCard({ view }: { view: GoalView }) {
   const { period, state, goal, progress } = view;
   const label = period.type === "weekly" ? "Weekly" : "Yearly";
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(goal ? String(goal.target_seconds / 3600) : "");
+  const [value, setValue] = useState(goal ? goalHoursInput(goal.target_seconds) : "");
   const [result, action, pending] = useActionState(saveReadingGoal, null);
   return <article aria-label={`${label} reading goal`} className="space-y-3 rounded-lg border p-4">
     <h3 className="font-medium">{label} goal</h3>

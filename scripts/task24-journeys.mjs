@@ -599,6 +599,17 @@ export async function runJourneys({
     await expect(yearlyGoal).toContainText("No goal set.");
     const createGoal = async (card, label, value) => {
       await card.getByRole("button", { name: "Set goal", exact: true }).click();
+      if (label === "Weekly") {
+        await card.getByLabel(`${label} target in hours`).fill("0.001");
+        await card.getByRole("button", { name: "Save goal", exact: true }).click();
+        await expect(card).toContainText("Enter positive hours");
+        await card.getByLabel(`${label} target in hours`).fill(value);
+        state.fault = "reading_goals";
+        await card.getByRole("button", { name: "Save goal", exact: true }).click();
+        await expect(card).toContainText("Goal could not be saved");
+        await expect(card.getByLabel(`${label} target in hours`)).toHaveValue(value);
+        state.fault = null;
+      }
       await card.getByLabel(`${label} target in hours`).fill(value);
       await card.getByRole("button", { name: "Save goal", exact: true }).click();
       await expect(card).toContainText("Goal saved for this period.");
@@ -621,15 +632,26 @@ export async function runJourneys({
     sql("insert into public.reading_goals(type,period_start,target_seconds) values('yearly','2020-01-01',9000);");
     await yearlyGoal.getByRole("button", { name: "Edit goal" }).click();
     await yearlyGoal.getByLabel("Yearly target in hours").fill("20.01");
-    await yearlyGoal.getByRole("button", { name: "Save goal", exact: true }).click();
+    await yearlyGoal.getByRole("button", { name: "Save goal", exact: true }).press("Enter");
     await expect(yearlyGoal).toContainText("Target 20.01 h");
     assert.equal(sql("select target_seconds from public.reading_goals where type='yearly' and period_start='2020-01-01';").trim(), "9000");
+    state.fault = "metrics";
+    await page.reload();
+    await expect(yearlyGoal).toContainText("Target 20.01 h");
+    await expect(yearlyGoal).toContainText("Reading progress unavailable");
+    state.fault = "reading_goals";
+    await page.reload();
+    await expect(yearlyGoal).toContainText("Goal unavailable");
+    await expect(yearlyGoal).not.toContainText("No goal set.");
+    state.fault = null;
+    await page.reload();
     for (const width of [390, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
       for (const colorScheme of ["light", "dark"]) {
         await page.emulateMedia({ colorScheme });
         await expect(yearlyGoal.getByRole("progressbar")).toBeVisible();
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+        await capture(`goals-${width}-${colorScheme}`);
       }
     }
     await page.emulateMedia({ colorScheme: "light" });

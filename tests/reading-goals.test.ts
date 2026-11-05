@@ -1,7 +1,7 @@
 import { cappedPostgrest } from "./fixtures/capped-postgrest";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { currentGoalPeriod, goalProgress, parseGoalHours, remainingCalendarDays } from "../lib/reading-goals";
+import { currentGoalPeriod, goalProgress, goalHoursInput, parseGoalHours, remainingCalendarDays } from "../lib/reading-goals";
 import { mutateReadingGoal, loadReadingGoals } from "../lib/reading-goals-service";
 import type { MatterStatsSupabaseClient } from "../lib/supabase-queries";
 
@@ -98,4 +98,12 @@ test("analytics outage preserves a configured goal with unavailable progress",as
   }} as unknown as MatterStatsSupabaseClient;
   const result=await loadReadingGoals(client,new Date("2026-11-05T10:00Z"));
   for(const view of result){assert.equal(view.state,"available");assert.equal(view.goal?.target_seconds,4500);assert.equal(view.progress,null);}
+});
+
+test("editable hour text round-trips even at the largest supported exact target",()=>{
+  for(const text of ["0.01","2.01","2501999792983.60"]) {
+    const seconds=parseGoalHours(text)!;
+    assert.equal(goalHoursInput(seconds),text);
+    assert.equal(parseGoalHours(goalHoursInput(seconds)),seconds);
+  }
 });

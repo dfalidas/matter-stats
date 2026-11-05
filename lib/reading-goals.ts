@@ -22,6 +22,12 @@ export function parseGoalHours(value: unknown): number | null {
   return Number.isSafeInteger(seconds) && seconds > 0 ? seconds : null;
 }
 
+/** Reconstruct editable decimal text without floating-point division by 3600. */
+export function goalHoursInput(seconds: number): string {
+  const hundredths = seconds / 36;
+  return `${Math.floor(hundredths / 100)}.${String(hundredths % 100).padStart(2, "0")}`;
+}
+
 export function remainingCalendarDays(period: GoalPeriod, now: Date): number {
   if (now >= period.endUtc) return 0;
   const time = now < period.startUtc ? period.startUtc : now;
