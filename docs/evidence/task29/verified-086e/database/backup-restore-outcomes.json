@@ -1,0 +1,53 @@
+{
+  "steps": [
+    {
+      "name": "source-rejection",
+      "status": "passed"
+    },
+    {
+      "name": "target",
+      "status": "passed"
+    },
+    {
+      "name": "synthetic-seed",
+      "status": "passed"
+    },
+    {
+      "name": "source-snapshot",
+      "status": "passed"
+    },
+    {
+      "name": "dump",
+      "status": "passed"
+    },
+    {
+      "name": "restore",
+      "status": "passed"
+    },
+    {
+      "name": "preservation",
+      "status": "passed"
+    },
+    {
+      "name": "catalog",
+      "status": "passed"
+    },
+    {
+      "name": "data-api",
+      "status": "passed"
+    },
+    {
+      "name": "source-reset",
+      "status": "passed"
+    }
+  ],
+  "counts": {
+    "passed": 10,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0,
+    "blocked": 0,
+    "not-run": 0,
+    "running": 0
+  }
+}

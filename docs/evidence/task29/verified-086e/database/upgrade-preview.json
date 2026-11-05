@@ -1,0 +1,14 @@
+{
+  "status": "passed",
+  "checks": [
+    "Actual CLI with dedicated isolated service configuration produces JSON/summary, exit 2 for invalid input, and identical reconciliation",
+    "10003 tied sessions, valid zero/unlinked, null historical duration/timestamp, repeated reconciliation; independent whole-database before/after count and value fingerprints unchanged",
+    "Concurrent session update/insert and rollup update excluded from the repeatable-read snapshot; all four passes agree",
+    "Read-only transaction rejects mutation; source query errors fail, never become zero",
+    "Real fenced production writers persist canonical metadata, reject false canonical words, clear metadata for old/unknown writer input; page/ack callers share these functions; full Data API evidence remains separate",
+    "Additive metadata has no browser column grants; existing exact function/security inventories remain comprehensive"
+  ],
+  "realSql": true,
+  "syntheticOnly": true,
+  "cleanup": "passed"
+}

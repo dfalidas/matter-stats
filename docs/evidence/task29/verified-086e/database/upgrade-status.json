@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "checks": [
+    "Partial page commits do not establish completion evidence.",
+    "Empty terminal page records actual database completion atomically; forced evidence failure rolls back checkpoint/receipt; receipt replay preserves timestamp.",
+    "Later partial work and expired workers preserve prior completion; metadata completion is independent.",
+    "Concurrent terminal transitions produce one completion; stale transition cannot refresh it.",
+    "Invocation evidence records skipped attempts with explicit trigger and rejects late outcome overwrite; bounded generation/retry reads project safe fields.",
+    "Every new table CRUD and callable RPC denied through real Data API to anonymous and authenticated roles; service-role controls succeed."
+  ],
+  "realSqlAndDataApi": true,
+  "cleanup": "passed"
+}

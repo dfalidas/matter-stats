@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "checks": [
+    "SQL binary64 intermediates and normalizer/preview agree at 2,6,130,246,262 seconds",
+    "All 601 normalizer outputs (0–600 seconds) persisted through 7 real fenced Data API page transactions",
+    "Ten incorrectly tagged boundary updates fail HTTP 400 / 23514 / session_word_method_valid and atomically preserve rows, checkpoint, receipt and dirty revision"
+  ],
+  "range": {
+    "start": 0,
+    "endInclusive": 600,
+    "rows": 601,
+    "committedPages": 7,
+    "rejectedPages": 10
+  },
+  "boundaries": [
+    {
+      "seconds": 2,
+      "words": 8
+    },
+    {
+      "seconds": 6,
+      "words": 23
+    },
+    {
+      "seconds": 130,
+      "words": 487
+    },
+    {
+      "seconds": 246,
+      "words": 922
+    },
+    {
+      "seconds": 262,
+      "words": 982
+    }
+  ],
+  "realSqlAndDataApi": true,
+  "cleanup": "passed"
+}

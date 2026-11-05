@@ -1,0 +1,66 @@
+{
+  "status": "failed",
+  "gitSha": "06889dd2f061209ba10c201b1e435a1ee8c7bf50",
+  "failedPath": "fresh",
+  "failureKind": "infrastructure",
+  "category": "disk-capacity",
+  "databaseCode": null,
+  "missingRelation": null,
+  "permissionReason": null,
+  "paths": [],
+  "message": "Disposable verification failed; consult phase outcomes and sanitized diagnostics.",
+  "disposableDiagnostics": [
+    {
+      "component": "kong",
+      "stateAvailable": false,
+      "running": false,
+      "outOfMemory": false,
+      "exitCode": null,
+      "logsAvailable": false,
+      "errorCounts": {
+        "upstream": 0,
+        "connectionReset": 0,
+        "processCrash": 0,
+        "databaseError": 0,
+        "workerConnections": 0,
+        "databaseConnections": 0,
+        "postgrest": 0
+      }
+    },
+    {
+      "component": "rest",
+      "stateAvailable": false,
+      "running": false,
+      "outOfMemory": false,
+      "exitCode": null,
+      "logsAvailable": false,
+      "errorCounts": {
+        "upstream": 0,
+        "connectionReset": 0,
+        "processCrash": 0,
+        "databaseError": 0,
+        "workerConnections": 0,
+        "databaseConnections": 0,
+        "postgrest": 0
+      }
+    },
+    {
+      "component": "db",
+      "stateAvailable": false,
+      "running": false,
+      "outOfMemory": false,
+      "exitCode": null,
+      "logsAvailable": false,
+      "errorCounts": {
+        "upstream": 0,
+        "connectionReset": 0,
+        "processCrash": 0,
+        "databaseError": 0,
+        "workerConnections": 0,
+        "databaseConnections": 0,
+        "postgrest": 0
+      }
+    }
+  ],
+  "cleanup": "passed"
+}

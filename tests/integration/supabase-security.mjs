@@ -30,6 +30,7 @@ const attemptHash = await hash(`${prefix}-attempt`);
 // Explicitly mirrors the columns, constraints, keys, and foreign keys in the
 // migration chain. Each browser INSERT uses a distinct valid row.
 const fixtures = [
+  { table: "reading_goals", row: { type: "weekly", period_start: "2096-01-02", target_seconds: 4500, enabled: true }, deniedRow: { type: "yearly", period_start: "2096-01-01", target_seconds: 36 }, selector: { type: "weekly", period_start: "2096-01-02" }, update: { target_seconds: 7236 }, field: "target_seconds", expected: 7236 },
   { table: "matter_items", row: { id: `${prefix}-item`, title: "positive" }, deniedRow: { id: `${prefix}-denied-item`, title: "denied" }, selector: { id: `${prefix}-item` }, update: { title: "updated" }, field: "title", expected: "updated" },
   { table: "reading_sessions", row: { id: `${prefix}-reading`, item_id: `${prefix}-item`, source_device: "positive" }, deniedRow: { id: `${prefix}-denied-reading`, item_id: `${prefix}-item`, source_device: "denied" }, selector: { id: `${prefix}-reading` }, update: { source_device: "updated" }, field: "source_device", expected: "updated" },
   { table: "matter_tags", row: { id: `${prefix}-tag`, name: `${prefix}-positive` }, deniedRow: { id: `${prefix}-denied-tag`, name: `${prefix}-denied` }, selector: { id: `${prefix}-tag` }, update: { name: `${prefix}-updated` }, field: "name", expected: `${prefix}-updated` },
@@ -48,6 +49,7 @@ function filtered(query, selector) {
 }
 
 function selectorForRow(fixture, row) {
+  if (fixture.table === "reading_goals") return { type: row.type, period_start: row.period_start };
   if (fixture.table === "matter_sync_streams") return { stream: row.stream };
   if (fixture.table === "item_tags") return { item_id: row.item_id, tag_id: row.tag_id };
   if (fixture.table === "daily_stats") return { date: row.date };
@@ -210,6 +212,22 @@ try {
   assertSuccessful(expiryStored, "expired-attempt cleanup readback");
   assert.equal(expiryStored.data.length, 1, "expired attempts must be removed and replaced by exactly one attempt");
   assert.ok(new Date(expiryStored.data[0].attempted_at).getTime() > new Date(expiredAt).getTime(), "remaining attempt must be newly created");
+
+  // Real Data API uniqueness under concurrent upserts, exact storage and constraints.
+  const goalKey = { type: "weekly", period_start: "2096-01-02" };
+  const concurrentGoals = await Promise.all(Array.from({ length: 12 }, () => service.from("reading_goals").upsert({ ...goalKey, target_seconds: 4500, enabled: true }, { onConflict: "type,period_start" })));
+  for (const response of concurrentGoals) assertSuccessful(response, "concurrent goal upsert");
+  const storedGoals = await filtered(service.from("reading_goals").select("target_seconds,enabled"), goalKey);
+  assertSuccessful(storedGoals, "goal readback");
+  assert.deepEqual(storedGoals.data, [{ target_seconds: 4500, enabled: true }]);
+  for (const target of [0, -36, 37, 9007199254741000]) {
+    const invalid = await filtered(service.from("reading_goals").update({ target_seconds: target }), goalKey);
+    assert.equal(invalid.error?.code, "23514", "goal numeric CHECK must reject invalid seconds");
+  }
+  for (const row of [{ type: "monthly", period_start: "2096-01-02" }, { type: "weekly", period_start: "2096-01-03" }, { type: "yearly", period_start: "2096-02-01" }]) {
+    const invalid = await service.from("reading_goals").insert({ ...row, target_seconds: 36 });
+    assert.equal(invalid.error?.code, "23514", "goal period CHECK must reject invalid identity");
+  }
 
   // Delete all remaining positive targets in foreign-key-safe reverse order and
   // prove every service-role DELETE affected its target.

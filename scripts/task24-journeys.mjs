@@ -592,6 +592,95 @@ export async function runJourneys({
     check(
       "Reports PR85 successful cross-year/week and cross-month references survive frequency/history/reload with real CSV",
     );
+    await goto("/dashboard?start=2025-01-01&end=2025-01-31");
+    const weeklyGoal = page.getByRole("article", { name: "Weekly reading goal" });
+    const yearlyGoal = page.getByRole("article", { name: "Yearly reading goal" });
+    await expect(weeklyGoal).toContainText("No goal set.");
+    await expect(yearlyGoal).toContainText("No goal set.");
+    let capturedGoalAction;
+    const createGoal = async (card, label, value) => {
+      await card.getByRole("button", { name: "Set goal", exact: true }).click();
+      if (label === "Weekly") {
+        await card.getByLabel(`${label} target in hours`).fill("0.001");
+        await card.getByRole("button", { name: "Save goal", exact: true }).click();
+        await expect(card).toContainText("Enter positive hours");
+        await card.getByLabel(`${label} target in hours`).fill(value);
+        state.fault = "reading_goals";
+        await card.getByRole("button", { name: "Save goal", exact: true }).click();
+        await expect(card).toContainText("Goal could not be saved");
+        await expect(card.getByLabel(`${label} target in hours`)).toHaveValue(value);
+        state.fault = null;
+      }
+      await card.getByLabel(`${label} target in hours`).fill(value);
+      const goalRequest = page.waitForRequest(request => request.method() === "POST" && Boolean(request.headers()["next-action"]));
+      await card.getByRole("button", { name: "Save goal", exact: true }).click();
+      const request = await goalRequest;
+      capturedGoalAction = { url: request.url(), body: request.postDataBuffer(), headers: {
+        "next-action": request.headers()["next-action"], "content-type": request.headers()["content-type"], origin,
+      } };
+      await expect(card).toContainText("Goal saved for this period.");
+    };
+    await createGoal(weeklyGoal, "Weekly", "1.25");
+    await createGoal(yearlyGoal, "Yearly", "12.34");
+    assert.deepEqual(JSON.parse(sql("select jsonb_agg(jsonb_build_array(type,target_seconds,enabled) order by type)::text from public.reading_goals;")), [["weekly",4500,true],["yearly",44424,true]]);
+    await page.reload();
+    await expect(weeklyGoal).toContainText("Target 1.25 h");
+    await expect(yearlyGoal).toContainText("Target 12.34 h");
+    await weeklyGoal.getByRole("button", { name: "Edit goal" }).click();
+    await weeklyGoal.getByLabel("Weekly target in hours").fill("2.01");
+    await weeklyGoal.getByRole("button", { name: "Save goal", exact: true }).click();
+    await expect(weeklyGoal).toContainText("Target 2.01 h");
+    await weeklyGoal.getByRole("button", { name: "Disable goal" }).click();
+    await expect(weeklyGoal).toContainText("Goal disabled for this period.");
+    await page.reload();
+    await expect(weeklyGoal).toContainText("Goal disabled for this period.");
+    assert.equal(sql("select target_seconds || ':' || enabled from public.reading_goals where type='weekly';").trim(), "7236:false");
+    sql("insert into public.reading_goals(type,period_start,target_seconds) values('yearly','2020-01-01',9000);");
+    await yearlyGoal.getByRole("button", { name: "Edit goal" }).click();
+    await yearlyGoal.getByLabel("Yearly target in hours").fill("20.01");
+    await yearlyGoal.getByRole("button", { name: "Save goal", exact: true }).press("Enter");
+    await expect(yearlyGoal).toContainText("Target 20.01 h");
+    assert.equal(sql("select target_seconds from public.reading_goals where type='yearly' and period_start='2020-01-01';").trim(), "9000");
+    state.fault = "metrics";
+    await page.reload();
+    await expect(yearlyGoal).toContainText("Target 20.01 h");
+    await expect(yearlyGoal).toContainText("Reading progress unavailable");
+    state.fault = "reading_goals";
+    await page.reload();
+    await expect(yearlyGoal).toContainText("Goal unavailable");
+    await expect(yearlyGoal).not.toContainText("No goal set.");
+    state.fault = null;
+    await page.reload();
+    for (const width of [390, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const colorScheme of ["light", "dark"]) {
+        await page.emulateMedia({ colorScheme });
+        await page.evaluate(dark => document.documentElement.classList.toggle("dark", dark), colorScheme === "dark");
+        await expect(yearlyGoal.getByRole("progressbar")).toBeVisible();
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+        await page.evaluate(() => document.getElementById("reading-goals-title").scrollIntoView({ block: "start" }));
+        await capture(`goals-${width}-${colorScheme}`);
+      }
+    }
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.evaluate(() => document.documentElement.classList.remove("dark"));
+    const goalCookie = (await context.cookies()).find(cookie => cookie.name === cookieName);
+    assert.ok(goalCookie);
+    const goalRowsBeforeDeniedAction = sql("select jsonb_agg(to_jsonb(g) order by type,period_start)::text from public.reading_goals g;");
+    await page.waitForLoadState("networkidle");
+    state.authReadControl = { reads: 0, onActionRead: () => sql(`update public.app_sessions set revoked_at=clock_timestamp() where token_hash='${hash(goalCookie.value)}';`) };
+    try {
+      const deniedGoal = await context.request.post(capturedGoalAction.url, { data: capturedGoalAction.body, headers: capturedGoalAction.headers, maxRedirects: 0 });
+      assert.match(deniedGoal.headers()["x-action-redirect"] ?? await deniedGoal.text(), /\/login/);
+      assert.ok(state.authReadControl.reads >= 1, "goal action must perform its independent session guard");
+      assert.equal(sql("select jsonb_agg(to_jsonb(g) order by type,period_start)::text from public.reading_goals g;"), goalRowsBeforeDeniedAction);
+    } finally {
+      state.authReadControl = null;
+      sql(`update public.app_sessions set revoked_at=null where token_hash='${hash(goalCookie.value)}';`);
+    }
+    check("Goals: independent server-action guard rejects a revoked session and leaves all persisted goal fields unchanged");
+    check("Goals: browser/server/real database create, reload, edit, disable, historical isolation, filter independence and mobile/theme layouts");
+    sql("delete from public.reading_goals;");
     databasePhases.end();
     phases.end();
 

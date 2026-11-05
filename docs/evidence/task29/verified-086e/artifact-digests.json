@@ -1,0 +1,23 @@
+{
+  "run": 42031208666,
+  "attempt": 1,
+  "testedSha": "086e7039cda8c20d69a9f509cc75986a8890f17b",
+  "artifacts": {
+    "browser": {
+      "id": 13416353376,
+      "sha256": "add5b352c7a3d881481ead88680f80302673702e9f78e2de218173db085be3f4",
+      "matchesGitHubDigest": true
+    },
+    "db": {
+      "id": 13418005437,
+      "sha256": "06582cd24b06715a81382664b8981743813a3822dc1c9acccdb7d7663ede4be1",
+      "matchesGitHubDigest": true
+    },
+    "audit": {
+      "id": 13415708558,
+      "sha256": "21d863493d408f83211cfc6d7d65dd5d0f94dd4137d560d2c769f6be2d4d910a",
+      "matchesGitHubDigest": true
+    }
+  },
+  "harnessHashesMatchTestedCommit": true
+}

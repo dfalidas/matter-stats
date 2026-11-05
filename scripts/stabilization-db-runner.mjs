@@ -16,7 +16,7 @@ import { REQUEST_TABLES, REQUEST_FUNCTION_SIGNATURES } from "./matter-request-in
 import { GENERATION_TABLES, GENERATION_FUNCTION_SIGNATURES } from "./reading-generation-inventory.mjs";
 
 export const INVENTORIED_TABLES = [
-  "matter_items", "reading_sessions", "matter_tags", "item_tags", "annotations",
+  "reading_goals", "matter_items", "reading_sessions", "matter_tags", "item_tags", "annotations",
   "daily_stats", "sync_runs", "sync_state", "app_sessions", "app_login_attempts",
   "matter_sync_streams", "matter_sync_leases", ...PAGE_TABLES, ...CONTINUATION_TABLES, ...REQUEST_TABLES, ...GENERATION_TABLES, ...STATUS_TABLES,
 ];

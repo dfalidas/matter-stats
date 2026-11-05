@@ -141,6 +141,10 @@ jobs:
             artifacts/task24/**/network.json
             artifacts/task24/**/failure.json
             artifacts/task24/**/cleanup.json
+            artifacts/task24/**/goals-390-light.png
+            artifacts/task24/**/goals-390-dark.png
+            artifacts/task24/**/goals-1440-light.png
+            artifacts/task24/**/goals-1440-dark.png
             artifacts/task24/**/overview-desktop.png
             artifacts/task24/**/overview-synced-desktop.png
             artifacts/task24/**/reports-cross-month-desktop.png

@@ -433,3 +433,12 @@ session linkage is separate from current item metadata. Task 21 remains the
 single synchronization interpretation. No metric, database, auth, ingestion or
 deployment contract changes. Production synchronization and scheduled execution
 are not certified by synthetic UI screenshots.
+
+## Optional reading goals (Task 29)
+
+Overview has independent current-week/current-year goals fixed to Europe/Athens.
+`public.reading_goals` is service-role-only, guarded by opaque app sessions.
+Composite period identity, integer-second precision, canonical raw pagination,
+error semantics, DST pacing and migration-first rollback/rollout are documented
+in [the Task 29 operator guide](task-29-operator-guide.md). No carry-forward or
+changes to ingestion, navigation, CSV or existing metric semantics.
