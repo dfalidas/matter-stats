@@ -655,12 +655,15 @@ export async function runJourneys({
       await page.setViewportSize({ width, height: 1000 });
       for (const colorScheme of ["light", "dark"]) {
         await page.emulateMedia({ colorScheme });
+        await page.evaluate(dark => document.documentElement.classList.toggle("dark", dark), colorScheme === "dark");
         await expect(yearlyGoal.getByRole("progressbar")).toBeVisible();
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+        await page.evaluate(() => document.getElementById("reading-goals-title").scrollIntoView({ block: "start" }));
         await capture(`goals-${width}-${colorScheme}`);
       }
     }
     await page.emulateMedia({ colorScheme: "light" });
+    await page.evaluate(() => document.documentElement.classList.remove("dark"));
     const goalCookie = (await context.cookies()).find(cookie => cookie.name === cookieName);
     assert.ok(goalCookie);
     const goalRowsBeforeDeniedAction = sql("select jsonb_agg(to_jsonb(g) order by type,period_start)::text from public.reading_goals g;");

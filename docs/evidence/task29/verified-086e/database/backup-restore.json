@@ -1,0 +1,18 @@
+{
+  "status": "passed",
+  "syntheticOnly": true,
+  "separateTarget": true,
+  "tablesCompared": 27,
+  "schemaAndSecurity": "passed",
+  "rawAndProgress": "passed",
+  "dataApi": "passed",
+  "backupUploaded": false,
+  "backupIdentity": {
+    "schemas": [
+      "public",
+      "supabase_migrations"
+    ],
+    "bytes": 375397,
+    "sha256": "0ce0406e5968061441891bc4d2c2c4a5ef6eee2f405c22f0410a6567b864ff4f"
+  }
+}

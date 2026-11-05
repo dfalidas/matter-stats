@@ -1,0 +1,22 @@
+{
+  "status": "passed",
+  "checks": [
+    "A/B/C: 5000 documented sessions, ties/multiple years, independent SQL raw reference, 51 exact pages, bounded fresh processes/daily cron, pinned contract/watermark, pending library fairness, completed replay/overlap idempotence and bounded post-exhaustion cron recovery",
+    "D/G: counted me/list/item/all annotation attempts; request/deadline stops and deterministic cancellation timers inside real preparation never commit a subset; fresh reservation completes a valid 100-annotation-page preparation",
+    "E/G: terminal history SQL response lost then exact receipt replay; 500/401 and me/item/annotation 429 stop without incomplete page effects; account cooldown blocks all Matter calls",
+    "F/H: real anon/authenticated CRUD and exact function denials; service controls including safeupdate-enabled cooldown SQL, invalid coverage, idempotent intent, expiry/takeover and stale intent/start/turn/release fences"
+  ],
+  "historyReference": {
+    "count": 5000,
+    "distinct": 5000,
+    "mismatches": 0,
+    "wordMismatches": 0,
+    "duration": 1460736,
+    "referenceDuration": 1460736,
+    "sessionPages": 51,
+    "invocations": 7
+  },
+  "realSqlAndDataApi": true,
+  "syntheticMatterOnly": true,
+  "cleanup": "passed"
+}

@@ -1,0 +1,29 @@
+{
+  "status": "passed",
+  "checks": [
+    "Exact injected-clock production SQL rolling-window boundaries: adjacent minute/second buckets never replenish; expiry is precisely 60s/1s",
+    "16 independent processes: exactly five burst admissions, eleven durable quota refusals, no over-admission",
+    "Uncertain reserved attempt remains counted and never automatically retries after process death/expiry; deliberate recovery resumes the same bounded chain",
+    "Real markdown double-accounting and independent GET/markdown minute refusals",
+    "Real stale/concurrent header feedback cannot replenish remaining capacity or shorten account cooldown",
+    "Real /me admission: numeric/date/invalid Retry-After persists cooldown; recreated process performs zero upstream requests",
+    "Eligible 503 chain exhausts at exactly three real admissions across fresh processes, independently of quota expiry",
+    "Valid pinned 201-request page: first invocation uses exactly 120 admissions, retains 119 reads with zero ingestion; next invocation runs sibling then only missing reads and atomically commits all 100 sessions without changing limit/filters",
+    "Retry-exhausted page retains checkpoint and cannot starve pending sibling across recreated invocations",
+    "R4 manual/scheduled/manual preserves both independent pinned cursors; held shared lease rejects concurrent trigger with zero Matter reads",
+    "P1 production sync library/item/new response: rejection has zero ingestion/completion, recorded manual eligibility recovers corrected upstream, valid and sibling preparation preserved",
+    "P1 production sync library/tag/new response: rejection has zero ingestion/completion, recorded manual eligibility recovers corrected upstream, valid and sibling preparation preserved",
+    "P1 production sync linked/item/new response: rejection has zero ingestion/completion, recorded manual eligibility recovers corrected upstream, valid and sibling preparation preserved",
+    "P1 production sync linked/tag/new response: rejection has zero ingestion/completion, recorded manual eligibility recovers corrected upstream, valid and sibling preparation preserved",
+    "P1 production sync embedded/tag/new response: rejection has zero ingestion/completion, recorded manual eligibility recovers corrected upstream, valid and sibling preparation preserved",
+    "P1 production sync library/tag/legacy cached: rejection has zero ingestion/completion, recorded manual eligibility recovers corrected upstream, valid and sibling preparation preserved",
+    "P1 production sync linked/tag/legacy cached: rejection has zero ingestion/completion, recorded manual eligibility recovers corrected upstream, valid and sibling preparation preserved",
+    "P1 production sync embedded/tag/legacy cached: rejection has zero ingestion/completion, recorded manual eligibility recovers corrected upstream, valid and sibling preparation preserved",
+    "Real takeover fences all preparation/admission/cache writes; stale worker cannot complete or clear retry identity",
+    "Cross-invocation A/B/A cursor loop rolls back effects, receipt and checkpoint in the existing page transaction",
+    "Valid anon/authenticated CRUD and all exact RPC/trigger denials; service-only evaluation/reservation/feedback/fenced writes; singleton reset and deletion denied"
+  ],
+  "realSqlAndDataApi": true,
+  "syntheticMatterOnly": true,
+  "cleanup": "passed"
+}

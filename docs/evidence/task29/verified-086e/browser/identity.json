@@ -1,0 +1,30 @@
+{
+  "testedSha": "086e7039cda8c20d69a9f509cc75986a8890f17b",
+  "event": "pull_request",
+  "checkoutKind": "pr-head",
+  "prHeadSha": "086e7039cda8c20d69a9f509cc75986a8890f17b",
+  "eventSha": "ef31bad5ca7c1b561c40320ad3b96066318c5c01",
+  "workflowRun": "https://github.com/dfalidas/matter-stats/actions/runs/42031208666",
+  "runAttempt": "1",
+  "worktreeDirty": false,
+  "node": "v22.23.4",
+  "npm": "10.9.9",
+  "baseSha": "a6e968e4a0b1f1e3379573df4312a90f240cade8",
+  "applicationSha": "086e7039cda8c20d69a9f509cc75986a8890f17b",
+  "buildSha": "086e7039cda8c20d69a9f509cc75986a8890f17b",
+  "harnessSha": "086e7039cda8c20d69a9f509cc75986a8890f17b",
+  "harnessContentHashes": {
+    "task24-full-stack.mjs": "eba16ad49b2b756ef748f4c19fb60f90ce3fb9e8d2ec8a9287a7ebf4284fe609",
+    "task24-app.mjs": "29632e76fbef47d7fa9b7f67a56956e665f76ed61cdffcf054740b5bf086b93e",
+    "task24-transport.mjs": "b6aefee00e192dff62a6404204890395e2351e531512698b039079021da97769",
+    "task24-fixtures.mjs": "4117f59f5bc3d5247584bd5a4f7de5eedf14f27bf2a5acba28048636d9f88581",
+    "task24-journeys.mjs": "10a20b0a5be1453c1e9a3bd325166dc7539e575aa56f3720445e787e5b947082"
+  },
+  "environment": "B: local isolated full-stack",
+  "appTimezone": "Europe/Athens",
+  "browserTimezone": "America/New_York",
+  "hostedStaging": "blocked",
+  "production": "not-run",
+  "scheduledDelivery": "not-run",
+  "startedAt": "2026-11-05T12:56:41.432Z"
+}

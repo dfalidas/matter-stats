@@ -1,0 +1,14 @@
+{
+  "status": "passed",
+  "checks": [
+    "A: 24 concurrent Data API acquisitions admit exactly one owner",
+    "G: every lease table/RPC/helper grant denied to both browser roles; service controls succeed",
+    "C/D/E/F: renewal, invalid TTL, expiry recovery, every stale write, success/cooldown, and compare-release verified",
+    "A SQL: 12 concurrent psql transactions admit one owner",
+    "E SQL: protected RPC transaction serializes takeover through commit",
+    "B/H: production trigger exclusion, linked imports/rollup/tag deletion, and independent stream state verified",
+    "E/F: delayed success and 429 responses after takeover are fenced; cancellation releases own lease"
+  ],
+  "realSqlAndDataApi": true,
+  "syntheticMatterOnly": true
+}
