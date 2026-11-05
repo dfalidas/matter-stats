@@ -592,6 +592,49 @@ export async function runJourneys({
     check(
       "Reports PR85 successful cross-year/week and cross-month references survive frequency/history/reload with real CSV",
     );
+    await goto("/dashboard?start=2025-01-01&end=2025-01-31");
+    const weeklyGoal = page.getByRole("article", { name: "Weekly reading goal" });
+    const yearlyGoal = page.getByRole("article", { name: "Yearly reading goal" });
+    await expect(weeklyGoal).toContainText("No goal set.");
+    await expect(yearlyGoal).toContainText("No goal set.");
+    const createGoal = async (card, label, value) => {
+      await card.getByRole("button", { name: "Set goal", exact: true }).click();
+      await card.getByLabel(`${label} target in hours`).fill(value);
+      await card.getByRole("button", { name: "Save goal", exact: true }).click();
+      await expect(card).toContainText("Goal saved for this period.");
+    };
+    await createGoal(weeklyGoal, "Weekly", "1.25");
+    await createGoal(yearlyGoal, "Yearly", "12.34");
+    assert.deepEqual(JSON.parse(sql("select jsonb_agg(jsonb_build_array(type,target_seconds,enabled) order by type)::text from public.reading_goals;")), [["weekly",4500,true],["yearly",44424,true]]);
+    await page.reload();
+    await expect(weeklyGoal).toContainText("Target 1.25 h");
+    await expect(yearlyGoal).toContainText("Target 12.34 h");
+    await weeklyGoal.getByRole("button", { name: "Edit goal" }).click();
+    await weeklyGoal.getByLabel("Weekly target in hours").fill("2.01");
+    await weeklyGoal.getByRole("button", { name: "Save goal", exact: true }).click();
+    await expect(weeklyGoal).toContainText("Target 2.01 h");
+    await weeklyGoal.getByRole("button", { name: "Disable goal" }).click();
+    await expect(weeklyGoal).toContainText("Goal disabled for this period.");
+    await page.reload();
+    await expect(weeklyGoal).toContainText("Goal disabled for this period.");
+    assert.equal(sql("select target_seconds || ':' || enabled from public.reading_goals where type='weekly';").trim(), "7236:false");
+    sql("insert into public.reading_goals(type,period_start,target_seconds) values('yearly','2020-01-01',9000);");
+    await yearlyGoal.getByRole("button", { name: "Edit goal" }).click();
+    await yearlyGoal.getByLabel("Yearly target in hours").fill("20.01");
+    await yearlyGoal.getByRole("button", { name: "Save goal", exact: true }).click();
+    await expect(yearlyGoal).toContainText("Target 20.01 h");
+    assert.equal(sql("select target_seconds from public.reading_goals where type='yearly' and period_start='2020-01-01';").trim(), "9000");
+    for (const width of [390, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const colorScheme of ["light", "dark"]) {
+        await page.emulateMedia({ colorScheme });
+        await expect(yearlyGoal.getByRole("progressbar")).toBeVisible();
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      }
+    }
+    await page.emulateMedia({ colorScheme: "light" });
+    check("Goals: browser/server/real database create, reload, edit, disable, historical isolation, filter independence and mobile/theme layouts");
+    sql("delete from public.reading_goals;");
     databasePhases.end();
     phases.end();
 

@@ -1,3 +1,6 @@
+import { ReadingGoals } from "./reading-goals";
+import { loadReadingGoals } from "@/lib/reading-goals-service";
+import { currentGoalPeriod } from "@/lib/reading-goals";
 import { SyncStatusPanel } from "@/components/sync-status";
 import { loadSyncStatus, unavailableSyncStatus } from "@/lib/sync-status";
 import { PageShell } from "../_components/page-shell";
@@ -43,7 +46,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     try { return await loadSyncStatus(getSupabaseAdminClient(), now, timezone); }
     catch { return unavailableSyncStatus(now, timezone); }
   })();
-  const [metricsResult, status] = await Promise.all([getDashboardMetrics(period, start, end, now, timezone), statusRead]);
+  const goalsRead = (async () => {
+    try { return await loadReadingGoals(getSupabaseAdminClient(), now); }
+    catch { return (["weekly", "yearly"] as const).map(type => ({ period: currentGoalPeriod(type, now), state: "unavailable" as const, goal: null, progress: null })); }
+  })();
+  const [metricsResult, status, goals] = await Promise.all([getDashboardMetrics(period, start, end, now, timezone), statusRead, goalsRead]);
 
   return (
     <PageShell
@@ -52,6 +59,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       description="Reliable time-based insights from your synced Matter reading sessions."
     >
       <SyncStatusPanel view={status.view} />
+      <ReadingGoals goals={goals} />
       <DashboardOverview fallbackDate={formatDateInTimezone(now, timezone)} period={start && end ? "custom" : period} metricsResult={metricsResult} />
     </PageShell>
   );

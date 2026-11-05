@@ -16,7 +16,7 @@ export const SUPABASE_CLI_VERSION = "2.48.3";
 export const UPGRADE_BASELINE = "20260519090000";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const migrationsSource = path.join(repoRoot, "supabase/migrations");
-export const PRE_STATUS_TABLES = INVENTORIED_TABLES.filter(table => !STATUS_TABLES.includes(table));
+export const PRE_STATUS_TABLES = INVENTORIED_TABLES.filter(table => !STATUS_TABLES.includes(table) && table !== "reading_goals");
 
 export { sanitizedEnvironment } from "./database-evidence.mjs";
 
@@ -295,12 +295,19 @@ async function verifyPath({ name, workdir, projectId, upgrade, phases, evidenceD
     // derived generation and ingestion-control table, without inventing event times.
     const task20SnapshotSql=PRE_STATUS_TABLES.map(t=>`select jsonb_build_object('table','${t}','count',count(*),'hash',md5(coalesce(string_agg(to_jsonb(r)::text,E'\\n' order by to_jsonb(r)::text),'')))::text from public.${t} r;`).join("\n");
     const beforeTask21=containerPsql(projectId,task20SnapshotSql);
-    await copyMigrations(workdir,filename=>filename.slice(0,14)>="20261015141435");
+    await copyMigrations(workdir,filename=>filename.slice(0,14)==="20261015141435");
     cli(["migration","up","--local","--workdir",workdir],{env:sanitizedEnvironment()});
     assert.equal(containerPsql(projectId,task20SnapshotSql),beforeTask21,"Task 21 changed existing Task 20/source/progress/generation state");
     assert.equal(containerPsql(projectId,"select count(*) from public.matter_cycle_completions;").trim(),"0");
     assert.equal(containerPsql(projectId,"select count(*) from public.matter_invocation_status;").trim(),"0");
     statusPreservation="passed";
+    const preGoalsSnapshot = INVENTORIED_TABLES.filter(table => table !== "reading_goals").map(table => `select md5(coalesce(string_agg(to_jsonb(r)::text,E'\\n' order by to_jsonb(r)::text),'')) from public.${table} r;`).join("\n");
+    const beforeGoals = containerPsql(projectId, preGoalsSnapshot);
+    await copyMigrations(workdir, filename => filename.slice(0,14) > "20261015141435");
+    cli(["migration", "up", "--local", "--workdir", workdir], { env: sanitizedEnvironment() });
+    assert.equal(containerPsql(projectId, preGoalsSnapshot), beforeGoals, "Goals migration changed existing data/control state");
+    assert.equal(containerPsql(projectId, "select count(*) from public.reading_goals;").trim(), "0");
+
 
     // Only this disposable path owns the synthetic 2099 quota seed copied
     // from its pre-upgrade stream fixture; clear it after verifying preservation.

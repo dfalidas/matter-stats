@@ -3,6 +3,12 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
+      reading_goals: {
+        Row: { type: "weekly" | "yearly"; period_start: string; target_seconds: number; enabled: boolean; updated_at: string };
+        Insert: { type: "weekly" | "yearly"; period_start: string; target_seconds: number; enabled?: boolean; updated_at?: string };
+        Update: { target_seconds?: number; enabled?: boolean; updated_at?: string };
+        Relationships: [];
+      };
       app_sessions: {
         Row: { token_hash: string; credential_version: number; created_at: string; expires_at: string; revoked_at: string | null; last_seen_at: string | null };
         Insert: { token_hash: string; credential_version: number; created_at?: string; expires_at: string; revoked_at?: string | null; last_seen_at?: string | null };
