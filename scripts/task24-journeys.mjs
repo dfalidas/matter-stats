@@ -597,6 +597,7 @@ export async function runJourneys({
     const yearlyGoal = page.getByRole("article", { name: "Yearly reading goal" });
     await expect(weeklyGoal).toContainText("No goal set.");
     await expect(yearlyGoal).toContainText("No goal set.");
+    let capturedGoalAction;
     const createGoal = async (card, label, value) => {
       await card.getByRole("button", { name: "Set goal", exact: true }).click();
       if (label === "Weekly") {
@@ -611,7 +612,12 @@ export async function runJourneys({
         state.fault = null;
       }
       await card.getByLabel(`${label} target in hours`).fill(value);
+      const goalRequest = page.waitForRequest(request => request.method() === "POST" && Boolean(request.headers()["next-action"]));
       await card.getByRole("button", { name: "Save goal", exact: true }).click();
+      const request = await goalRequest;
+      capturedGoalAction = { url: request.url(), body: request.postDataBuffer(), headers: {
+        "next-action": request.headers()["next-action"], "content-type": request.headers()["content-type"], origin,
+      } };
       await expect(card).toContainText("Goal saved for this period.");
     };
     await createGoal(weeklyGoal, "Weekly", "1.25");
@@ -655,6 +661,21 @@ export async function runJourneys({
       }
     }
     await page.emulateMedia({ colorScheme: "light" });
+    const goalCookie = (await context.cookies()).find(cookie => cookie.name === cookieName);
+    assert.ok(goalCookie);
+    const goalRowsBeforeDeniedAction = sql("select jsonb_agg(to_jsonb(g) order by type,period_start)::text from public.reading_goals g;");
+    await page.waitForLoadState("networkidle");
+    state.authReadControl = { reads: 0, onActionRead: () => sql(`update public.app_sessions set revoked_at=clock_timestamp() where token_hash='${hash(goalCookie.value)}';`) };
+    try {
+      const deniedGoal = await context.request.post(capturedGoalAction.url, { data: capturedGoalAction.body, headers: capturedGoalAction.headers, maxRedirects: 0 });
+      assert.match(deniedGoal.headers()["x-action-redirect"] ?? await deniedGoal.text(), /\/login/);
+      assert.ok(state.authReadControl.reads >= 1, "goal action must perform its independent session guard");
+      assert.equal(sql("select jsonb_agg(to_jsonb(g) order by type,period_start)::text from public.reading_goals g;"), goalRowsBeforeDeniedAction);
+    } finally {
+      state.authReadControl = null;
+      sql(`update public.app_sessions set revoked_at=null where token_hash='${hash(goalCookie.value)}';`);
+    }
+    check("Goals: independent server-action guard rejects a revoked session and leaves all persisted goal fields unchanged");
     check("Goals: browser/server/real database create, reload, edit, disable, historical isolation, filter independence and mobile/theme layouts");
     sql("delete from public.reading_goals;");
     databasePhases.end();

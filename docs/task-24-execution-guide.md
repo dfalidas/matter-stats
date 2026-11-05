@@ -90,8 +90,8 @@ separate. Application test counts come from `verify`, browser behavioral counts 
 groups from `outcomes.json` and Task 23's separate artifacts.
 Do not add these unlike units into one total.
 
-The workflow explicitly allows only named sanitized JSON files and seven selected
-screenshots. Phase state is written before execution. Infrastructure-blocked,
+The workflow explicitly allows only named sanitized JSON files and eleven selected
+screenshots (including Task 29 goal layouts at 390/1440 in light/dark). Phase state is written before execution. Infrastructure-blocked,
 assertion-failed, skipped, TODO, not-run and running remain distinct; unsuccessful
 prerequisites/assertions exit nonzero. Success and failure both retain sanitized
 outcome/cleanup/browser/network reports. Local `work/task24-private-failure.txt` is
