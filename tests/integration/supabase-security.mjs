@@ -49,6 +49,7 @@ function filtered(query, selector) {
 }
 
 function selectorForRow(fixture, row) {
+  if (fixture.table === "reading_goals") return { type: row.type, period_start: row.period_start };
   if (fixture.table === "matter_sync_streams") return { stream: row.stream };
   if (fixture.table === "item_tags") return { item_id: row.item_id, tag_id: row.tag_id };
   if (fixture.table === "daily_stats") return { date: row.date };
