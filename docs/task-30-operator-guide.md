@@ -31,7 +31,7 @@ of started_at, including sessions that cross midnight. No interval splitting.
 - New time labels round the final total/ratio to a minute; positive values below
   30 seconds show **<1 min**. Longer totals use hours/minutes; percentages use one
   decimal with optional trailing .0, and average sessions use one decimal minute.
-  Chart coordinates retain seconds/60 without rounding the source buckets.
+  Monthly chart coordinates retain seconds/60 without rounding the source buckets.
 
 September's synthetic example is 43,200s/60 sessions/18 active days/2,400s per
 active day/162,000 estimated words. August is 36,000s/48/15/2,400s/135,024 words.
@@ -91,7 +91,7 @@ latency benchmark or upstream completeness is claimed from isolated fixtures.
 
 ## Rollout and recovery
 
-No migration, dependency change or configuration change is required. Existing
+No migration, dependency change or runtime configuration change is required. Existing
 ordered schema through Task 29 remains prerequisite. Review the draft and actual
 candidate checks/artifacts before a separately authorized rollout. A Git push may
 create automatic preview deployments; these are not production acceptance or

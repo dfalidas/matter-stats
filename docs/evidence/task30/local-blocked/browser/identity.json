@@ -1,0 +1,30 @@
+{
+  "testedSha": "d97c2aaf15092aaf78aa41ed53a58e6c96b159e3",
+  "event": "local",
+  "checkoutKind": "local",
+  "prHeadSha": null,
+  "eventSha": null,
+  "workflowRun": null,
+  "runAttempt": null,
+  "worktreeDirty": false,
+  "node": "v22.23.4",
+  "npm": "10.9.10",
+  "baseSha": "1db07bcfd8fab23119f1b8c35d80f1354efe2352",
+  "applicationSha": "d97c2aaf15092aaf78aa41ed53a58e6c96b159e3",
+  "buildSha": "d97c2aaf15092aaf78aa41ed53a58e6c96b159e3",
+  "harnessSha": "d97c2aaf15092aaf78aa41ed53a58e6c96b159e3",
+  "harnessContentHashes": {
+    "task24-full-stack.mjs": "ecb051bbdcbfc60472dc04685f38d3adb158416e64f059ea0ca2aec4229fd316",
+    "task24-app.mjs": "29632e76fbef47d7fa9b7f67a56956e665f76ed61cdffcf054740b5bf086b93e",
+    "task24-transport.mjs": "1ce7afcb99e22c974c907d854c7858a6be6fc2090813ffaf0c1c965d960e3ba2",
+    "task24-fixtures.mjs": "4117f59f5bc3d5247584bd5a4f7de5eedf14f27bf2a5acba28048636d9f88581",
+    "task24-journeys.mjs": "e4f9e2352625d6306759e7a441974c37912d16602cb76483956090acbec7e19b"
+  },
+  "environment": "B: local isolated full-stack",
+  "appTimezone": "Europe/Athens",
+  "browserTimezone": "America/New_York",
+  "hostedStaging": "blocked",
+  "production": "not-run",
+  "scheduledDelivery": "not-run",
+  "startedAt": "2026-11-06T08:43:07.855Z"
+}

@@ -1,0 +1,71 @@
+{
+  "status": "failed",
+  "category": "execution",
+  "failureLocation": [
+    "task24-full-stack.mjs",
+    "282",
+    "30"
+  ],
+  "rawDetailsWithheld": true,
+  "infrastructureReason": null,
+  "databaseCode": "23514",
+  "diagnosticStages": [],
+  "diagnosticWords": [
+    "schema"
+  ],
+  "tool": "docker",
+  "operation": "exec",
+  "disposableDiagnostics": [
+    {
+      "component": "kong",
+      "stateAvailable": true,
+      "running": true,
+      "outOfMemory": false,
+      "exitCode": 0,
+      "logsAvailable": true,
+      "errorCounts": {
+        "upstream": 0,
+        "connectionReset": 0,
+        "processCrash": 0,
+        "databaseError": 0,
+        "workerConnections": 0,
+        "databaseConnections": 0,
+        "postgrest": 0
+      }
+    },
+    {
+      "component": "rest",
+      "stateAvailable": true,
+      "running": true,
+      "outOfMemory": false,
+      "exitCode": 0,
+      "logsAvailable": true,
+      "errorCounts": {
+        "upstream": 0,
+        "connectionReset": 0,
+        "processCrash": 0,
+        "databaseError": 0,
+        "workerConnections": 0,
+        "databaseConnections": 0,
+        "postgrest": 0
+      }
+    },
+    {
+      "component": "db",
+      "stateAvailable": true,
+      "running": true,
+      "outOfMemory": false,
+      "exitCode": 0,
+      "logsAvailable": true,
+      "errorCounts": {
+        "upstream": 0,
+        "connectionReset": 0,
+        "processCrash": 0,
+        "databaseError": 1,
+        "workerConnections": 0,
+        "databaseConnections": 0,
+        "postgrest": 0
+      }
+    }
+  ]
+}

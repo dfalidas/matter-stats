@@ -54,3 +54,14 @@ fixture set `history_status=complete` without its required intent/generation/tim
 fields. Corrected the isolated fixture to satisfy the existing CHECK and restore
 all original history fields afterward; no database constraint was changed.
 Downloaded browser ZIP digest matched GitHub (`62b4050a9145c66eec48e0b419833ba03b4f7aee746010b058e8ea557af39898`).
+
+Local isolated startup on `d97c2aaf15092aaf78aa41ed53a58e6c96b159e3` exhausted
+the 7.9 GiB workspace disk before assertions. Only the two owned CLI startup
+processes were stopped; browser harness classifies disk-capacity blocked, while
+the fresh/upgrade harness records interrupted execution during startup. Neither
+is a pass. Both runners verified owned resource and temporary-directory removal;
+[sanitized evidence](evidence/task30/local-blocked/). Disk space recovered after
+cleanup. No Docker prune, unrelated cleanup or production fallback was used.
+
+Review also preserved the existing whole-minute chart display outside monthly
+Reports; fractional minute coordinates apply only to the new monthly resolution.

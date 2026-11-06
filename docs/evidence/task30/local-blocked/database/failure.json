@@ -1,0 +1,66 @@
+{
+  "status": "failed",
+  "gitSha": "d97c2aaf15092aaf78aa41ed53a58e6c96b159e3",
+  "failedPath": "fresh",
+  "failureKind": "assertion-or-suite",
+  "category": "execution",
+  "databaseCode": null,
+  "missingRelation": null,
+  "permissionReason": null,
+  "paths": [],
+  "message": "Disposable verification failed; consult phase outcomes and sanitized diagnostics.",
+  "disposableDiagnostics": [
+    {
+      "component": "kong",
+      "stateAvailable": false,
+      "running": false,
+      "outOfMemory": false,
+      "exitCode": null,
+      "logsAvailable": false,
+      "errorCounts": {
+        "upstream": 0,
+        "connectionReset": 0,
+        "processCrash": 0,
+        "databaseError": 0,
+        "workerConnections": 0,
+        "databaseConnections": 0,
+        "postgrest": 0
+      }
+    },
+    {
+      "component": "rest",
+      "stateAvailable": false,
+      "running": false,
+      "outOfMemory": false,
+      "exitCode": null,
+      "logsAvailable": false,
+      "errorCounts": {
+        "upstream": 0,
+        "connectionReset": 0,
+        "processCrash": 0,
+        "databaseError": 0,
+        "workerConnections": 0,
+        "databaseConnections": 0,
+        "postgrest": 0
+      }
+    },
+    {
+      "component": "db",
+      "stateAvailable": false,
+      "running": false,
+      "outOfMemory": false,
+      "exitCode": null,
+      "logsAvailable": false,
+      "errorCounts": {
+        "upstream": 0,
+        "connectionReset": 0,
+        "processCrash": 0,
+        "databaseError": 0,
+        "workerConnections": 0,
+        "databaseConnections": 0,
+        "postgrest": 0
+      }
+    }
+  ],
+  "cleanup": "passed"
+}

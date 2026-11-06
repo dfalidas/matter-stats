@@ -1,0 +1,140 @@
+{
+  "testedSha": "d97c2aaf15092aaf78aa41ed53a58e6c96b159e3",
+  "event": "local",
+  "checkoutKind": "local",
+  "prHeadSha": null,
+  "eventSha": null,
+  "workflowRun": null,
+  "runAttempt": null,
+  "worktreeDirty": false,
+  "node": "v22.23.4",
+  "npm": "10.9.10",
+  "steps": [
+    {
+      "name": "toolchain",
+      "status": "passed"
+    },
+    {
+      "name": "compilation",
+      "status": "passed"
+    },
+    {
+      "name": "configuration",
+      "status": "passed"
+    },
+    {
+      "name": "fresh:migrations-preservation",
+      "status": "failed",
+      "failureKind": "assertion-or-suite"
+    },
+    {
+      "name": "fresh:gateway",
+      "status": "not-run"
+    },
+    {
+      "name": "fresh:catalog",
+      "status": "not-run"
+    },
+    {
+      "name": "backup-restore",
+      "status": "not-run"
+    },
+    {
+      "name": "fresh:security",
+      "status": "not-run"
+    },
+    {
+      "name": "fresh:lease",
+      "status": "not-run"
+    },
+    {
+      "name": "fresh:page",
+      "status": "not-run"
+    },
+    {
+      "name": "fresh:word-method",
+      "status": "not-run"
+    },
+    {
+      "name": "fresh:continuation",
+      "status": "not-run"
+    },
+    {
+      "name": "fresh:requests",
+      "status": "not-run"
+    },
+    {
+      "name": "fresh:preview",
+      "status": "not-run"
+    },
+    {
+      "name": "fresh:status",
+      "status": "not-run"
+    },
+    {
+      "name": "fresh:repair",
+      "status": "not-run"
+    },
+    {
+      "name": "upgrade:migrations-preservation",
+      "status": "not-run"
+    },
+    {
+      "name": "upgrade:gateway",
+      "status": "not-run"
+    },
+    {
+      "name": "upgrade:catalog",
+      "status": "not-run"
+    },
+    {
+      "name": "upgrade:security",
+      "status": "not-run"
+    },
+    {
+      "name": "upgrade:lease",
+      "status": "not-run"
+    },
+    {
+      "name": "upgrade:page",
+      "status": "not-run"
+    },
+    {
+      "name": "upgrade:word-method",
+      "status": "not-run"
+    },
+    {
+      "name": "upgrade:continuation",
+      "status": "not-run"
+    },
+    {
+      "name": "upgrade:requests",
+      "status": "not-run"
+    },
+    {
+      "name": "upgrade:preview",
+      "status": "not-run"
+    },
+    {
+      "name": "upgrade:status",
+      "status": "not-run"
+    },
+    {
+      "name": "upgrade:repair",
+      "status": "not-run"
+    },
+    {
+      "name": "cleanup",
+      "status": "passed"
+    }
+  ],
+  "counts": {
+    "passed": 4,
+    "failed": 1,
+    "skipped": 0,
+    "todo": 0,
+    "blocked": 0,
+    "not-run": 24,
+    "running": 0
+  }
+}

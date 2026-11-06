@@ -517,7 +517,7 @@ function groupTimeline(
   }
   return [...buckets].map(([date, seconds]) => ({
     date,
-    minutes: seconds / 60,
+    minutes: period === "monthly" ? seconds / 60 : Math.round(seconds / 60),
   }));
 }
 function Metric({
