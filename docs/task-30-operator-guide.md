@@ -4,7 +4,9 @@ Use Reports → Month → a validated calendar month. The four existing totals r
 time per active day appears beside the monthly introduction. Reading over time
 defaults to **Daily** for months, with **Weekly** (Monday first) available. Expand
 “Daily values (all local dates)” for exact canonical seconds, including successful
-zero dates. Weekly and yearly Reports keep their existing grouping and navigation.
+zero dates. Weekly and yearly Reports keep their existing grouping and navigation. Weekly
+month-chart groups contain only the selected month's dates, including partial
+first/last Monday groups.
 
 “Monthly trend — selected year” lists all twelve months of the selected report's
 year. Each month is a keyboard-accessible link to its monthly report; retained URL

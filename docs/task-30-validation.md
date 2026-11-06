@@ -8,12 +8,18 @@ the Task 25 specification. See [operator guide](task-30-operator-guide.md).
 
 ## Evidence status
 
-Implementation validation is in progress. Exact tested executable/final SHAs,
-local results, CI identities, isolated browser/database results, artifact inspection
-and automatic preview status will be recorded here before handoff. Pending or
-blocked gates are not passes. Production, hosted staging, actual Matter history,
-sync/import/cron, migration/repair, personal goals, manual deployment, promotion
-and merge are not executed by this task.
+Draft PR: https://github.com/dfalidas/matter-stats/pull/95, open/draft/unmerged.
+Final executable application and harness source:
+`c7f28b97e04afeeba6c3be7c693e58eecb40a70a`. The handoff commit changes documentation
+and sanitized evidence only. Its exact final-head CI run, actual checkout SHAs,
+artifact digests, visual inspection and status are recorded in the PR's validation
+table (linked above); that table is the final-push evidence ledger. Earlier source
+checks below must not be substituted for a later candidate's required gates.
+
+Production, hosted staging, actual Matter history, sync/import/cron, migration/
+repair, personal goals, manual deployment, promotion and merge are not executed
+by this task. Local and CI isolation are category B evidence, not production
+acceptance. No new migration, dependency or runtime configuration is required.
 
 Focused behavioral tests use independent September/August expected numbers,
 per-session rounding, zeros, read failures, coverage, current/future suppression,
@@ -108,3 +114,55 @@ verified source is not presented as proof of later changes.
 Craft Project Log and Action Plan v2.1 now link the single draft PR #95 and explicitly
 show implementation complete / validation in progress, with final updates pending
 the remaining exact-candidate checks. No production acceptance is recorded.
+
+## Final executable source and handoff ledger
+
+`c7f28b97e04afeeba6c3be7c693e58eecb40a70a` passed the full local sequence again
+in a separate clean detached checkout (identical clean start/end SHA): npm ci,
+route type generation, typecheck, lint, **447 tests / 0 failed / 0 skipped / 0 TODO**,
+production build, audit:ci (**0 full findings / 0 production vulnerabilities**)
+and git diff --check. Node 22.23.4/npm 10.9.10.
+[Exact-source local evidence](evidence/task30/verified-c7/local-checks.json).
+The focused current/previous/year-failure, metric and report suite also passed
+52/52 checks after the nullable comparison change. Existing numeric assertions
+still require their independent constants: optional access only reflects the new
+unavailable type and does not accept an absent successful result.
+
+Final-source refinements after d0abb4a:
+
+- A failed comparison has null totals and delta inside the service as well as
+  the client payload; no percentage/delta arithmetic runs against fake zero input.
+- Trend table cells have explicit column spacing at mobile widths. Summary
+  screenshots use a consistent scroll position in light/dark.
+- Synthetic fixtures restore their intent fields and remove only dirty markers
+  in a date range asserted empty before seeding, after deleting those fixture
+  sessions. Later ingestion tests keep their original input. No production state
+  or real ingestion controls are touched.
+
+The prior [CI 42191549517](https://github.com/dfalidas/matter-stats/actions/runs/42191549517)
+completed **SUCCESS 3/3 jobs**. Its fresh/upgrade job tested clean exact d0abb4a:
+**29/29 phase groups**, **21 migrations per path**, synthetic backup/restore
+**10/10 groups / 27 tables**, fresh/restore/upgrade and temporary cleanup verified.
+No failed/skipped/TODO/blocked/not-run/running phase remains in that run.
+Database artifact 13491455496 downloaded/inspected; ZIP SHA-256 matches GitHub:
+`a4cbc4e27f8009bdeb4de20f5d97631104d2c975c7125502e159bf1be5d30b00`.
+Audit artifact 13490441316 downloaded/inspected, full/production findings 0;
+ZIP SHA-256 matches GitHub:
+`3789aa5f3630e8d308ff61a7fc3989af6db52405893a4772cea918018c971070`.
+[Database evidence](evidence/task30/verified-d0/database/) /
+[audit reports](evidence/task30/verified-d0/audit/).
+
+The final push is checked independently through the unchanged three CI jobs.
+See the PR validation table for its actual final head and merge checkout SHAs,
+completed statuses and inspected artifact results; pending checks are never
+presented as passed. Automatic Vercel Git previews are reported separately there
+and do not establish isolated hosting or production runtime acceptance.
+
+Craft's Project Log and Action Plan v2.1 have the PR link and implementation
+status. Their same dated entries are finalized with the exact handoff SHA and
+observed final CI/artifact results, without recording production acceptance.
+Operator guide covers UI choices, formulas, complete-month/coverage rules, query
+impact (bounded year scan + three status reads, no all-history streak scan for
+monthly Reports), live-read consistency limits, no migration and revert rollback.
+Task 27 final real-history acceptance remains after Task 26 terminal evidence and
+subsequent incremental success. No Task 26/27/28/31/32 closure is claimed.
