@@ -104,11 +104,11 @@ test("approved September/August example: exact raw totals, S/A, S/N, per-session
   assert.equal(report.metrics.totals.totalReadingTimeSeconds, 43200);
   assert.equal(report.metrics.totals.sessionsCount, 60);
   assert.equal(report.metrics.totals.wordsRead, 162000);
-  assert.equal(report.metrics.comparison.totals.totalReadingTimeSeconds, 36000);
-  assert.equal(report.metrics.comparison.totals.wordsRead, 135024);
-  assert.equal(report.metrics.comparison.delta.totalReadingTimeSeconds, 7200);
+  assert.equal(report.metrics.comparison.totals?.totalReadingTimeSeconds, 36000);
+  assert.equal(report.metrics.comparison.totals?.wordsRead, 135024);
+  assert.equal(report.metrics.comparison.delta?.totalReadingTimeSeconds, 7200);
   assert.equal(
-    report.metrics.comparison.delta.totalReadingTimePercentChange,
+    report.metrics.comparison.delta?.totalReadingTimePercentChange,
     0.2,
   );
   assert.deepEqual(report.monthlyReview?.current, {
@@ -295,6 +295,8 @@ for (const fail of ["current", "previous", "year"] as const)
     assert.equal(report.monthlyReview?.current.seconds, 43200);
     if (fail === "previous") {
       assert.equal(report.monthlyReview?.previous, null);
+      assert.equal(report.metrics.comparison.totals, null);
+      assert.equal(report.metrics.comparison.delta, null);
       assert.deepEqual(report.monthlyReview?.observations, []);
       assert.equal(
         toReportsClientPayload(report).metrics.comparison.totals,

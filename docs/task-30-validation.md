@@ -73,3 +73,38 @@ The value shares a paragraph with its label, so the locator was corrected to
 assert the full “Time per active day: 40 min” text. This changes no product
 behavior or expected number. Downloaded ZIP digest matched GitHub:
 `471b6e41b721b67d8d5db62b320a3d60b21d10ae8e8d941ad4a63a102d36ef06`.
+
+## Verified source d0abb4a
+
+A separate clean detached checkout at
+`d0abb4ab840561ab626de324f20e3607bf559b65` passed the complete local sequence:
+Node 22.23.4/npm 10.9.10, npm ci, route type generation, typecheck, lint,
+**447/447 tests, 0 failed/skipped/TODO**, production build, unchanged audit policy
+(full findings 0, production 0) and git diff --check. Start/end SHA and tracked
+worktree remained identical and clean. Existing skill-directory lint warnings
+remain; nested-worktree tracing-root warning did not change configuration.
+[Sanitized local evidence](evidence/task30/verified-d0/local-checks.json).
+
+[CI 42191549517](https://github.com/dfalidas/matter-stats/actions/runs/42191549517)
+verify passed on PR merge `d285ef779ae5c14dd2b039761299f7e8d1139d5d`. Its
+isolated browser passed on clean exact head d0abb4a: **13/13 phases**,
+**50 browser behavioral checks**, **7/7 SQL/Data API groups**, zero page/console/
+resource errors, unexpected network or real Matter requests. All owned cleanup
+verified. Downloaded browser ZIP digest matches GitHub:
+`1bd94695455d737064a7cea9a6c701848aabe92423a978faa9c3e4882984596a`
+(artifact 13489364549). All five harness hashes match the exact tested source.
+[Inspected sanitized evidence](evidence/task30/verified-d0/browser/).
+
+All eight Task 30 screenshots were visually inspected (390/1440, actual class-based
+light/dark, summary/chart views). Chart labels and zero/current/future states were
+readable, with no horizontal overflow. Inspection identified cramped mobile trend
+column separation and inconsistent summary capture scroll; the following candidate
+adds column padding and consistently positions summary captures. It also keeps
+unavailable comparison totals/deltas null inside the service, avoiding arithmetic
+on a failed previous input, and restores only proven-new synthetic dirty markers
+after fixture deletion. Required checks are rerun for that candidate; the earlier
+verified source is not presented as proof of later changes.
+
+Craft Project Log and Action Plan v2.1 now link the single draft PR #95 and explicitly
+show implementation complete / validation in progress, with final updates pending
+the remaining exact-candidate checks. No production acceptance is recorded.

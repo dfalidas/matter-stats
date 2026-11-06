@@ -273,7 +273,7 @@ function positiveInteger(value: number | null): number {
 /** Complete aggregates, fixed bins and no raw sessions cross the RSC boundary. */
 export function toReportsClientPayload(report: ReadingReport) {
   const { range, totals, comparison, heatmap } = report.metrics;
-  return { period: report.period, metrics: { range, totals, comparison: comparison.available === false ? { ...comparison, totals: null, delta: null } : comparison, heatmap }, sessionLengthHistogram: report.sessionLengthHistogram, monthlyReview: report.monthlyReview, monthlyTrend: report.monthlyTrend };
+  return { period: report.period, metrics: { range, totals, comparison, heatmap }, sessionLengthHistogram: report.sessionLengthHistogram, monthlyReview: report.monthlyReview, monthlyTrend: report.monthlyTrend };
 }
 export type ReportsClientPayload = ReturnType<typeof toReportsClientPayload>;
 

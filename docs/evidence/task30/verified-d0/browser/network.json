@@ -1,0 +1,24 @@
+{
+  "matter": {
+    "requests": 72,
+    "paths": [
+      "/public/v1/me",
+      "/public/v1/reading_sessions",
+      "/public/v1/items",
+      "/public/v1/items/task24-imported-item/annotations"
+    ]
+  },
+  "databaseRequests": 2870,
+  "applicationSelfRequests": 7,
+  "databaseErrorCount": 0,
+  "databaseErrors": [],
+  "matterFaults": {
+    "429": 1,
+    "timeout": 1,
+    "interrupt": 1
+  },
+  "injectedFaults": 84,
+  "unexpectedNetwork": 0,
+  "serverOutputLines": 397,
+  "realMatterRequests": 0
+}

@@ -490,6 +490,7 @@ export async function runJourneys({
       });
     }
     // Task 30: actual Reports UI, synthetic SQL only, same owned isolated stack.
+    assert.equal(sql("select count(*) from public.matter_dirty_rollups where date between '2026-08-01' and '2026-09-30';"), "0", "monthly fixture dates must have no pre-existing dirty markers");
     const reportControlBefore = sql("select jsonb_build_object('streams',(select jsonb_agg(jsonb_build_object('stream',stream,'active',cycle_active)) from public.matter_sync_streams),'history',(select history_status from public.matter_sync_continuation where account_scope='matter'))::text;");
     const reportControl = JSON.parse(reportControlBefore);
     const restoreReportHistory = sql("select format('update public.matter_sync_continuation set history_status=%L,requested_at=%L,history_cycle_generation=%L,completed_at=%L where account_scope=''matter'';',history_status,requested_at,history_cycle_generation,completed_at) from public.matter_sync_continuation where account_scope='matter';");
@@ -566,7 +567,7 @@ export async function runJourneys({
       for(const colorScheme of ["light","dark"]) {
         await page.emulateMedia({colorScheme});
         await page.evaluate(dark=>document.documentElement.classList.toggle("dark",dark),colorScheme === "dark");
-        await page.getByRole("heading",{name:"Your monthly review",exact:true}).scrollIntoViewIfNeeded();
+        await page.getByRole("heading",{name:"Your monthly review",exact:true}).evaluate(element => element.scrollIntoView({block:"start"}));
         await capture(`monthly-${width}-${colorScheme}`);
         await page.getByRole("heading",{name:"Reading over time",exact:true}).scrollIntoViewIfNeeded();
         await expect(page.getByText("Minutes per day · Daily resolution",{exact:true})).toBeVisible();
@@ -577,6 +578,9 @@ export async function runJourneys({
     await page.emulateMedia({colorScheme:"light"});
     await page.setViewportSize({width:1440,height:1000});
     sql("delete from public.reading_sessions where id like 'task30-%';");
+    // Raw fixture deletion dirties its dates too. Restore only the proven-empty
+    // owned date range so later ingestion journeys keep their original input.
+    sql("delete from public.matter_dirty_rollups where date between '2026-08-01' and '2026-09-30';");
     for(const stream of reportControl.streams) sql(`update public.matter_sync_streams set cycle_active=${stream.active} where stream='${stream.stream}';`);
     sql(restoreReportHistory);
     check("Monthly review: desktop/mobile light/dark screenshots, keyboard controls and no horizontal overflow");

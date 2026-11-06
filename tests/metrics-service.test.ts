@@ -141,8 +141,8 @@ test("Overview month-to-date uses one intraday now and clamps short months", asy
   ];
   const metrics = await getReadingMetrics(createClient({ sessions }), { ...windows, now, timezone: "Europe/Athens" });
   assert.equal(metrics.totals.totalReadingTimeSeconds, 120);
-  assert.equal(metrics.comparison.totals.totalReadingTimeSeconds, 60);
-  assert.equal(metrics.comparison.delta.totalReadingTimePercentChange, 1);
+  assert.equal(metrics.comparison.totals?.totalReadingTimeSeconds, 60);
+  assert.equal(metrics.comparison.delta?.totalReadingTimePercentChange, 1);
   assert.equal(metrics.heatmap.at(-1)?.date, "2026-03-31");
 });
 
@@ -177,12 +177,12 @@ test("Overview production caller normalizes cross-month and DST comparison ends"
   assert.equal(metrics.comparison.range?.end.toISOString(), "2026-03-29T09:00:00.000Z");
   assert.equal(metrics.totals.totalReadingTimeSeconds, 120);
   assert.equal(metrics.totals.wordsRead, 450);
-  assert.equal(metrics.comparison.totals.totalReadingTimeSeconds, 90);
-  assert.equal(metrics.comparison.totals.wordsRead, 338);
-  assert.equal(metrics.comparison.delta.totalReadingTimePercentChange, 30 / 90);
+  assert.equal(metrics.comparison.totals?.totalReadingTimeSeconds, 90);
+  assert.equal(metrics.comparison.totals?.wordsRead, 338);
+  assert.equal(metrics.comparison.delta?.totalReadingTimePercentChange, 30 / 90);
   assert.equal(metrics.heatmap.reduce((sum, day) => sum + day.readingTimeSeconds, 0), 120);
-  assert.equal(metrics.comparison.totals.sessionsCount, 2, "include start, exclude before-start and exclusive end");
-  assert.equal(metrics.comparison.totals.articlesRead, 2);
+  assert.equal(metrics.comparison.totals?.sessionsCount, 2, "include start, exclude before-start and exclusive end");
+  assert.equal(metrics.comparison.totals?.articlesRead, 2);
   assert.equal(formatOverviewRangeLabel(metrics), "30 Mar – 5 Apr 2026 · Europe/Athens");
 });
 
@@ -239,7 +239,7 @@ test("returns typed zero metrics for an empty data set", async () => {
     sessionsCount: 0,
   });
   assert.deepEqual(metrics.comparison.totals, metrics.totals);
-  assert.equal(metrics.comparison.delta.totalReadingTimePercentChange, 0);
+  assert.equal(metrics.comparison.delta?.totalReadingTimePercentChange, 0);
 });
 
 
@@ -361,9 +361,9 @@ test("aggregates reading metrics, rankings, heatmap, recency, comparison, and st
     sessionsCount: 1,
     averageSessionLengthSeconds: 240,
   });
-  assert.equal(metrics.comparison.delta.totalReadingTimeSeconds, 240);
-  assert.equal(metrics.comparison.delta.totalReadingTimePercentChange, 1);
-  assert.equal(metrics.comparison.delta.wordsReadPercentChange, 1);
+  assert.equal(metrics.comparison.delta?.totalReadingTimeSeconds, 240);
+  assert.equal(metrics.comparison.delta?.totalReadingTimePercentChange, 1);
+  assert.equal(metrics.comparison.delta?.wordsReadPercentChange, 1);
 });
 
 test("ignores empty and non-positive session fields when building critical metrics", async () => {

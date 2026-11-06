@@ -147,10 +147,10 @@ test('historical report production paths retain calendar comparison identity', a
     assert.equal(march.metrics.range.end.toISOString(),'2026-03-31T21:00:00.000Z');
     assert.equal(march.metrics.comparison.range?.start?.toISOString(),'2026-01-31T22:00:00.000Z');
     assert.equal(march.metrics.comparison.range?.end.toISOString(),'2026-02-28T22:00:00.000Z');
-    assert.equal(march.metrics.comparison.totals.totalReadingTimeSeconds,60);
+    assert.equal(march.metrics.comparison.totals?.totalReadingTimeSeconds,60);
     const january=await getReadingReport(client([],sessions),'monthly',{reference:'2026-01'});
     assert.equal(january.metrics.comparison.range?.startDate,'2025-12-01');
-    assert.equal(january.metrics.comparison.totals.totalReadingTimeSeconds,30);
+    assert.equal(january.metrics.comparison.totals?.totalReadingTimeSeconds,30);
     const year=await getReadingReport(client([],sessions),'yearly',{reference:'2026'});
     assert.equal(year.metrics.comparison.range?.startDate,'2025-01-01');
     assert.equal(year.metrics.comparison.range?.endDate,'2026-01-01');

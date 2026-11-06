@@ -330,15 +330,15 @@ export function ReportsOverview({
               </caption>
               <thead>
                 <tr className="border-b">
-                  <th scope="col">Month</th>
-                  <th scope="col">Reading time</th>
+                  <th scope="col" className="pr-3">Month</th>
+                  <th scope="col" className="pr-3">Reading time</th>
                   <th scope="col">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {r.monthlyTrend.months.map((month, index) => (
                   <tr key={month.month} className="border-b">
-                    <th scope="row" className="font-normal">
+                    <th scope="row" className="pr-3 font-normal">
                       <Link
                         prefetch={false}
                         href={trendHref(month.month)}
@@ -366,12 +366,12 @@ export function ReportsOverview({
                         }
                       </Link>
                     </th>
-                    <td>
+                    <td className="pr-3">
                       {month.state === "future"
                         ? "—"
                         : formatReviewTime(month.seconds)}
                     </td>
-                    <td>
+                    <td className="pr-3">
                       {month.state === "future"
                         ? "Not started"
                         : month.state === "current"

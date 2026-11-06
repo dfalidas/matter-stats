@@ -74,10 +74,15 @@ export type MetricsComparisonDelta = MetricTotals & {
 };
 
 export type MetricsComparison = {
-  available?: boolean;
+  available?: true;
   range: MetricsDateRange | null;
   totals: MetricTotals;
   delta: MetricsComparisonDelta;
+} | {
+  available: false;
+  range: MetricsDateRange | null;
+  totals: null;
+  delta: null;
 };
 
 export type ReadingMetrics = {
@@ -306,7 +311,7 @@ export async function getReadingMetrics(
   const rangeTagsByItemId = await context.tags(rangeItemIds);
 
   const totals = summarizeSessions(rangeSessions);
-  const previousTotals = summarizeSessions(previousSessions ?? []);
+  const previousTotals = previousSessions === null ? null : summarizeSessions(previousSessions);
 
   return {
     range,
@@ -321,12 +326,14 @@ export async function getReadingMetrics(
     topTags: rankTags(rangeSessions, rangeTagsByItemId, topLimit),
     recentReads: buildRecentReads(rangeSessions, recentLimit),
     heatmap: buildHeatmap(rangeSessions, range, range.timezone),
-    comparison: {
-      ...(options.tolerateComparisonFailure ? { available: previousSessions !== null } : {}),
-      range: previousRange,
-      totals: previousTotals,
-      delta: buildComparisonDelta(totals, previousTotals),
-    },
+    comparison: previousTotals === null
+      ? { available: false, range: previousRange, totals: null, delta: null }
+      : {
+        ...(options.tolerateComparisonFailure ? { available: true as const } : {}),
+        range: previousRange,
+        totals: previousTotals,
+        delta: buildComparisonDelta(totals, previousTotals),
+      },
   };
 }
 
