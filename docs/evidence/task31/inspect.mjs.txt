@@ -1,0 +1,43 @@
+import {chromium,webkit} from '../../node_modules/playwright/index.mjs';
+import {mkdir,writeFile} from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const out='docs/evidence/task31';await mkdir(out,{recursive:true});
+const result={sourceSha:'2054aa821f399b4c3073e4147fb78c49a4631352',observedAt:new Date().toISOString(),classification:'Synthetic browser inspection; not real-usage evidence',runs:[]};
+for(const [engine,launcher,widths] of [['chromium',chromium,[320,390,1440]],['webkit',webkit,[390]]]) {
+ let browser;
+ try {browser=await launcher.launch({headless:true});}catch(e){result.runs.push({engine,status:'blocked',reason:e.message});continue;}
+ try{
+ for(const width of widths)for(const theme of ['light','dark']){
+ const context=await browser.newContext({viewport:{width,height:width===1440?1000:844},isMobile:width<1000,hasTouch:width<1000,colorScheme:theme});
+ await context.addCookies([{name:'matter_stats_session',value:'task21-synthetic-session-cookie-only',domain:'127.0.0.1',path:'/'}]);
+ const page=await context.newPage();const unexpected=[];const errors=[];
+ await context.route('**/*',route=>{const u=new URL(route.request().url());return u.hostname==='127.0.0.1'?route.continue():(unexpected.push({host:u.hostname,method:route.request().method()}),route.abort());});
+ page.on('pageerror',e=>errors.push(e.message));
+ const run={engine,version:browser.version(),width,height:width===1440?1000:844,theme,userAgent:await page.evaluate(()=>navigator.userAgent),pages:[],unexpected,errors};result.runs.push(run);
+ for(const [name,url] of [['overview','/dashboard?period=month'],['reports','/reports?period=monthly&date=2026-09'],['settings','/settings']]){
+ await page.goto('http://127.0.0.1:3091'+url);await page.waitForLoadState('networkidle');
+ await page.evaluate(t=>document.documentElement.classList.toggle('dark',t==='dark'),theme);
+ await page.screenshot({path:`${out}/${engine}-${width}-${theme}-${name}.png`});
+ const p={name,url:page.url(),overflow:await page.evaluate(()=>({viewport:innerWidth,document:document.documentElement.scrollWidth,body:document.body.scrollWidth})),controls:await page.locator('main button,main input,header button').evaluateAll(es=>es.filter(e=>e.getBoundingClientRect().width>0).map(e=>({name:e.getAttribute('aria-label')||e.textContent?.trim()||e.name,height:Math.round(e.getBoundingClientRect().height),width:Math.round(e.getBoundingClientRect().width),disabled:e.disabled}))),primaryTabs:await page.getByRole('navigation',{name:'Primary navigation'}).filter({visible:true}).getByRole('link').allTextContents()};run.pages.push(p);
+ if(name==='overview'){
+ await page.getByRole('heading',{name:'Reading goals',exact:true}).scrollIntoViewIfNeeded();
+ await page.getByRole('region',{name:'Reading goals',exact:true}).screenshot({path:`${out}/${engine}-${width}-${theme}-goals.png`});
+ p.goalText=await page.getByRole('article',{name:'Weekly reading goal'}).innerText();
+ await page.getByRole('button',{name:'Edit goal'}).first().click();
+ const input=page.getByRole('textbox',{name:'Weekly target in hours'});await input.focus();p.goalInputFocused=await input.evaluate(e=>e===document.activeElement);await page.getByRole('button',{name:'Close',exact:true}).click();
+ }
+ if(name==='reports'){
+ await page.getByRole('heading',{name:'Your monthly review',exact:true}).locator('..').screenshot({path:`${out}/${engine}-${width}-${theme}-review.png`});
+ const input=page.getByLabel('Specific report period');await input.fill('2026-08');await page.getByRole('button',{name:'Apply period'}).click();await page.waitForURL('**date=2026-08');await page.waitForLoadState('networkidle');p.appliedPeriod=input?await page.getByLabel('Specific report period').inputValue():null;
+ }
+ if(name==='settings'){await page.getByRole('button',{name:'Start / Resume Session History',exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:`${out}/${engine}-${width}-${theme}-sync.png`});}
+ if(name==='settings'&&width<1000){
+ await page.locator('summary').filter({hasText:'Account'}).click();p.accountMenu=await page.getByRole('link',{name:'Settings',exact:true}).isVisible()&&await page.getByRole('button',{name:'Log out',exact:true}).isVisible();await page.keyboard.press('Escape');p.accountFocusRestored=await page.locator('summary').filter({hasText:'Account'}).evaluate(e=>e===document.activeElement);
+ }
+ await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));p.bottom=await page.evaluate(()=>{const es=[...document.querySelectorAll('main button,main input,main a')].filter(e=>e.getBoundingClientRect().width>0);return {scrollY,innerHeight,scrollHeight:document.documentElement.scrollHeight,mainPaddingBottom:getComputedStyle(document.querySelector('main')).paddingBottom,lastControl:es.at(-1)?.getBoundingClientRect().bottom,mobileNavTop:innerWidth<1024?[...document.querySelectorAll('nav')].find(e=>e.getBoundingClientRect().width===innerWidth)?.getBoundingClientRect().top:null};});
+ }
+ await context.close();await writeFile(`${out}/inspection.json`,JSON.stringify(result,null,2));
+ }
+ }finally{await browser.close();}
+}
+await writeFile(`${out}/inspection.json`,JSON.stringify(result,null,2));console.log(JSON.stringify(result.runs.map(r=>({engine:r.engine,width:r.width,theme:r.theme,status:r.status||'complete',pages:r.pages?.map(p=>({name:p.name,overflow:p.overflow})),errors:r.errors})),null,2));
