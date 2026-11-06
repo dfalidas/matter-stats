@@ -1,0 +1,32 @@
+{
+  "testedSha": "c7f28b97e04afeeba6c3be7c693e58eecb40a70a",
+  "environment": "local clean detached worktree",
+  "startSha": "c7f28b97e04afeeba6c3be7c693e58eecb40a70a",
+  "endSha": "c7f28b97e04afeeba6c3be7c693e58eecb40a70a",
+  "worktreeDirtyAtStart": false,
+  "worktreeDirtyAtEnd": false,
+  "node": "v22.23.4",
+  "npm": "10.9.10",
+  "commands": [
+    "npm ci",
+    "next typegen",
+    "npm run typecheck",
+    "npm run lint",
+    "npm run test",
+    "npm run build",
+    "npm run audit:ci",
+    "git diff --check"
+  ],
+  "status": "passed",
+  "tests": {
+    "passed": 447,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "audit": {
+    "fullFindingEntries": 0,
+    "productionVulnerabilities": 0
+  },
+  "browserAndDatabase": "separate CI evidence; local disposable startup blocked on disk capacity"
+}

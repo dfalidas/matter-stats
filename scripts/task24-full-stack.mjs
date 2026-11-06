@@ -417,6 +417,8 @@ try {
           decision = { kind: "real" };
           if (
             state.fault === endpoint ||
+            (state.fault === "report-previous" && message.reportReadScope === "previous") ||
+            (state.fault === "report-trend" && message.reportReadScope === "trend") ||
             (state.fault === "metrics" &&
               ["reading_sessions", "read_generation_days"].includes(endpoint))
           )

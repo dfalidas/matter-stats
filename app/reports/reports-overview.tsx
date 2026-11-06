@@ -2,7 +2,7 @@
 import { chartTooltipStyle } from "@/components/chart-style";
 import Link from "next/link";
 import type { Route } from "next";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Bar,
@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import type { ReportsClientPayload, ReportPeriod } from "@/lib/reports-service";
 import { formatReportCsv } from "@/lib/report-csv";
+import { formatReviewTime } from "@/lib/monthly-review";
 import { addCalendarDays } from "@/lib/calendar";
 
 type Result =
@@ -39,6 +40,7 @@ export function ReportsOverview({
     path = usePathname(),
     params = useSearchParams();
   const [pending, start] = useTransition();
+  const [resolution, setResolution] = useState<"daily" | "weekly">("daily");
   function change(value: ReportPeriod) {
     const next = new URLSearchParams(params);
     next.set("period", value);
@@ -104,7 +106,15 @@ export function ReportsOverview({
       ),
     }),
   );
-  const timeline = groupTimeline(m.heatmap, period);
+  const review = r.monthlyReview;
+  const timeline = groupTimeline(m.heatmap, period, resolution);
+  function trendHref(month: string) {
+    const next = new URLSearchParams(params);
+    next.set("period", "monthly");
+    next.set("date", month);
+    next.delete("weekStart");
+    return `${path}?${next}` as Route;
+  }
   const exportCsv = () => {
     const blob = new Blob([formatReportCsv(m.heatmap)], { type: "text/csv" });
     const a = document.createElement("a");
@@ -212,12 +222,72 @@ export function ReportsOverview({
           </p>
         )}
         <h2 className="mt-3 text-3xl font-semibold">Your {period} review</h2>
+        {review && (
+          <p className="mt-2 font-medium">
+            {review.state === "current"
+              ? "In progress"
+              : review.state === "future"
+                ? "Not started"
+                : "Month ended"}
+          </p>
+        )}
         <p className="mt-3 max-w-2xl font-serif text-lg leading-8 text-muted-foreground">
           You spent {dur(m.totals.totalReadingTimeSeconds)} reading across{" "}
           {active} active {active === 1 ? "day" : "days"}, in{" "}
           {m.totals.sessionsCount} imported sessions. Upstream historical
           coverage is unverified.
         </p>
+        {review && (
+          <div className="mt-4 space-y-2 text-sm">
+            <p>
+              <strong>Time per active day:</strong>{" "}
+              {review.current.timePerActiveDay === null
+                ? "— / No active days"
+                : formatReviewTime(review.current.timePerActiveDay)}
+            </p>
+            {review.state === "closed" && review.current.sessions === 0 && (
+              <p>No imported activity.</p>
+            )}
+            {review.coverage === "incomplete" && (
+              <p role="status">Review is provisional; import is incomplete.</p>
+            )}
+            {review.coverage === "unavailable" && (
+              <p role="status">
+                Import status unavailable; performance comparisons are
+                unavailable.
+              </p>
+            )}
+            {!review.previous && <p role="status">Comparison unavailable.</p>}
+            {(review.anomalies.invalidDurations > 0 ||
+              review.anomalies.nullDurations > 0 ||
+              review.anomalies.futureOccurrences > 0) && (
+              <p role="status">
+                Input anomalies in selected/comparison months:{" "}
+                {review.anomalies.invalidDurations} invalid durations,{" "}
+                {review.anomalies.nullDurations} missing durations,{" "}
+                {review.anomalies.futureOccurrences} future occurrences.
+                Existing normalization retained; stored data unchanged.
+              </p>
+            )}
+            {review.observations.length > 0 && (
+              <section aria-label="Monthly observations">
+                <p className="font-medium">
+                  Based on imported sessions only · compared with the complete
+                  previous month
+                </p>
+                <ul className="mt-2 list-disc space-y-2 pl-5">
+                  {review.observations.map((observation) => (
+                    <li key={observation}>{observation}</li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            <p className="text-muted-foreground">
+              Coverage and session–item linkage are separate; unlinked sessions
+              remain included.
+            </p>
+          </div>
+        )}
       </section>
       <div className="grid border-b sm:grid-cols-2 lg:grid-cols-4">
         <Metric
@@ -232,6 +302,95 @@ export function ReportsOverview({
         <Metric label="Active days" value={String(active)} />
         <Metric label="Sessions" value={String(m.totals.sessionsCount)} />
       </div>
+      {r.monthlyTrend && (
+        <section className="mt-8" aria-labelledby="monthly-trend-title">
+          <h3 id="monthly-trend-title" className="text-xl font-semibold">
+            Monthly trend — selected year
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {r.monthlyTrend.year} · Imported reading time · {m.range.timezone}
+          </p>
+          {r.monthlyTrend.ok &&
+            Object.values(r.monthlyTrend.anomalies).some(
+              (count) => count > 0,
+            ) && (
+              <p role="status" className="mt-2 text-sm">
+                Selected-year input anomalies:{" "}
+                {r.monthlyTrend.anomalies.invalidDurations} invalid durations,{" "}
+                {r.monthlyTrend.anomalies.nullDurations} missing durations,{" "}
+                {r.monthlyTrend.anomalies.futureOccurrences} future occurrences.
+                Stored data unchanged.
+              </p>
+            )}
+          {r.monthlyTrend.ok ? (
+            <table className="mt-4 w-full text-left text-sm">
+              <caption className="sr-only">
+                January–December {r.monthlyTrend.year} reading-time totals;
+                select a month to open its report
+              </caption>
+              <thead>
+                <tr className="border-b">
+                  <th scope="col" className="pr-3">Month</th>
+                  <th scope="col" className="pr-3">Reading time</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {r.monthlyTrend.months.map((month, index) => (
+                  <tr key={month.month} className="border-b">
+                    <th scope="row" className="pr-3 font-normal">
+                      <Link
+                        prefetch={false}
+                        href={trendHref(month.month)}
+                        aria-current={
+                          month.month === reference ? "date" : undefined
+                        }
+                        className="inline-flex min-h-11 items-center text-primary underline"
+                        aria-label={`Open ${month.month} monthly report`}
+                      >
+                        {
+                          [
+                            "January",
+                            "February",
+                            "March",
+                            "April",
+                            "May",
+                            "June",
+                            "July",
+                            "August",
+                            "September",
+                            "October",
+                            "November",
+                            "December",
+                          ][index]
+                        }
+                      </Link>
+                    </th>
+                    <td className="pr-3">
+                      {month.state === "future"
+                        ? "—"
+                        : formatReviewTime(month.seconds)}
+                    </td>
+                    <td className="pr-3">
+                      {month.state === "future"
+                        ? "Not started"
+                        : month.state === "current"
+                          ? "In progress"
+                          : month.seconds === 0
+                            ? "No imported activity"
+                            : "Month ended"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p role="status" className="mt-4">
+              Monthly trend unavailable.
+            </p>
+          )}
+        </section>
+      )}
       <div className="mt-10 grid gap-10 lg:grid-cols-2">
         <Panel
           title="Reading over time"
@@ -239,8 +398,60 @@ export function ReportsOverview({
             period === "yearly"
               ? "Minutes per month"
               : period === "monthly"
-                ? "Minutes per week"
+                ? `Minutes per ${resolution === "daily" ? "day · Daily resolution" : "week · Weekly resolution (Monday first)"}`
                 : "Minutes per day"
+          }
+          controls={
+            period === "monthly" ? (
+              <div
+                role="group"
+                aria-label="Reading over time resolution"
+                className="mb-4 flex gap-2"
+              >
+                {(["daily", "weekly"] as const).map((value) => (
+                  <button
+                    key={value}
+                    onClick={() => setResolution(value)}
+                    aria-pressed={resolution === value}
+                    className={`min-h-11 rounded-lg border px-4 text-sm ${resolution === value ? "bg-foreground text-background" : "bg-card"}`}
+                  >
+                    {value === "daily" ? "Daily" : "Weekly"}
+                  </button>
+                ))}
+              </div>
+            ) : undefined
+          }
+          details={
+            period === "monthly" ? (
+              <details className="mt-4 text-sm">
+                <summary className="min-h-11 cursor-pointer py-3">
+                  Daily values (all local dates)
+                </summary>
+                <table className="w-full text-left">
+                  <caption className="sr-only">
+                    Canonical daily reading time in seconds
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Date</th>
+                      <th scope="col" className="text-right">
+                        Reading seconds
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {m.heatmap.map((day) => (
+                      <tr className="border-b" key={day.date}>
+                        <th scope="row" className="py-2 font-normal">
+                          {day.date}
+                        </th>
+                        <td className="text-right">{day.readingTimeSeconds}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
+            ) : undefined
           }
         >
           <ResponsiveContainer width="100%" height="100%">
@@ -291,12 +502,13 @@ export function ReportsOverview({
 function groupTimeline(
   days: ReportsClientPayload["metrics"]["heatmap"],
   period: ReportPeriod,
+  resolution: "daily" | "weekly",
 ) {
   const buckets = new Map<string, number>();
   for (const day of days) {
     let key = day.date.slice(5);
     if (period === "yearly") key = day.date.slice(0, 7);
-    if (period === "monthly") {
+    if (period === "monthly" && resolution === "weekly") {
       const [year, month, date] = day.date.split("-").map(Number);
       const weekday = new Date(Date.UTC(year, month - 1, date)).getUTCDay();
       key = `Week ${addCalendarDays(day.date, -((weekday + 6) % 7)).slice(5)}`;
@@ -305,7 +517,7 @@ function groupTimeline(
   }
   return [...buckets].map(([date, seconds]) => ({
     date,
-    minutes: Math.round(seconds / 60),
+    minutes: period === "monthly" ? seconds / 60 : Math.round(seconds / 60),
   }));
 }
 function Metric({
@@ -329,16 +541,22 @@ function Panel({
   title,
   subtitle,
   children,
+  controls,
+  details,
 }: {
   title: string;
   subtitle: string;
   children: React.ReactNode;
+  controls?: React.ReactNode;
+  details?: React.ReactNode;
 }) {
   return (
     <section>
       <h3 className="text-xl font-semibold">{title}</h3>
       <p className="mb-5 text-sm text-muted-foreground">{subtitle}</p>
+      {controls}
       <div className="h-72">{children}</div>
+      {details}
     </section>
   );
 }

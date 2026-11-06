@@ -74,9 +74,15 @@ export type MetricsComparisonDelta = MetricTotals & {
 };
 
 export type MetricsComparison = {
+  available?: true;
   range: MetricsDateRange | null;
   totals: MetricTotals;
   delta: MetricsComparisonDelta;
+} | {
+  available: false;
+  range: MetricsDateRange | null;
+  totals: null;
+  delta: null;
 };
 
 export type ReadingMetrics = {
@@ -112,6 +118,10 @@ export type GetReadingMetricsOptions = {
   recentLimit?: number;
   /** Explicitly shared only within one service request. */
   queryContext?: AnalyticsQueryContext;
+  /** Monthly Reports does not consume streaks; avoid unrelated all-history reads. */
+  includeStreaks?: boolean;
+  /** Keep successful current input when the separate comparison query fails. */
+  tolerateComparisonFailure?: boolean;
 };
 
 type SessionItem = {
@@ -284,10 +294,13 @@ export async function getReadingMetrics(
   // complete input. This scans no further than the original streak reads.
   const historyEnd = new Date(Math.max(range.end.getTime(), currentStreakEnd.getTime(), historicalStreakEnd?.getTime() ?? -Infinity));
   const rangeRead = context.sessions(range.start, range.end, "details");
-  const historyRead = context.sessions(null, historyEnd, "streak");
+  const historyRead = options.includeStreaks === false ? Promise.resolve([]) : context.sessions(null, historyEnd, "streak");
   const [rangeSessions, previousSessions, historySessions] = await Promise.all([
     rangeRead,
-    previousRange ? context.sessions(previousRange.start, previousRange.end, "details") : Promise.resolve([]),
+    previousRange ? context.sessions(previousRange.start, previousRange.end, "details").catch((error) => {
+      if (options.tolerateComparisonFailure) return null;
+      throw error;
+    }) : Promise.resolve([]),
     historyRead,
   ]);
   const before = (end: Date) => historySessions.filter((session) => session.started_at && Date.parse(session.started_at) < end.getTime());
@@ -298,7 +311,7 @@ export async function getReadingMetrics(
   const rangeTagsByItemId = await context.tags(rangeItemIds);
 
   const totals = summarizeSessions(rangeSessions);
-  const previousTotals = summarizeSessions(previousSessions);
+  const previousTotals = previousSessions === null ? null : summarizeSessions(previousSessions);
 
   return {
     range,
@@ -313,11 +326,14 @@ export async function getReadingMetrics(
     topTags: rankTags(rangeSessions, rangeTagsByItemId, topLimit),
     recentReads: buildRecentReads(rangeSessions, recentLimit),
     heatmap: buildHeatmap(rangeSessions, range, range.timezone),
-    comparison: {
-      range: previousRange,
-      totals: previousTotals,
-      delta: buildComparisonDelta(totals, previousTotals),
-    },
+    comparison: previousTotals === null
+      ? { available: false, range: previousRange, totals: null, delta: null }
+      : {
+        ...(options.tolerateComparisonFailure ? { available: true as const } : {}),
+        range: previousRange,
+        totals: previousTotals,
+        delta: buildComparisonDelta(totals, previousTotals),
+      },
   };
 }
 

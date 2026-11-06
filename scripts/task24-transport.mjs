@@ -61,6 +61,11 @@ export function installTransport(config, ipc) {
         // Only synthetic upstream parameters; database predicates/cookies/headers
         // and all request bodies stay inside the app process.
         query: matter ? Object.fromEntries(url.searchParams) : undefined,
+        // Fixed synthetic report enums only; never forward database predicates.
+        reportReadScope: url.pathname.endsWith("/reading_sessions")
+          ? url.searchParams.getAll("started_at").includes("gte.2026-07-31T21:00:00.000Z") ? "previous"
+            : url.searchParams.getAll("started_at").includes("gte.2025-12-31T22:00:00.000Z") && url.searchParams.get("select") === "id,started_at,duration_seconds" ? "trend" : null
+          : null,
       });
     });
     if (decision.kind === "fault")

@@ -489,6 +489,101 @@ export async function runJourneys({
         source: "raw SQL / downloaded Reports CSV", actual: rawPeriod.slice(0,3), difference: [0,0,0], activeDays: rawPeriod[3],
       });
     }
+    // Task 30: actual Reports UI, synthetic SQL only, same owned isolated stack.
+    assert.equal(sql("select count(*) from public.matter_dirty_rollups where date between '2026-08-01' and '2026-09-30';"), "0", "monthly fixture dates must have no pre-existing dirty markers");
+    const reportControlBefore = sql("select jsonb_build_object('streams',(select jsonb_agg(jsonb_build_object('stream',stream,'active',cycle_active)) from public.matter_sync_streams),'history',(select history_status from public.matter_sync_continuation where account_scope='matter'))::text;");
+    const reportControl = JSON.parse(reportControlBefore);
+    const restoreReportHistory = sql("select format('update public.matter_sync_continuation set history_status=%L,requested_at=%L,history_cycle_generation=%L,completed_at=%L where account_scope=''matter'';',history_status,requested_at,history_cycle_generation,completed_at) from public.matter_sync_continuation where account_scope='matter';");
+    sql("update public.matter_sync_streams set cycle_active=false; update public.matter_sync_continuation set history_status='complete',requested_at='2026-01-01T00:00:00Z',history_cycle_generation=1,completed_at='2026-01-01T00:00:00Z' where account_scope='matter';");
+    sql(`insert into public.reading_sessions(id,started_at,duration_seconds) select 'task30-sep-' || i, ('2026-09-01T10:00:00Z'::timestamptz + ((i-1)%18)*interval '1 day'),720 from generate_series(1,60) i;
+      insert into public.reading_sessions(id,started_at,duration_seconds) select 'task30-aug-' || i, ('2026-08-01T10:00:00Z'::timestamptz + ((i-1)%15)*interval '1 day'),750 from generate_series(1,48) i;`);
+    await goto("/reports?period=monthly&date=2026-09&context=keep");
+    const observationsPanel = page.getByRole("region", {name:"Monthly observations"});
+    await expect(page.getByText("Time per active day: 40 min", {exact:true})).toBeVisible();
+    await expect(observationsPanel).toContainText("Imported reading time increased by 2h (20%).");
+    await expect(observationsPanel).toContainText("More active days (18 vs 15), shorter average sessions (12.0 min vs 12.5 min).");
+    await expect(page.getByText("Minutes per day · Daily resolution", {exact:true})).toBeVisible();
+    await page.getByRole("button", {name:"Weekly",exact:true}).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByText("Minutes per week · Weekly resolution (Monday first)",{exact:true})).toBeVisible();
+    await page.getByRole("button",{name:"Daily",exact:true}).press("Enter");
+    await page.getByText("Daily values (all local dates)",{exact:true}).click();
+    const dailyTable = page.getByRole("table",{name:"Canonical daily reading time in seconds"});
+    await expect(dailyTable.getByRole("row")).toHaveCount(31);
+    await expect(dailyTable.getByRole("row").last()).toContainText("2026-09-30");
+    await expect(dailyTable.getByRole("row").last()).toContainText("0");
+    const monthlyDownloadEvent = page.waitForEvent("download");
+    await page.getByRole("button",{name:"Export CSV",exact:true}).click();
+    const monthlyDownload=await monthlyDownloadEvent;
+    assert.equal(monthlyDownload.suggestedFilename(),"matter-stats-monthly-2026-09.csv");
+    const monthlyCsv=(await readFile(await monthlyDownload.path(),"utf8")).trim().split("\n");
+    assert.equal(monthlyCsv[0],"date,reading_time_seconds,estimated_words,sessions");
+    assert.equal(monthlyCsv.length,31);
+    assert.deepEqual(monthlyCsv.slice(1).reduce((sum,line)=>line.split(",").slice(1).map((value,index)=>sum[index]+Number(value)),[0,0,0]),[43200,162000,60]);
+    check("Monthly review: approved totals, two observations, keyboard resolution, all zero dates and unchanged exact CSV");
+    await page.getByRole("link",{name:"Open 2026-08 monthly report",exact:true}).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByLabel("Specific report period")).toHaveValue("2026-08");
+    assert.equal(new URL(page.url()).searchParams.get("context"),"keep");
+    await expect(page.locator("main")).toContainText("Previous month: 2026-07-01 – 2026-07-31");
+    await page.getByRole("link",{name:"Open 2026-01 monthly report",exact:true}).click();
+    await expect(page.getByLabel("Specific report period")).toHaveValue("2026-01");
+    await expect(page.locator("main")).toContainText("Previous month: 2025-12-01 – 2025-12-31");
+    await page.getByLabel("Specific report period").fill("2024-02");
+    await page.getByRole("button",{name:"Apply period",exact:true}).click();
+    await expect(page.getByLabel("Specific report period")).toHaveValue("2024-02");
+    await expect(page.getByRole("link",{name:"Open 2024-12 monthly report",exact:true})).toBeVisible();
+    await expect(page.getByRole("link",{name:"Explore your 2024 annual recap →",exact:true})).toHaveAttribute("href","/year-in-reading?year=2024");
+    await goto("/reports?period=monthly&date=2024-01");
+    await expect(page.getByText("— / No active days",{exact:false})).toBeVisible();
+    await expect(page.getByRole("region",{name:"Monthly observations"})).toContainText("No change (0 in both)");
+    check("Monthly review: trend month/year identity, retained context, January previous December, selected-year recap and empty zero states");
+    const localMonth = new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Athens",year:"numeric",month:"2-digit"}).formatToParts(new Date());
+    const selectedYear=localMonth.find(part=>part.type==="year").value;
+    const currentMonth=`${selectedYear}-${localMonth.find(part=>part.type==="month").value}`;
+    const futureMonth=`${Number(selectedYear)+1}-01`;
+    for(const [month,label] of [[currentMonth,"In progress"],[futureMonth,"Not started"]]) {
+      await goto(`/reports?period=monthly&date=${month}`);
+      await expect(page.locator("main")).toContainText(label);
+      await expect(page.getByRole("region",{name:"Monthly observations"})).toHaveCount(0);
+    }
+    sql("update public.matter_sync_continuation set history_status='pending',requested_at='2026-01-01T00:00:00Z',history_cycle_generation=null,completed_at=null where account_scope='matter';");
+    await goto("/reports?period=monthly&date=2026-09");
+    await expect(page.getByText("Review is provisional; import is incomplete.",{exact:true})).toBeVisible();
+    await expect(page.getByRole("region",{name:"Monthly observations"})).toHaveCount(0);
+    sql("update public.matter_sync_continuation set history_status='complete',requested_at='2026-01-01T00:00:00Z',history_cycle_generation=1,completed_at='2026-01-01T00:00:00Z' where account_scope='matter';");
+    for(const [fault,label] of [["report-previous","Comparison unavailable."],["report-trend","Monthly trend unavailable."],["matter_sync_streams","Import status unavailable; performance comparisons are unavailable."],["metrics","Reading report unavailable."]]) {
+      state.fault=fault;
+      await goto("/reports?period=monthly&date=2026-09");
+      await expect(page.locator("main")).toContainText(label);
+      if(fault !== "metrics") await expect(page.getByText("Time per active day: 40 min",{exact:true})).toBeVisible();
+      if(fault !== "report-trend") await expect(page.getByRole("region",{name:"Monthly observations"})).toHaveCount(0);
+    }
+    state.fault=null;
+    check("Monthly review: current/future suppress claims; incomplete import and separate current/previous/trend/status read failures are truthful");
+    await goto("/reports?period=monthly&date=2026-09");
+    for(const width of [390,1440]) {
+      await page.setViewportSize({width,height:1000});
+      for(const colorScheme of ["light","dark"]) {
+        await page.emulateMedia({colorScheme});
+        await page.evaluate(dark=>document.documentElement.classList.toggle("dark",dark),colorScheme === "dark");
+        await page.getByRole("heading",{name:"Your monthly review",exact:true}).evaluate(element => element.scrollIntoView({block:"start"}));
+        await capture(`monthly-${width}-${colorScheme}`);
+        await page.getByRole("heading",{name:"Reading over time",exact:true}).scrollIntoViewIfNeeded();
+        await expect(page.getByText("Minutes per day · Daily resolution",{exact:true})).toBeVisible();
+        await capture(`monthly-charts-${width}-${colorScheme}`);
+      }
+    }
+    await page.evaluate(()=>document.documentElement.classList.remove("dark"));
+    await page.emulateMedia({colorScheme:"light"});
+    await page.setViewportSize({width:1440,height:1000});
+    sql("delete from public.reading_sessions where id like 'task30-%';");
+    // Raw fixture deletion dirties its dates too. Restore only the proven-empty
+    // owned date range so later ingestion journeys keep their original input.
+    sql("delete from public.matter_dirty_rollups where date between '2026-08-01' and '2026-09-30';");
+    for(const stream of reportControl.streams) sql(`update public.matter_sync_streams set cycle_active=${stream.active} where stream='${stream.stream}';`);
+    sql(restoreReportHistory);
+    check("Monthly review: desktop/mobile light/dark screenshots, keyboard controls and no horizontal overflow");
     await goto("/dashboard?start=2025-01-02&end=2025-01-02");
     assert.match(await text(), /675/);
     assert.match(await text(), /3 min/);

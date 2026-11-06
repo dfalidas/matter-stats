@@ -66,7 +66,9 @@ test("R5 query efficiency (Task 18): actual HTTP requests and aggregate-only cli
   assert.deepEqual(Object.keys(toOverviewClientPayload(overview)),["metrics"]);
   const before = fixture.requests.length;
   const report = await getReadingReport(fixture.client,"monthly",{now,reference:"2026-09"});
-  assert.ok(fixture.requests.length-before <= 29, "selected input once, one narrow history, empty comparison");
+  const reportRequests = fixture.requests.slice(before);
+  assert.equal(reportRequests.filter(request => request.table === "reading_sessions").length, 29, "selected input once, one bounded selected-year scan, empty comparison; unchanged pagination budget");
+  assert.deepEqual(reportRequests.filter(request => request.table !== "reading_sessions").map(request => request.table).sort(), ["matter_sync_continuation", "matter_sync_streams", "read_matter_retry_status"], "exactly three bounded status reads; no per-day/month loop");
   assert.equal(report.metrics.totals.wordsRead,270000);
   assert.equal(toReportsClientPayload(report).sessionLengthHistogram[0].count,1200);
   assert.equal("timeline" in toReportsClientPayload(report),false);

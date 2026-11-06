@@ -26,7 +26,8 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   // Retain the validated calendar selection separately from Monday/month/year
   // aggregation boundaries. Use the service's local-today fallback for invalid
   // or absent references, including when the report query is unavailable.
-  const today = timestampToCalendarDate(new Date());
+  const now = new Date();
+  const today = timestampToCalendarDate(now);
   const reference =
     normalizeReference(period, params?.date ?? params?.weekStart) ??
     (period === "yearly"
@@ -35,7 +36,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         ? today.slice(0, 7)
         : today);
   const client = getSupabaseAdminClient();
-  const reportsResult = await getReportsResult(client, period, reference);
+  const reportsResult = await getReportsResult(client, period, reference, now);
 
   return (
     <PageShell
@@ -52,22 +53,35 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   );
 }
 
-function normalizeReportPeriod(value: string | string[] | undefined): ReportPeriod {
+function normalizeReportPeriod(
+  value: string | string[] | undefined,
+): ReportPeriod {
   const candidate = Array.isArray(value) ? value[0] : value;
-  return REPORT_PERIODS.includes(candidate as ReportPeriod) ? (candidate as ReportPeriod) : DEFAULT_REPORT_PERIOD;
+  return REPORT_PERIODS.includes(candidate as ReportPeriod)
+    ? (candidate as ReportPeriod)
+    : DEFAULT_REPORT_PERIOD;
 }
 
-function normalizeReference(period: ReportPeriod, value: string | string[] | undefined): string | null {
+function normalizeReference(
+  period: ReportPeriod,
+  value: string | string[] | undefined,
+): string | null {
   const candidate = Array.isArray(value) ? value[0] : value;
   return isValidReportReference(period, candidate) ? candidate : null;
 }
 
-async function getReportsResult(client: ReturnType<typeof getSupabaseAdminClient>, period: ReportPeriod, reference: string | null) {
+async function getReportsResult(
+  client: ReturnType<typeof getSupabaseAdminClient>,
+  period: ReportPeriod,
+  reference: string | null,
+  now: Date,
+) {
   try {
-    const report = await getReadingReport(client, period, { reference });
+    const report = await getReadingReport(client, period, { reference, now });
     return { ok: true as const, report: toReportsClientPayload(report) };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to load reading report.";
+    const message =
+      error instanceof Error ? error.message : "Unable to load reading report.";
     return { ok: false as const, message };
   }
 }

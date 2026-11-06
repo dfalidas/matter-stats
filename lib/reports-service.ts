@@ -1,3 +1,5 @@
+import { monthState, summarizeMonth, monthlyObservations, reviewAnomalies } from "./monthly-review";
+import { loadMonthlyTrend, loadReviewCoverage } from "./monthly-review-service";
 import { createAnalyticsQueryContext, type AnalyticsSession, type AnalyticsSessionItem } from "./analytics-query-context";
 import {
   addLocalDays,
@@ -58,6 +60,15 @@ export type ReadingReport = {
   sessionLengthHistogram: ReturnType<typeof buildSessionLengthHistogram>;
   longformReads: LongformRead[];
   latestWeekWithDataStartDate: string | null;
+  monthlyReview: null | {
+    state: ReturnType<typeof monthState>;
+    coverage: Awaited<ReturnType<typeof loadReviewCoverage>>;
+    current: ReturnType<typeof summarizeMonth>;
+    previous: ReturnType<typeof summarizeMonth> | null;
+    observations: string[];
+    anomalies: ReturnType<typeof reviewAnomalies>;
+  };
+  monthlyTrend: Awaited<ReturnType<typeof loadMonthlyTrend>> | null;
 };
 
 export async function getReadingReport(
@@ -71,11 +82,15 @@ export async function getReadingReport(
   const selectedRange = resolveReportRange(period, requestedReference, now, timezone);
   const latestWeekWithDataStartDate = period === "weekly" ? await getLatestWeekWithDataStartDate(client, timezone) : null;
   const queryContext = createAnalyticsQueryContext(client);
+  const previousRange = resolvePreviousReportRange(period, selectedRange, timezone);
+  const coverageRead = period === "monthly" ? loadReviewCoverage(client, now) : null;
   const metrics = await getReadingMetrics(client, {
     queryContext,
     timezone,
     range: selectedRange,
-    comparisonRange: resolvePreviousReportRange(period, selectedRange, timezone),
+    comparisonRange: previousRange,
+    includeStreaks: period !== "monthly",
+    tolerateComparisonFailure: period === "monthly",
     now,
     historicalStreakDate: formatDateInTimezone(addLocalDays(selectedRange.end, -1, timezone), timezone),
     topLimit: 6,
@@ -83,8 +98,28 @@ export async function getReadingReport(
   });
   const sessions = await queryContext.sessions(metrics.range.start, metrics.range.end, "details");
 
+  let monthlyReview: ReadingReport["monthlyReview"] = null;
+  let monthlyTrend: ReadingReport["monthlyTrend"] = null;
+  if (period === "monthly") {
+    const month = formatDateInTimezone(selectedRange.start, timezone).slice(0, 7);
+    // Exact detail reads are shared with Metrics; no duplicate per-day/month reads.
+    const previousSessions = metrics.comparison.available === false ? null
+      : await queryContext.sessions(previousRange.start, previousRange.end, "details");
+    const previous = previousSessions ? summarizeMonth(previousSessions, timezone) : null;
+    const current = summarizeMonth(sessions, timezone);
+    const state = monthState(month, now, timezone);
+    const coverage = (await coverageRead)!;
+    monthlyReview = { state, coverage, current, previous,
+      observations: monthlyObservations(state, coverage, current, previous),
+      anomalies: reviewAnomalies([...sessions, ...(previousSessions ?? [])], now),
+    };
+    monthlyTrend = await loadMonthlyTrend(queryContext, Number(month.slice(0, 4)), now, timezone);
+  }
+
   return {
     period,
+    monthlyReview,
+    monthlyTrend,
     metrics,
     timeline: sessions.map(mapTimelineSession),
     sessionLengthHistogram: buildSessionLengthHistogram(sessions.map((session) => positiveInteger(session.duration_seconds))),
@@ -238,7 +273,7 @@ function positiveInteger(value: number | null): number {
 /** Complete aggregates, fixed bins and no raw sessions cross the RSC boundary. */
 export function toReportsClientPayload(report: ReadingReport) {
   const { range, totals, comparison, heatmap } = report.metrics;
-  return { period: report.period, metrics: { range, totals, comparison, heatmap }, sessionLengthHistogram: report.sessionLengthHistogram };
+  return { period: report.period, metrics: { range, totals, comparison, heatmap }, sessionLengthHistogram: report.sessionLengthHistogram, monthlyReview: report.monthlyReview, monthlyTrend: report.monthlyTrend };
 }
 export type ReportsClientPayload = ReturnType<typeof toReportsClientPayload>;
 

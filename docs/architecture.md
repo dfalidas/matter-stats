@@ -442,3 +442,14 @@ Composite period identity, integer-second precision, canonical raw pagination,
 error semantics, DST pacing and migration-first rollback/rollout are documented
 in [the Task 29 operator guide](task-29-operator-guide.md). No carry-forward or
 changes to ingestion, navigation, CSV or existing metric semantics.
+
+## Monthly Reports review (Task 30)
+
+Monthly Reports adds S/A beside the existing totals, daily/weekly resolution and
+selected-year raw-session monthly totals, with bounded client buckets. Closed-month
+deterministic observations require successful current/previous inputs and inactive
+known ingestion evidence; unknown upstream completeness remains explicit. Current/
+future months suppress comparisons, and read failures remain unavailable. Monthly
+Reports omits unconsumed streak history; weekly/yearly behavior and CSV remain.
+See [the operator guide](task-30-operator-guide.md) for arithmetic, coverage,
+query cost, consistency limits and application-only rollback. No schema change.

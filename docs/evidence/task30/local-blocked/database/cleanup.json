@@ -1,0 +1,10 @@
+{
+  "gitSha": "d97c2aaf15092aaf78aa41ed53a58e6c96b159e3",
+  "resources": [
+    {
+      "path": "fresh",
+      "status": "verified-removed"
+    }
+  ],
+  "temporaryDirectoryRemoved": true
+}
