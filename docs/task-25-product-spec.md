@@ -41,6 +41,8 @@ Synthetic arithmetic example only: at **2026-10-23 12:00 Europe/Athens**, week `
 
 ## Task 30 — extend monthly Reports
 
+Task 30 draft implementation follows these proposed rules; see [operator guide](task-30-operator-guide.md) and [actual validation](task-30-validation.md). Production/final real-history acceptance remains separate.
+
 Reuse current metric tiles, period selector, retained `date` reference, full previous-period identity, annual recap, session histogram and weekday distribution. Add **time per active day** as a compact fifth summary value (or adjacent text); do not duplicate existing four metrics. Reuse canonical daily buckets for a daily distribution chart/table with every local date, including successful zero buckets. Offer daily resolution within the existing “Reading over time” panel; retain useful weekly grouping as an option.
 
 **Proposed new context panel:** “Monthly trend — selected year”, January–December totals from raw sessions in the selected year, with current month “In progress” and future months “Not started”, not historical zero. Empty past months mean “No imported activity”, not proven no reading. Selecting a trend month retains report identity/navigation. Avoid requiring raw session arrays in the client; extend the existing request-owned analytics context and bounded bucket payload. Do not introduce a second annual-recap page or a ranking card.

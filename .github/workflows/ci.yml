@@ -141,6 +141,14 @@ jobs:
             artifacts/task24/**/network.json
             artifacts/task24/**/failure.json
             artifacts/task24/**/cleanup.json
+            artifacts/task24/**/monthly-390-light.png
+            artifacts/task24/**/monthly-390-dark.png
+            artifacts/task24/**/monthly-1440-light.png
+            artifacts/task24/**/monthly-1440-dark.png
+            artifacts/task24/**/monthly-charts-390-light.png
+            artifacts/task24/**/monthly-charts-390-dark.png
+            artifacts/task24/**/monthly-charts-1440-light.png
+            artifacts/task24/**/monthly-charts-1440-dark.png
             artifacts/task24/**/goals-390-light.png
             artifacts/task24/**/goals-390-dark.png
             artifacts/task24/**/goals-1440-light.png
