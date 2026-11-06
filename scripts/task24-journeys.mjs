@@ -492,7 +492,8 @@ export async function runJourneys({
     // Task 30: actual Reports UI, synthetic SQL only, same owned isolated stack.
     const reportControlBefore = sql("select jsonb_build_object('streams',(select jsonb_agg(jsonb_build_object('stream',stream,'active',cycle_active)) from public.matter_sync_streams),'history',(select history_status from public.matter_sync_continuation where account_scope='matter'))::text;");
     const reportControl = JSON.parse(reportControlBefore);
-    sql("update public.matter_sync_streams set cycle_active=false; update public.matter_sync_continuation set history_status='complete' where account_scope='matter';");
+    const restoreReportHistory = sql("select format('update public.matter_sync_continuation set history_status=%L,requested_at=%L,history_cycle_generation=%L,completed_at=%L where account_scope=''matter'';',history_status,requested_at,history_cycle_generation,completed_at) from public.matter_sync_continuation where account_scope='matter';");
+    sql("update public.matter_sync_streams set cycle_active=false; update public.matter_sync_continuation set history_status='complete',requested_at='2026-01-01T00:00:00Z',history_cycle_generation=1,completed_at='2026-01-01T00:00:00Z' where account_scope='matter';");
     sql(`insert into public.reading_sessions(id,started_at,duration_seconds) select 'task30-sep-' || i, ('2026-09-01T10:00:00Z'::timestamptz + ((i-1)%18)*interval '1 day'),720 from generate_series(1,60) i;
       insert into public.reading_sessions(id,started_at,duration_seconds) select 'task30-aug-' || i, ('2026-08-01T10:00:00Z'::timestamptz + ((i-1)%15)*interval '1 day'),750 from generate_series(1,48) i;`);
     await goto("/reports?period=monthly&date=2026-09&context=keep");
@@ -545,11 +546,11 @@ export async function runJourneys({
       await expect(page.locator("main")).toContainText(label);
       await expect(page.getByRole("region",{name:"Monthly observations"})).toHaveCount(0);
     }
-    sql("update public.matter_sync_continuation set history_status='pending' where account_scope='matter';");
+    sql("update public.matter_sync_continuation set history_status='pending',requested_at='2026-01-01T00:00:00Z',history_cycle_generation=null,completed_at=null where account_scope='matter';");
     await goto("/reports?period=monthly&date=2026-09");
     await expect(page.getByText("Review is provisional; import is incomplete.",{exact:true})).toBeVisible();
     await expect(page.getByRole("region",{name:"Monthly observations"})).toHaveCount(0);
-    sql("update public.matter_sync_continuation set history_status='complete' where account_scope='matter';");
+    sql("update public.matter_sync_continuation set history_status='complete',requested_at='2026-01-01T00:00:00Z',history_cycle_generation=1,completed_at='2026-01-01T00:00:00Z' where account_scope='matter';");
     for(const [fault,label] of [["report-previous","Comparison unavailable."],["report-trend","Monthly trend unavailable."],["matter_sync_streams","Import status unavailable; performance comparisons are unavailable."],["metrics","Reading report unavailable."]]) {
       state.fault=fault;
       await goto("/reports?period=monthly&date=2026-09");
@@ -577,7 +578,7 @@ export async function runJourneys({
     await page.setViewportSize({width:1440,height:1000});
     sql("delete from public.reading_sessions where id like 'task30-%';");
     for(const stream of reportControl.streams) sql(`update public.matter_sync_streams set cycle_active=${stream.active} where stream='${stream.stream}';`);
-    sql(`update public.matter_sync_continuation set history_status='${reportControl.history}' where account_scope='matter';`);
+    sql(restoreReportHistory);
     check("Monthly review: desktop/mobile light/dark screenshots, keyboard controls and no horizontal overflow");
     await goto("/dashboard?start=2025-01-02&end=2025-01-02");
     assert.match(await text(), /675/);

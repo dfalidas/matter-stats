@@ -46,3 +46,11 @@ successful subsequent incremental cycle remains open; coverage and session–ite
 linkage remain independent. Conditional Task 28 and Tasks 31–32 are untouched.
 No migration is needed; revert application changes for rollback. Craft log and
 Action Plan v2.1 will be updated with actual evidence and the single draft PR.
+
+Initial CI [42189685460](https://github.com/dfalidas/matter-stats/actions/runs/42189685460)
+on executable `d97c2aaf15092aaf78aa41ed53a58e6c96b159e3`: verify passed,
+but browser failed a fixture SQL CHECK (23514) before Task 30 assertions. The
+fixture set `history_status=complete` without its required intent/generation/time
+fields. Corrected the isolated fixture to satisfy the existing CHECK and restore
+all original history fields afterward; no database constraint was changed.
+Downloaded browser ZIP digest matched GitHub (`62b4050a9145c66eec48e0b419833ba03b4f7aee746010b058e8ea557af39898`).
