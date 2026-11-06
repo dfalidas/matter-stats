@@ -65,3 +65,11 @@ cleanup. No Docker prune, unrelated cleanup or production fallback was used.
 
 Review also preserved the existing whole-minute chart display outside monthly
 Reports; fractional minute coordinates apply only to the new monthly resolution.
+
+Second CI browser attempt (`9660a7ef0174776915319cf4305ec5b24d4b0e97`,
+[42190675643](https://github.com/dfalidas/matter-stats/actions/runs/42190675643))
+passed fixture SQL but used a locator expecting a standalone “40 min” element.
+The value shares a paragraph with its label, so the locator was corrected to
+assert the full “Time per active day: 40 min” text. This changes no product
+behavior or expected number. Downloaded ZIP digest matched GitHub:
+`471b6e41b721b67d8d5db62b320a3d60b21d10ae8e8d941ad4a63a102d36ef06`.

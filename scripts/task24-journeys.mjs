@@ -498,7 +498,7 @@ export async function runJourneys({
       insert into public.reading_sessions(id,started_at,duration_seconds) select 'task30-aug-' || i, ('2026-08-01T10:00:00Z'::timestamptz + ((i-1)%15)*interval '1 day'),750 from generate_series(1,48) i;`);
     await goto("/reports?period=monthly&date=2026-09&context=keep");
     const observationsPanel = page.getByRole("region", {name:"Monthly observations"});
-    await expect(page.getByText("40 min", {exact:true})).toBeVisible();
+    await expect(page.getByText("Time per active day: 40 min", {exact:true})).toBeVisible();
     await expect(observationsPanel).toContainText("Imported reading time increased by 2h (20%).");
     await expect(observationsPanel).toContainText("More active days (18 vs 15), shorter average sessions (12.0 min vs 12.5 min).");
     await expect(page.getByText("Minutes per day · Daily resolution", {exact:true})).toBeVisible();
@@ -555,7 +555,7 @@ export async function runJourneys({
       state.fault=fault;
       await goto("/reports?period=monthly&date=2026-09");
       await expect(page.locator("main")).toContainText(label);
-      if(fault !== "metrics") await expect(page.getByText("40 min",{exact:true})).toBeVisible();
+      if(fault !== "metrics") await expect(page.getByText("Time per active day: 40 min",{exact:true})).toBeVisible();
       if(fault !== "report-trend") await expect(page.getByRole("region",{name:"Monthly observations"})).toHaveCount(0);
     }
     state.fault=null;
