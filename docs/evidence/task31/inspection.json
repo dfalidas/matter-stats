@@ -1,0 +1,1316 @@
+{
+  "sourceSha": "2054aa821f399b4c3073e4147fb78c49a4631352",
+  "observedAt": "2026-11-06T15:11:56.930Z",
+  "classification": "Synthetic browser inspection; not real-usage evidence",
+  "runs": [
+    {
+      "engine": "chromium",
+      "version": "156.0.8078.4",
+      "width": 320,
+      "height": 844,
+      "theme": "light",
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+      "pages": [
+        {
+          "name": "overview",
+          "url": "http://127.0.0.1:3091/dashboard?period=month",
+          "overflow": {
+            "viewport": 320,
+            "document": 320,
+            "body": 320
+          },
+          "controls": [
+            {
+              "name": "Log out",
+              "height": 44,
+              "width": 174,
+              "disabled": false
+            },
+            {
+              "name": "Edit goal",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            },
+            {
+              "name": "Edit goal",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            },
+            {
+              "name": "Week",
+              "height": 44,
+              "width": 68,
+              "disabled": false
+            },
+            {
+              "name": "Month",
+              "height": 44,
+              "width": 76,
+              "disabled": false
+            },
+            {
+              "name": "Year",
+              "height": 44,
+              "width": 61,
+              "disabled": false
+            },
+            {
+              "name": "Custom",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "goalText": "Weekly goal\n\n2026-11-02 to 2026-11-09 (exclusive) · Europe/Athens\n\nTarget 2 h\n\n0.01 h read · 0.3% achieved\n\n1.99 h remaining\n\n53 min/day needed\n\nAverage needed per remaining day, including the rest of today.\n\nEdit goal",
+          "goalInputFocused": true,
+          "bottom": {
+            "scrollY": 3290,
+            "innerHeight": 844,
+            "scrollHeight": 4134,
+            "mainPaddingBottom": "112px",
+            "lastControl": 731,
+            "mobileNavTop": 787.5
+          }
+        },
+        {
+          "name": "reports",
+          "url": "http://127.0.0.1:3091/reports?period=monthly&date=2026-09",
+          "overflow": {
+            "viewport": 320,
+            "document": 320,
+            "body": 320
+          },
+          "controls": [
+            {
+              "name": "Log out",
+              "height": 44,
+              "width": 174,
+              "disabled": false
+            },
+            {
+              "name": "Day",
+              "height": 44,
+              "width": 57,
+              "disabled": false
+            },
+            {
+              "name": "Week",
+              "height": 44,
+              "width": 68,
+              "disabled": false
+            },
+            {
+              "name": "Month",
+              "height": 44,
+              "width": 76,
+              "disabled": false
+            },
+            {
+              "name": "Year",
+              "height": 44,
+              "width": 61,
+              "disabled": false
+            },
+            {
+              "name": "Specific report period",
+              "height": 44,
+              "width": 176,
+              "disabled": false
+            },
+            {
+              "name": "Apply period",
+              "height": 44,
+              "width": 118,
+              "disabled": false
+            },
+            {
+              "name": "Export CSV",
+              "height": 44,
+              "width": 106,
+              "disabled": false
+            },
+            {
+              "name": "Daily",
+              "height": 44,
+              "width": 66,
+              "disabled": false
+            },
+            {
+              "name": "Weekly",
+              "height": 44,
+              "width": 81,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "appliedPeriod": "2026-08",
+          "bottom": {
+            "scrollY": 3104,
+            "innerHeight": 844,
+            "scrollHeight": 3948,
+            "mainPaddingBottom": "112px",
+            "lastControl": -444,
+            "mobileNavTop": 787.5
+          }
+        },
+        {
+          "name": "settings",
+          "url": "http://127.0.0.1:3091/settings",
+          "overflow": {
+            "viewport": 320,
+            "document": 320,
+            "body": 320
+          },
+          "controls": [
+            {
+              "name": "Log out",
+              "height": 44,
+              "width": 174,
+              "disabled": false
+            },
+            {
+              "name": "Sync Recent Activity",
+              "height": 36,
+              "width": 186,
+              "disabled": false
+            },
+            {
+              "name": "Start / Resume Session History",
+              "height": 36,
+              "width": 259,
+              "disabled": false
+            },
+            {
+              "name": "Backfill Library",
+              "height": 36,
+              "width": 154,
+              "disabled": false
+            },
+            {
+              "name": "Logout",
+              "height": 36,
+              "width": 230,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "accountMenu": true,
+          "accountFocusRestored": true,
+          "bottom": {
+            "scrollY": 5388,
+            "innerHeight": 844,
+            "scrollHeight": 6232,
+            "mainPaddingBottom": "112px",
+            "lastControl": 707,
+            "mobileNavTop": 787.5
+          }
+        }
+      ],
+      "unexpected": [],
+      "errors": []
+    },
+    {
+      "engine": "chromium",
+      "version": "156.0.8078.4",
+      "width": 320,
+      "height": 844,
+      "theme": "dark",
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+      "pages": [
+        {
+          "name": "overview",
+          "url": "http://127.0.0.1:3091/dashboard?period=month",
+          "overflow": {
+            "viewport": 320,
+            "document": 320,
+            "body": 320
+          },
+          "controls": [
+            {
+              "name": "Log out",
+              "height": 44,
+              "width": 174,
+              "disabled": false
+            },
+            {
+              "name": "Edit goal",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            },
+            {
+              "name": "Edit goal",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            },
+            {
+              "name": "Week",
+              "height": 44,
+              "width": 68,
+              "disabled": false
+            },
+            {
+              "name": "Month",
+              "height": 44,
+              "width": 76,
+              "disabled": false
+            },
+            {
+              "name": "Year",
+              "height": 44,
+              "width": 61,
+              "disabled": false
+            },
+            {
+              "name": "Custom",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "goalText": "Weekly goal\n\n2026-11-02 to 2026-11-09 (exclusive) · Europe/Athens\n\nTarget 2 h\n\n0.01 h read · 0.3% achieved\n\n1.99 h remaining\n\n53 min/day needed\n\nAverage needed per remaining day, including the rest of today.\n\nEdit goal",
+          "goalInputFocused": true,
+          "bottom": {
+            "scrollY": 3290,
+            "innerHeight": 844,
+            "scrollHeight": 4134,
+            "mainPaddingBottom": "112px",
+            "lastControl": 731,
+            "mobileNavTop": 787.5
+          }
+        },
+        {
+          "name": "reports",
+          "url": "http://127.0.0.1:3091/reports?period=monthly&date=2026-09",
+          "overflow": {
+            "viewport": 320,
+            "document": 320,
+            "body": 320
+          },
+          "controls": [
+            {
+              "name": "Log out",
+              "height": 44,
+              "width": 174,
+              "disabled": false
+            },
+            {
+              "name": "Day",
+              "height": 44,
+              "width": 57,
+              "disabled": false
+            },
+            {
+              "name": "Week",
+              "height": 44,
+              "width": 68,
+              "disabled": false
+            },
+            {
+              "name": "Month",
+              "height": 44,
+              "width": 76,
+              "disabled": false
+            },
+            {
+              "name": "Year",
+              "height": 44,
+              "width": 61,
+              "disabled": false
+            },
+            {
+              "name": "Specific report period",
+              "height": 44,
+              "width": 176,
+              "disabled": false
+            },
+            {
+              "name": "Apply period",
+              "height": 44,
+              "width": 118,
+              "disabled": false
+            },
+            {
+              "name": "Export CSV",
+              "height": 44,
+              "width": 106,
+              "disabled": false
+            },
+            {
+              "name": "Daily",
+              "height": 44,
+              "width": 66,
+              "disabled": false
+            },
+            {
+              "name": "Weekly",
+              "height": 44,
+              "width": 81,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "appliedPeriod": "2026-08",
+          "bottom": {
+            "scrollY": 3104,
+            "innerHeight": 844,
+            "scrollHeight": 3948,
+            "mainPaddingBottom": "112px",
+            "lastControl": -444,
+            "mobileNavTop": 787.5
+          }
+        },
+        {
+          "name": "settings",
+          "url": "http://127.0.0.1:3091/settings",
+          "overflow": {
+            "viewport": 320,
+            "document": 320,
+            "body": 320
+          },
+          "controls": [
+            {
+              "name": "Log out",
+              "height": 44,
+              "width": 174,
+              "disabled": false
+            },
+            {
+              "name": "Sync Recent Activity",
+              "height": 36,
+              "width": 186,
+              "disabled": false
+            },
+            {
+              "name": "Start / Resume Session History",
+              "height": 36,
+              "width": 259,
+              "disabled": false
+            },
+            {
+              "name": "Backfill Library",
+              "height": 36,
+              "width": 154,
+              "disabled": false
+            },
+            {
+              "name": "Logout",
+              "height": 36,
+              "width": 230,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "accountMenu": true,
+          "accountFocusRestored": true,
+          "bottom": {
+            "scrollY": 5388,
+            "innerHeight": 844,
+            "scrollHeight": 6232,
+            "mainPaddingBottom": "112px",
+            "lastControl": 707,
+            "mobileNavTop": 787.5
+          }
+        }
+      ],
+      "unexpected": [],
+      "errors": []
+    },
+    {
+      "engine": "chromium",
+      "version": "156.0.8078.4",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+      "pages": [
+        {
+          "name": "overview",
+          "url": "http://127.0.0.1:3091/dashboard?period=month",
+          "overflow": {
+            "viewport": 390,
+            "document": 390,
+            "body": 390
+          },
+          "controls": [
+            {
+              "name": "Log out",
+              "height": 44,
+              "width": 174,
+              "disabled": false
+            },
+            {
+              "name": "Edit goal",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            },
+            {
+              "name": "Edit goal",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            },
+            {
+              "name": "Week",
+              "height": 44,
+              "width": 68,
+              "disabled": false
+            },
+            {
+              "name": "Month",
+              "height": 44,
+              "width": 76,
+              "disabled": false
+            },
+            {
+              "name": "Year",
+              "height": 44,
+              "width": 61,
+              "disabled": false
+            },
+            {
+              "name": "Custom",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "goalText": "Weekly goal\n\n2026-11-02 to 2026-11-09 (exclusive) · Europe/Athens\n\nTarget 2 h\n\n0.01 h read · 0.3% achieved\n\n1.99 h remaining\n\n53 min/day needed\n\nAverage needed per remaining day, including the rest of today.\n\nEdit goal",
+          "goalInputFocused": true,
+          "bottom": {
+            "scrollY": 3150,
+            "innerHeight": 844,
+            "scrollHeight": 3994,
+            "mainPaddingBottom": "112px",
+            "lastControl": 731,
+            "mobileNavTop": 787.5
+          }
+        },
+        {
+          "name": "reports",
+          "url": "http://127.0.0.1:3091/reports?period=monthly&date=2026-09",
+          "overflow": {
+            "viewport": 390,
+            "document": 390,
+            "body": 390
+          },
+          "controls": [
+            {
+              "name": "Log out",
+              "height": 44,
+              "width": 174,
+              "disabled": false
+            },
+            {
+              "name": "Day",
+              "height": 44,
+              "width": 57,
+              "disabled": false
+            },
+            {
+              "name": "Week",
+              "height": 44,
+              "width": 68,
+              "disabled": false
+            },
+            {
+              "name": "Month",
+              "height": 44,
+              "width": 76,
+              "disabled": false
+            },
+            {
+              "name": "Year",
+              "height": 44,
+              "width": 61,
+              "disabled": false
+            },
+            {
+              "name": "Specific report period",
+              "height": 44,
+              "width": 176,
+              "disabled": false
+            },
+            {
+              "name": "Apply period",
+              "height": 44,
+              "width": 118,
+              "disabled": false
+            },
+            {
+              "name": "Export CSV",
+              "height": 44,
+              "width": 106,
+              "disabled": false
+            },
+            {
+              "name": "Daily",
+              "height": 44,
+              "width": 66,
+              "disabled": false
+            },
+            {
+              "name": "Weekly",
+              "height": 44,
+              "width": 81,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "appliedPeriod": "2026-08",
+          "bottom": {
+            "scrollY": 2840,
+            "innerHeight": 844,
+            "scrollHeight": 3684,
+            "mainPaddingBottom": "112px",
+            "lastControl": -424,
+            "mobileNavTop": 787.5
+          }
+        },
+        {
+          "name": "settings",
+          "url": "http://127.0.0.1:3091/settings",
+          "overflow": {
+            "viewport": 390,
+            "document": 390,
+            "body": 390
+          },
+          "controls": [
+            {
+              "name": "Log out",
+              "height": 44,
+              "width": 174,
+              "disabled": false
+            },
+            {
+              "name": "Sync Recent Activity",
+              "height": 36,
+              "width": 186,
+              "disabled": false
+            },
+            {
+              "name": "Start / Resume Session History",
+              "height": 36,
+              "width": 259,
+              "disabled": false
+            },
+            {
+              "name": "Backfill Library",
+              "height": 36,
+              "width": 154,
+              "disabled": false
+            },
+            {
+              "name": "Logout",
+              "height": 36,
+              "width": 300,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "accountMenu": true,
+          "accountFocusRestored": true,
+          "bottom": {
+            "scrollY": 4564,
+            "innerHeight": 844,
+            "scrollHeight": 5408,
+            "mainPaddingBottom": "112px",
+            "lastControl": 707,
+            "mobileNavTop": 787.5
+          }
+        }
+      ],
+      "unexpected": [],
+      "errors": []
+    },
+    {
+      "engine": "chromium",
+      "version": "156.0.8078.4",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+      "pages": [
+        {
+          "name": "overview",
+          "url": "http://127.0.0.1:3091/dashboard?period=month",
+          "overflow": {
+            "viewport": 390,
+            "document": 390,
+            "body": 390
+          },
+          "controls": [
+            {
+              "name": "Log out",
+              "height": 44,
+              "width": 174,
+              "disabled": false
+            },
+            {
+              "name": "Edit goal",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            },
+            {
+              "name": "Edit goal",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            },
+            {
+              "name": "Week",
+              "height": 44,
+              "width": 68,
+              "disabled": false
+            },
+            {
+              "name": "Month",
+              "height": 44,
+              "width": 76,
+              "disabled": false
+            },
+            {
+              "name": "Year",
+              "height": 44,
+              "width": 61,
+              "disabled": false
+            },
+            {
+              "name": "Custom",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "goalText": "Weekly goal\n\n2026-11-02 to 2026-11-09 (exclusive) · Europe/Athens\n\nTarget 2 h\n\n0.01 h read · 0.3% achieved\n\n1.99 h remaining\n\n53 min/day needed\n\nAverage needed per remaining day, including the rest of today.\n\nEdit goal",
+          "goalInputFocused": true,
+          "bottom": {
+            "scrollY": 3150,
+            "innerHeight": 844,
+            "scrollHeight": 3994,
+            "mainPaddingBottom": "112px",
+            "lastControl": 731,
+            "mobileNavTop": 787.5
+          }
+        },
+        {
+          "name": "reports",
+          "url": "http://127.0.0.1:3091/reports?period=monthly&date=2026-09",
+          "overflow": {
+            "viewport": 390,
+            "document": 390,
+            "body": 390
+          },
+          "controls": [
+            {
+              "name": "Log out",
+              "height": 44,
+              "width": 174,
+              "disabled": false
+            },
+            {
+              "name": "Day",
+              "height": 44,
+              "width": 57,
+              "disabled": false
+            },
+            {
+              "name": "Week",
+              "height": 44,
+              "width": 68,
+              "disabled": false
+            },
+            {
+              "name": "Month",
+              "height": 44,
+              "width": 76,
+              "disabled": false
+            },
+            {
+              "name": "Year",
+              "height": 44,
+              "width": 61,
+              "disabled": false
+            },
+            {
+              "name": "Specific report period",
+              "height": 44,
+              "width": 176,
+              "disabled": false
+            },
+            {
+              "name": "Apply period",
+              "height": 44,
+              "width": 118,
+              "disabled": false
+            },
+            {
+              "name": "Export CSV",
+              "height": 44,
+              "width": 106,
+              "disabled": false
+            },
+            {
+              "name": "Daily",
+              "height": 44,
+              "width": 66,
+              "disabled": false
+            },
+            {
+              "name": "Weekly",
+              "height": 44,
+              "width": 81,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "appliedPeriod": "2026-08",
+          "bottom": {
+            "scrollY": 2840,
+            "innerHeight": 844,
+            "scrollHeight": 3684,
+            "mainPaddingBottom": "112px",
+            "lastControl": -424,
+            "mobileNavTop": 787.5
+          }
+        },
+        {
+          "name": "settings",
+          "url": "http://127.0.0.1:3091/settings",
+          "overflow": {
+            "viewport": 390,
+            "document": 390,
+            "body": 390
+          },
+          "controls": [
+            {
+              "name": "Log out",
+              "height": 44,
+              "width": 174,
+              "disabled": false
+            },
+            {
+              "name": "Sync Recent Activity",
+              "height": 36,
+              "width": 186,
+              "disabled": false
+            },
+            {
+              "name": "Start / Resume Session History",
+              "height": 36,
+              "width": 259,
+              "disabled": false
+            },
+            {
+              "name": "Backfill Library",
+              "height": 36,
+              "width": 154,
+              "disabled": false
+            },
+            {
+              "name": "Logout",
+              "height": 36,
+              "width": 300,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "accountMenu": true,
+          "accountFocusRestored": true,
+          "bottom": {
+            "scrollY": 4564,
+            "innerHeight": 844,
+            "scrollHeight": 5408,
+            "mainPaddingBottom": "112px",
+            "lastControl": 707,
+            "mobileNavTop": 787.5
+          }
+        }
+      ],
+      "unexpected": [],
+      "errors": []
+    },
+    {
+      "engine": "chromium",
+      "version": "156.0.8078.4",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light",
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+      "pages": [
+        {
+          "name": "overview",
+          "url": "http://127.0.0.1:3091/dashboard?period=month",
+          "overflow": {
+            "viewport": 1440,
+            "document": 1440,
+            "body": 1440
+          },
+          "controls": [
+            {
+              "name": "Edit goal",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            },
+            {
+              "name": "Edit goal",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            },
+            {
+              "name": "Week",
+              "height": 44,
+              "width": 68,
+              "disabled": false
+            },
+            {
+              "name": "Month",
+              "height": 44,
+              "width": 76,
+              "disabled": false
+            },
+            {
+              "name": "Year",
+              "height": 44,
+              "width": 61,
+              "disabled": false
+            },
+            {
+              "name": "Custom",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "goalText": "Weekly goal\n\n2026-11-02 to 2026-11-09 (exclusive) · Europe/Athens\n\nTarget 2 h\n\n0.01 h read · 0.3% achieved\n\n1.99 h remaining\n\n53 min/day needed\n\nAverage needed per remaining day, including the rest of today.\n\nEdit goal",
+          "goalInputFocused": true,
+          "bottom": {
+            "scrollY": 1103,
+            "innerHeight": 1000,
+            "scrollHeight": 2103,
+            "mainPaddingBottom": "56px",
+            "lastControl": 943,
+            "mobileNavTop": null
+          }
+        },
+        {
+          "name": "reports",
+          "url": "http://127.0.0.1:3091/reports?period=monthly&date=2026-09",
+          "overflow": {
+            "viewport": 1440,
+            "document": 1440,
+            "body": 1440
+          },
+          "controls": [
+            {
+              "name": "Day",
+              "height": 44,
+              "width": 57,
+              "disabled": false
+            },
+            {
+              "name": "Week",
+              "height": 44,
+              "width": 68,
+              "disabled": false
+            },
+            {
+              "name": "Month",
+              "height": 44,
+              "width": 76,
+              "disabled": false
+            },
+            {
+              "name": "Year",
+              "height": 44,
+              "width": 61,
+              "disabled": false
+            },
+            {
+              "name": "Specific report period",
+              "height": 44,
+              "width": 176,
+              "disabled": false
+            },
+            {
+              "name": "Apply period",
+              "height": 44,
+              "width": 118,
+              "disabled": false
+            },
+            {
+              "name": "Export CSV",
+              "height": 44,
+              "width": 106,
+              "disabled": false
+            },
+            {
+              "name": "Daily",
+              "height": 44,
+              "width": 66,
+              "disabled": false
+            },
+            {
+              "name": "Weekly",
+              "height": 44,
+              "width": 81,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "appliedPeriod": "2026-08",
+          "bottom": {
+            "scrollY": 1626,
+            "innerHeight": 1000,
+            "scrollHeight": 2626,
+            "mainPaddingBottom": "56px",
+            "lastControl": 184,
+            "mobileNavTop": null
+          }
+        },
+        {
+          "name": "settings",
+          "url": "http://127.0.0.1:3091/settings",
+          "overflow": {
+            "viewport": 1440,
+            "document": 1440,
+            "body": 1440
+          },
+          "controls": [
+            {
+              "name": "Sync Recent Activity",
+              "height": 36,
+              "width": 186,
+              "disabled": false
+            },
+            {
+              "name": "Start / Resume Session History",
+              "height": 36,
+              "width": 259,
+              "disabled": false
+            },
+            {
+              "name": "Backfill Library",
+              "height": 36,
+              "width": 154,
+              "disabled": false
+            },
+            {
+              "name": "Logout",
+              "height": 36,
+              "width": 336,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "bottom": {
+            "scrollY": 1590,
+            "innerHeight": 1000,
+            "scrollHeight": 2590,
+            "mainPaddingBottom": "56px",
+            "lastControl": 825,
+            "mobileNavTop": null
+          }
+        }
+      ],
+      "unexpected": [],
+      "errors": []
+    },
+    {
+      "engine": "chromium",
+      "version": "156.0.8078.4",
+      "width": 1440,
+      "height": 1000,
+      "theme": "dark",
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.8078.4 Safari/537.36",
+      "pages": [
+        {
+          "name": "overview",
+          "url": "http://127.0.0.1:3091/dashboard?period=month",
+          "overflow": {
+            "viewport": 1440,
+            "document": 1440,
+            "body": 1440
+          },
+          "controls": [
+            {
+              "name": "Edit goal",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            },
+            {
+              "name": "Edit goal",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            },
+            {
+              "name": "Week",
+              "height": 44,
+              "width": 68,
+              "disabled": false
+            },
+            {
+              "name": "Month",
+              "height": 44,
+              "width": 76,
+              "disabled": false
+            },
+            {
+              "name": "Year",
+              "height": 44,
+              "width": 61,
+              "disabled": false
+            },
+            {
+              "name": "Custom",
+              "height": 44,
+              "width": 83,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "goalText": "Weekly goal\n\n2026-11-02 to 2026-11-09 (exclusive) · Europe/Athens\n\nTarget 2 h\n\n0.01 h read · 0.3% achieved\n\n1.99 h remaining\n\n53 min/day needed\n\nAverage needed per remaining day, including the rest of today.\n\nEdit goal",
+          "goalInputFocused": true,
+          "bottom": {
+            "scrollY": 1103,
+            "innerHeight": 1000,
+            "scrollHeight": 2103,
+            "mainPaddingBottom": "56px",
+            "lastControl": 943,
+            "mobileNavTop": null
+          }
+        },
+        {
+          "name": "reports",
+          "url": "http://127.0.0.1:3091/reports?period=monthly&date=2026-09",
+          "overflow": {
+            "viewport": 1440,
+            "document": 1440,
+            "body": 1440
+          },
+          "controls": [
+            {
+              "name": "Day",
+              "height": 44,
+              "width": 57,
+              "disabled": false
+            },
+            {
+              "name": "Week",
+              "height": 44,
+              "width": 68,
+              "disabled": false
+            },
+            {
+              "name": "Month",
+              "height": 44,
+              "width": 76,
+              "disabled": false
+            },
+            {
+              "name": "Year",
+              "height": 44,
+              "width": 61,
+              "disabled": false
+            },
+            {
+              "name": "Specific report period",
+              "height": 44,
+              "width": 176,
+              "disabled": false
+            },
+            {
+              "name": "Apply period",
+              "height": 44,
+              "width": 118,
+              "disabled": false
+            },
+            {
+              "name": "Export CSV",
+              "height": 44,
+              "width": 106,
+              "disabled": false
+            },
+            {
+              "name": "Daily",
+              "height": 44,
+              "width": 66,
+              "disabled": false
+            },
+            {
+              "name": "Weekly",
+              "height": 44,
+              "width": 81,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "appliedPeriod": "2026-08",
+          "bottom": {
+            "scrollY": 1626,
+            "innerHeight": 1000,
+            "scrollHeight": 2626,
+            "mainPaddingBottom": "56px",
+            "lastControl": 184,
+            "mobileNavTop": null
+          }
+        },
+        {
+          "name": "settings",
+          "url": "http://127.0.0.1:3091/settings",
+          "overflow": {
+            "viewport": 1440,
+            "document": 1440,
+            "body": 1440
+          },
+          "controls": [
+            {
+              "name": "Sync Recent Activity",
+              "height": 36,
+              "width": 186,
+              "disabled": false
+            },
+            {
+              "name": "Start / Resume Session History",
+              "height": 36,
+              "width": 259,
+              "disabled": false
+            },
+            {
+              "name": "Backfill Library",
+              "height": 36,
+              "width": 154,
+              "disabled": false
+            },
+            {
+              "name": "Logout",
+              "height": 36,
+              "width": 336,
+              "disabled": false
+            }
+          ],
+          "primaryTabs": [
+            "Overview",
+            "Activity",
+            "Library",
+            "Reports"
+          ],
+          "bottom": {
+            "scrollY": 1590,
+            "innerHeight": 1000,
+            "scrollHeight": 2590,
+            "mainPaddingBottom": "56px",
+            "lastControl": 825,
+            "mobileNavTop": null
+          }
+        }
+      ],
+      "unexpected": [],
+      "errors": []
+    },
+    {
+      "engine": "webkit",
+      "status": "blocked",
+      "reason": "browserType.launch: \n╔══════════════════════════════════════════════════════╗\n║ Host system is missing dependencies to run browsers. ║\n║ Missing libraries:                                   ║\n║     libgtk-4.so.1                                    ║\n║     libgraphene-1.0.so.0                             ║\n║     libharfbuzz-icu.so.0                             ║\n║     libmanette-0.2.so.0                              ║\n║     libhyphen.so.0                                   ║\n║     libGLESv2.so.2                                   ║\n╚══════════════════════════════════════════════════════╝"
+    }
+  ]
+}

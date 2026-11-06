@@ -1,0 +1,63 @@
+{
+  "sha": "2054aa821f399b4c3073e4147fb78c49a4631352",
+  "node": "v22.23.4",
+  "results": [
+    {
+      "name": "typegen",
+      "exit": 0
+    },
+    {
+      "name": "typecheck",
+      "exit": 0
+    },
+    {
+      "name": "lint",
+      "exit": 0
+    },
+    {
+      "name": "test",
+      "exit": 0
+    },
+    {
+      "name": "build",
+      "exit": 0
+    },
+    {
+      "name": "audit:ci",
+      "exit": 0
+    }
+  ],
+  "npm": "10.9.10",
+  "install": {
+    "command": "npm ci",
+    "exit": 0,
+    "packages": 348
+  },
+  "tests": {
+    "pass": 447,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "audit": {
+    "full": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "production": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    }
+  },
+  "scope": "Executable baseline, tracked runtime unchanged; not final PR head CI",
+  "dbSuites": "Not run locally; disposable opt-in unset"
+}
